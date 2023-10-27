@@ -1,0 +1,23 @@
+{
+  "name": "steamengine-server",
+  "version": "1.0.0",
+  "description": "Steam Engine CRM Server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "knex": "^3.0.1",
+    "mysql2": "^3.6.2",
+    "objection": "^3.1.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.52.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "objection-gen": "^0.5.4"
+  }
+}
