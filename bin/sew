@@ -1,0 +1,8 @@
+#!/bin/bash
+#This lets us know the current process to check for configurations
+export STEAMENGINE_PARENT_PID=$PPID
+RUNNER_PATH=$STEAMENGINE_SERVER_DIR/worker-manager/WorkerRunner.js
+echo SteamEngine Worker CLI - PID $STEAMENGINE_PARENT_PID running $RUNNER_PATH
+export DEBUG=*,WorkerRunner
+
+node --unhandled-rejections=strict $RUNNER_PATH "$@"
