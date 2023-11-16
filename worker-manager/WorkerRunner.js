@@ -138,8 +138,6 @@ WorkerRunner.prototype.getMethod = function getMethod(WorkerConstructor, callbac
   if (methods.length === 0) {
     return callback(`There are no available method for this workerInstance, with prototype items:${Object.keys(WorkerConstructor.prototype)}`);
   }
-  debug('Checking argv:', argv);
-
   let method = null;
   if (argv._[1]) {
     const n = argv._[1].toLowerCase();
@@ -343,7 +341,8 @@ WorkerRunner.prototype.run = function run() {
       if (process.stdout.isTTY) {
         s = `\u001b[31m ${s} \u001b[0m `;
       }
-      debug(s);
+      // eslint-disable-next-line no-console
+      console.error(s);
       if (process.send) {
         process.send({ frakture_type: 'error', data: e.stack || e }, () => {
           process.exit(-1);
@@ -416,7 +415,6 @@ WorkerRunner.prototype.run = function run() {
       process.exit(-2);
     }
   });
-  debug('***Starting processing***');
   async.autoInject({
     accountId: (cb) => getAccountId(cb),
     WorkerConstructor: (accountId, cb) => runner.getWorkerConstructor({ accountId }, cb),
@@ -438,9 +436,10 @@ WorkerRunner.prototype.run = function run() {
         return instanceCallback(e);
       }
     },
-    assignCommonMethods: (_workerInstance, method, cb) => {
+    assignCommonMethods: (_workerInstance, accountId, method, cb) => {
       const progressLimiter = new RateLimiter(1, 3000);
       const workerInstance = _workerInstance;
+      workerInstance.accountId = accountId;
       workerInstance.progress = function progress(prog) {
         // Okay, we need to throttle this, so we don't have too many items
         let o = null;
@@ -496,15 +495,32 @@ WorkerRunner.prototype.run = function run() {
       let hasError = false;
 
       debug(`Running ${method.name} with options `, options);
+      /*
+        If it's async, await the response and check for a modify output
+      */
 
+      async function checkAsync(cb) {
+        if (util.types.isAsyncFunction(workerInstance[method.name])) {
+          try {
+            const l = workerInstance[method.name].length;
+            if (l > 1) throw new Error(`async functions must take zero or one parameter, ${method.name} has ${l}`);
+            const response = await (workerInstance[method.name](options));
+            if (response.modify) return cb(null, null, response.modify);
+            return cb(null, response);
+          } catch (e) {
+            return cb(e);
+          }
+        }
+        return workerInstance[method.name](options, cb);
+      }
       const start = new Date().getTime();
-      workerInstance[method.name](options, (_e, output, _modify) => {
+      checkAsync((_e, _output, _modify) => {
         const runtime = new Date().getTime() - start;
         const modify = _modify;
 
         debug(`Exited running ${method.name}`);
         if (hasError) {
-          workerInstance.log({ type: 'warning', message: `Output specified, but already errored:${JSON.stringify(output || {})}` });
+          workerInstance.log({ type: 'warning', message: `Output specified, but already errored:${JSON.stringify(_output || {})}` });
           workerInstance.log({ type: 'error', message: 'Error has already been called' });
           return null;
         }
@@ -556,16 +572,16 @@ WorkerRunner.prototype.run = function run() {
         }
         // Try to parse the output, looking for circular structure
         try {
-          JSON.stringify(output);
+          JSON.stringify(_output);
         } catch (e) {
-          debug(`Completed method ${method.name} but there was an unserializable part of the response:`, output);
+          debug(`Completed method ${method.name} but there was an unserializable part of the response:`, _output);
           hasError = true;
           return callback(e);
         }
         /*
             Add in standard workerInstance stored variables
             */
-        const metadata = { ...(output || {}).metadata || {} };
+        const metadata = { ...(_output || {}).metadata || {} };
         if (workerInstance.http_counter) {
           metadata.http_counter = workerInstance.http_counter;
         }
@@ -576,14 +592,13 @@ WorkerRunner.prototype.run = function run() {
 
         metadata.resolved_options = options;
 
-        if (output.records !== undefined) {
-          metadata.records = output.records;
+        if (_output.records !== undefined) {
+          metadata.records = _output.records;
         }
 
         metadata.runtime = runtime;
-        const response = { ...output, metadata };
-        debug({ type: 'complete', message: 'Job completed', data: modify });
-        debug('Completed task, writing to stdout');
+        const response = _output;
+        response.metadata = metadata;
         if (process.stdout.isTTY) {
           // eslint-disable-next-line no-console
           console.log(util.inspect(response, { colors: true, depth: 6, maxArrayLength: 1000 }));
@@ -610,7 +625,10 @@ function end(e, d) {
     throw e;
   }
 
-  if (d) console.log(JSON.stringify(d, null, 4));
+  if (d) {
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify(d, null, 4));
+  }
 
   process.exit();
 }

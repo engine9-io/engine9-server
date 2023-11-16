@@ -40,6 +40,35 @@ Worker.prototype.echo.metadata = {
   },
 };
 
+Worker.prototype.async = async function asyncFunc(options) {
+  function timeout(ms) {
+    return new Promise((resolve) => { setTimeout(resolve, ms); });
+  }
+  const seconds = parseInt(options.seconds || 0, 10);
+  debug(`Async function waiting ${seconds}`);
+  await timeout(seconds * 1000);
+  const obj = JSON.parse(JSON.stringify(options));
+  obj.last_run = new Date();
+  return obj;
+};
+Worker.prototype.async.metadata = {
+  options: {
+    seconds: {},
+  },
+};
+Worker.prototype.asyncError = async function echo(options) {
+  function timeout(ms) {
+    return new Promise((resolve) => { setTimeout(resolve, ms); });
+  }
+  await timeout(parseInt(options.seconds || 1, 10) * 1000);
+  throw new Error('Expected asyncError');
+};
+Worker.prototype.asyncError.metadata = {
+  options: {
+    seconds: {},
+  },
+};
+
 Worker.prototype.info = function info(options, callback) {
   debug('Returning metadata about this worker');
   return callback(null, Worker.metadata);
