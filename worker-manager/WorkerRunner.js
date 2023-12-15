@@ -225,9 +225,8 @@ WorkerRunner.prototype.getOptionValues = function getOptionValues(method, callba
       if (i === '_' || i.indexOf('$') === 0) return;
       options[i] = v;
     });
-
     // Prefill any defaults
-    Object.entries(method.metadata.options).forEach(([i]) => {
+    Object.entries(method.metadata.options || {}).forEach(([i]) => {
       if (!options[i] && method?.metadata?.options?.[i]?.default) {
         options[i] = method.metadata.options[i].default;
       }
