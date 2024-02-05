@@ -33,6 +33,7 @@ WorkerRunner.prototype.getWorkerPath = function getWorkerPath(options, callback)
   let pathLookup = argv._[0];
   if (!pathLookup) return callback('No path specified in command line');
   pathLookup = pathLookup.toLowerCase();
+  if (pathLookup === 'sql')pathLookup = 'sqlworker';// optimization for sql specific worker
   const d = path.resolve(__dirname, '../workers');
   debug('Looking for workers in path:', d);
   const availableWorkerPaths = getFiles(d);
@@ -203,7 +204,7 @@ function getStdIn(cb) {
   return process.stdin.on('end', () => {
     let output = {};
     if (toParse) {
-      output = JSON5(toParse);
+      output = JSON5.parse(toParse);
     }
     return cb(null, output);
   });
@@ -493,7 +494,7 @@ WorkerRunner.prototype.run = function run() {
     function runOnce() {
       let hasError = false;
 
-      debug(`Running ${method.name} with options `, options);
+      debug(`Running ${method.name} with options `, Object.keys(options));
       /*
         If it's async, await the response and check for a modify output
       */
@@ -589,7 +590,7 @@ WorkerRunner.prototype.run = function run() {
           metadata.sql_counter = workerInstance.sql_counter;
         }
 
-        metadata.resolved_options = options;
+        // metadata.resolved_options = options;
 
         if (_output.records !== undefined) {
           metadata.records = _output.records;

@@ -97,4 +97,11 @@ function bool(x, _defaultVal) {
   const y = x.toLowerCase();
   return !!(y.indexOf('y') + 1) || !!(y.indexOf('t') + 1);
 }
-module.exports = { bool, parseRegExp, relativeDate };
+function toCharCodes(x) {
+  if (!x) return [];
+  return Array.from(x).filter(Boolean).map((d) => d.charCodeAt(0));
+}
+
+module.exports = {
+  bool, parseRegExp, relativeDate, toCharCodes,
+};
