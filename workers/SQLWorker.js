@@ -367,7 +367,7 @@ Worker.prototype.insertFromStream = async function (options) {
     let defaults = options.defaults || {};
     if (typeof defaults === 'string') defaults = JSON5.parse(defaults);
 
-    const batchSize = parseInt(options.batchSize || 300, 10);
+    const batchSize = parseInt(options.batchSize || 3, 10);
     const counter = 0;
 
     let fields = null;
@@ -385,7 +385,7 @@ Worker.prototype.insertFromStream = async function (options) {
         return false;
       });
     }
-    const toSQL = through2.obj({}, (o, enc, cb) => {
+    const toSQL = through2.obj({}, function (o, enc, cb) {
       if (!o) return cb();
 
       sqlCounter += 1;
@@ -445,7 +445,7 @@ Worker.prototype.insertFromStream = async function (options) {
         }
         if (rows.length > 0) {
           try {
-            const sql = this.createInsertSql({
+            const sql = worker.createInsertSql({
               knex, table, columns: fields, rows,
             });
             if ((counter % 50000 === 0) || (counter < 1000 && counter % 200 === 0)) debug(`Inserting ${rows.length} rows, Total:${counter}`);
@@ -492,7 +492,9 @@ Worker.prototype.insertFromStream = async function (options) {
 
     let hasError = null;
     const insertSQL = through2.obj((o, enc, cb) => {
-      worker.runQuery(o).then(cb).catch(cb);
+      worker.runQuery(o).then(() => {
+        cb();
+      }).catch(cb);
     });
 
     stream

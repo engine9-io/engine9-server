@@ -3,6 +3,6 @@
 export STEAMENGINE_PARENT_PID=$PPID
 RUNNER_PATH=$STEAMENGINE_SERVER_DIR/worker-manager/WorkerRunner.js
 >&2 echo SteamEngine Worker CLI - PID $STEAMENGINE_PARENT_PID running $RUNNER_PATH
-export DEBUG=*,WorkerRunner
+export DEBUG=*,WorkerRunner,-knex:client,-knex:bindings
 
 node --unhandled-rejections=strict $RUNNER_PATH "$@"

@@ -1,6 +1,11 @@
 const debug = require('debug')('BaseWorker');
-const fs = require('fs');
-const { Transform } = require('stream');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const util = require('node:util');
+const { mkdirp } = require('mkdirp');
+
+const { Transform } = require('node:stream');
 
 function Worker(worker) {
   if (worker) {
@@ -30,16 +35,70 @@ Worker.prototype.getJSONStringifyStream = function () {
       objectMode: true,
       transform(d, encoding, cb) {
         debug(d);
-        cb(false, `${JSON.stringify(d)}/n`);
+        cb(false, `${JSON.stringify(d)}\n`);
       },
     }),
   };
 };
 
-Worker.prototype.getFileWriterStream = function () {
-  const filename = `${this.accountId}_${new Date().getTime()}.json`;
+Worker.prototype.getTempDir = async function () {
+  const worker = this;
+  const accountPart = worker.account_id || 'unknown';
+  const dir = [os.tmpdir(), accountPart, new Date().toISOString().substring(0, 10)].join(path.sep);
+
+  try {
+    await mkdirp(dir);
+  } catch (err) {
+    if (err && err.code !== 'EEXIST') throw err;
+  }
+
+  return dir;
+};
+
+Worker.prototype.getFileWriterStream = async function (options = {}) {
+  const postfix = options.postfix || 'jsonl';
+  const tempDir = await this.getTempDir();
+  const filename = `${tempDir}${path.sep}${this.accountId}_${new Date().getTime()}.${postfix}`;
   const stream = fs.createWriteStream(filename);
+  debug('Writing to file ', filename);
 
   return { filename, stream };
 };
+
+Worker.prototype.getFilename = function (options) {
+  const worker = this;
+  let f = options.filename;
+
+  if (!f) throw new Error('No filename specified');
+  if (typeof f !== 'string') throw new Error(`filename is a ${typeof f}`);
+
+  let hasTilda = false;
+
+  let match = /^[.a-z/_0-9-(),& ]+$/i;
+  if (path.sep === '\\') {
+    // different windows filter, allow tildas
+    match = /^[:~.,a-z\\/_0-9-()' ]+$/i;
+  } else if (f.indexOf('~') === 0) {
+    if (!worker.accountId || !String(worker.accountId).match(/^[0-9a-z_]*$/)) throw new Error('worker.accountId is invalid');
+    hasTilda = true;
+    f = f.slice(1);
+  }
+
+  if (hasTilda) {
+    if (f.indexOf('/') !== 0) f = `/${f}`;
+    const prefix = `${process.env.STEAMENGINE_HOME.replace('/server', '')}/accounts/`;
+    f = prefix + worker.accountId + f;
+  }
+
+  if (!f) throw new Error('Invalid, empty filename');
+  if (!f.match(match)) throw new Error(`Invalid filename:"${options.filename}", does not match ${util.inspect(match)}`);
+  if (f.indexOf('..') >= 0) throw new Error(`Invalid filename:"${options.filename}", double dots not allowed`);
+
+  return f;
+};
+
+Worker.prototype.getFilename.metadata = {
+  options: { filename: { required: true } },
+};
+
 module.exports = Worker;

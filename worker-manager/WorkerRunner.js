@@ -319,7 +319,7 @@ function getAccountId(cb) {
     accountId = 'steamengine';
   }
   if (!accountId.match(/^[a-zA-Z0-9_-]+$/)) throw new Error(`invalid accountId=${accountId}`);
-  debug(`Using accountId=${accountId} in environment ${process.env.NODE_ENV}`);
+  debug(`Using accountId=${accountId} in environment ${process.env.NODE_ENV} with debug ${process.env.DEBUG}`);
   // don't need this in the options
   delete argv.accountId;
   delete argv.a;
@@ -505,6 +505,7 @@ WorkerRunner.prototype.run = function run() {
             const l = workerInstance[method.name].length;
             if (l > 1) throw new Error(`async functions must take zero or one parameter, ${method.name} has ${l}`);
             const response = await (workerInstance[method.name](options));
+            if (response === undefined) throw new Error('No return value from method -- be sure to return something');
             if (response.modify) return cb(null, null, response.modify);
             return cb(null, response);
           } catch (e) {
