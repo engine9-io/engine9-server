@@ -1,14 +1,12 @@
 const util = require('util');
 const debug = require('debug')('SQLWorker');
 const Knex = require('knex');
-const { SchemaInspector } = require('knex-schema-inspector');
 const { Readable } = require('stream');
 const through2 = require('through2');
 const JSON5 = require('json5');// Useful for parsing extended JSON
-const { bool, toCharCodes } = require('../utilities');
+const { bool, toCharCodes, parseRegExp } = require('../utilities');
 
 const BaseWorker = require('./BaseWorker');
-const SQLTypes = require('./SQLTypes');
 
 require('dotenv').config({ path: '.env' });
 
@@ -48,21 +46,69 @@ Worker.prototype.ok = async function f() {
 Worker.prototype.ok.metadata = {
   options: {},
 };
-Worker.prototype.runQuery = async function (sql) {
+Worker.prototype.query = async function (_sql) {
+  let sql = _sql;
+  if (typeof _sql !== 'string') sql = _sql.sql;
   const knex = await this.connect();
-  return knex.raw(sql);
+  const [data, fields] = await knex.raw(sql);
+  return { data, fields };
 };
-Worker.prototype.runQuery.metadata = {
+Worker.prototype.query.metadata = {
   options: {
     sql: {},
   },
 };
 
-Worker.prototype.tables = async function f() {
-  const knex = await this.connect();
-  const inspector = SchemaInspector(knex);
-  return inspector.tables();
+Worker.prototype.tables = async function f(options) {
+  let sql = 'select TABLE_NAME from information_schema.tables where table_schema=';
+  if (options.database) {
+    sql += this.escapeValue(options.database);
+  } else {
+    sql += 'database()';
+  }
+  if (options.type === 'view') {
+    sql += " and table_type='VIEW'";
+  } else if (options.type === 'table') {
+    sql += " and table_type='BASE TABLE'";
+  }
+
+  let d = await this.query(sql);
+  d = d.data.map((t) => t.TABLE_NAME || t.table_name);
+  d.sort((a, b) => (a < b ? -1 : 1));
+
+  if (options.tables) {
+    const tables = options.tables.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+    d = d.filter((t) => tables.indexOf(t.toLowerCase()) >= 0);
+  }
+
+  if (options.filter) {
+    const filters = options.filter.split(',').map((r) => parseRegExp(r));
+    d = d.filter((t) => filters.some((r) => t.match(r)));
+  }
+
+  if (options.exclude) {
+    const exclude = options.exclude.split(',').map((x) => x.trim().toLowerCase());
+    d = d.filter((t) => exclude.indexOf(t.toLowerCase()) < 0);
+  }
+  if (bool(options.exclude_temp_tables, false)) { d = d.filter((t) => t.indexOf('temp_') !== 0); }
+
+  return {
+    tables: d,
+    records: d.length,
+  };
 };
+
+Worker.prototype.tables.metadata = {
+
+  options: {
+    tables: { description: 'Comma delimited list of tables to include' },
+    filter: { description: 'Comma delimited regular expressions to match' },
+    exclude: { description: 'Exclude tables that are included in this comma delimited list' },
+    type: { description: 'Type of table to show: view, table, or both(default)' },
+    exclude_temp_tables: { description: 'Exclude tables that are prefixed with temp_ (default false)' },
+  },
+};
+
 Worker.prototype.tables.metadata = {
   options: {},
 };
@@ -108,59 +154,39 @@ Worker.prototype.indexes.metadata = {
 };
 
 Worker.prototype.describe = async function describe({ table }) {
-  const knex = await this.connect();
-  const inspector = SchemaInspector(knex);
-  const columnNames = await inspector.columns(table);
-  const columns = (await Promise.all(columnNames.map(
-    async ({ column }) => inspector.columnInfo(table, column),
-  )));
-  columns.forEach((c) => {
-    delete c.table;
-    delete c.numeric_precision;
-    delete c.numeric_scale;
+  const sql = `select database() as db,column_name,column_type,data_type,is_nullable,column_default,extra,character_maximum_length,extra FROM information_schema.columns WHERE  table_schema = Database() AND table_name = '${this.escapeTable(table)}' order by ORDINAL_POSITION`;
+
+  const cols = (await this.query(sql)).data;
+  if (cols.length === 0) throw new Error({ message: `Could not find table ${table}`, no_fields: true });
+  // databases return back arbitrary capitalization from information_schema
+  cols.forEach((c) => { Object.keys(c).forEach((k) => { c[k.toUpperCase()] = c[k]; }); });
+
+  const results = {};
+  results.database = cols[0].db;
+  results.fields = cols.map((d) => {
+    let columnDefault = d.COLUMN_DEFAULT;
+    const extra = d.EXTRA.toUpperCase();
+    const onUpdate = 'ON UPDATE CURRENT_TIMESTAMP';
+    if (extra.indexOf(onUpdate) >= 0) columnDefault = (`${columnDefault || ''} ${onUpdate}`).trim();
+    const o = {
+    // raw: d,
+      name: d.COLUMN_NAME,
+      column_type: d.COLUMN_TYPE,
+      length: d.CHARACTER_MAXIMUM_LENGTH,
+      nullable: d.IS_NULLABLE.toUpperCase() === 'YES',
+      // extra: d.EXTRA, //not standardized
+      column_default: columnDefault,
+      auto_increment: (d.EXTRA || '').toUpperCase().indexOf('AUTO_INCREMENT') >= 0,
+    };
+    return o;
   });
-  return {
-    columns,
-    primary: await inspector.primary(table),
-  };
+  return results;
 };
 
 Worker.prototype.describe.metadata = {
   options: {
     table: { required: true },
   },
-};
-
-Worker.prototype.diffSchema = async function ({ table, schema }) {
-  const desc = await this.describe({ table });
-  const dbLookup = desc.columns.reduce((o, col) => Object.assign(o, { [col.name]: col }), {});
-
-  let schemaArray = schema.columns;
-  if (!Array.isArray(schema)) {
-    schemaArray = Object.entries(schema)
-      .reduce((a, [name, v]) => a.concat(Object.assign(v, { name })), []);
-  }
-  // const schemaLookup = schemaArray.reduce((o, col) => Object.assign(o, { [o.name]: o }, {}));
-  const differences = schemaArray.map((_c) => {
-    const c = SQLTypes.mysql.toColumn(_c);
-    const dbColumn = dbLookup[c.name];
-    if (!dbColumn) return { differences: 'new', ...c };
-    const differenceKeys = Object.keys(c).reduce((out, k) => {
-      if (c[k] !== dbColumn[k]) {
-        debug(c.name, k, c[k], '!=', dbColumn[k]);
-        out[k] = c[k];
-      }
-      return out;
-    }, {});
-    if (Object.keys(differenceKeys).length > 0) {
-      return { differences: differenceKeys, ...c };
-    }
-    return null;
-  }).filter(Boolean);
-  return { differences };
-};
-Worker.prototype.diffSchema.metadata = {
-  options: {},
 };
 
 Worker.prototype.stream = async function describe({ sql }) {
@@ -492,7 +518,7 @@ Worker.prototype.insertFromStream = async function (options) {
 
     let hasError = null;
     const insertSQL = through2.obj((o, enc, cb) => {
-      worker.runQuery(o).then(() => {
+      worker.query(o).then(() => {
         cb();
       }).catch(cb);
     });

@@ -599,7 +599,10 @@ WorkerRunner.prototype.run = function run() {
 
         metadata.runtime = runtime;
         const response = _output;
-        response.metadata = metadata;
+        // Don't assign metadata all the time to the output,
+        // dirties up the output for arrays,files, etc. Just log it
+        debug('Output Metadata:', metadata);
+        // response.metadata = metadata;
         if (process.stdout.isTTY) {
           // eslint-disable-next-line no-console
           console.log(util.inspect(response, { colors: true, depth: 6, maxArrayLength: 1000 }));

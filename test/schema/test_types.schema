@@ -1,0 +1,26 @@
+{
+  name: 'test_type_schema',
+  tables: [
+    {
+      name: 'test_types',
+      columns: {
+        id: 'id',
+        person_id: 'person_id',
+        int: 'int',
+        bigint: 'bigint',
+        currency: 'currency',
+        decimal: 'decimal',
+        double: 'double',
+        string: 'string',
+        string_32: { type: 'string', length: 32 },
+        text: 'text',
+        date_created: 'date_created',
+        last_modified: 'last_modified',
+        url: 'url',
+        date: 'date',
+        datetime: 'datetime',
+        time: 'time',
+      },
+    },
+  ],
+}

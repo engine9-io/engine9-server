@@ -2,6 +2,7 @@ const fs = require('node:fs');
 
 const fsp = fs.promises;
 const zlib = require('node:zlib');
+const { promisify } = require('node:util');
 const util = require('node:util');
 const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
@@ -80,17 +81,22 @@ Worker.prototype.csvToObjectTransforms = function (options) {
   return { transforms };
 };
 
-Worker.prototype.detectCharset = async function (options) {
+Worker.prototype.detectEncoding = async function (options) {
+  if (options.encoding_override) return { encoding: options.encoding_override };
   // Limit to only the top 1000 characters -- for perfomance
   const bytes = 10000;
-  if (options.charset) return options.charset;
   const buff = Buffer.alloc(bytes);
   const fd = await fsp.open(options.filename);
   await fd.read(buff, 0, bytes);
-  return languageEncoding(buff);
+  let finalBuff = buff;
+  if (options.filename.slice(-3) === '.gz') {
+    finalBuff = await promisify(zlib.gunzip)(buff);
+  }
+
+  return languageEncoding(finalBuff);
 };
 
-Worker.prototype.detectCharset.metadata = {
+Worker.prototype.detectEncoding.metadata = {
   options: {
     filename: { required: true },
   },
@@ -102,41 +108,32 @@ Internal method to transform a file into a stream of objects.
 Worker.prototype.fileToObjectStream = async function (options) {
   const { filename } = options;
   if (!filename) throw new Error('fileToObjectStream: filename is required');
-  const charset = this.detectCharset(options);
-  let count = 0;
-
-  debug(`Reading file ${filename} with charset:`, charset);
-
-  const head = null;
-  let transforms = [];
-  let stream = null;
-
   let postfix = options.source_postfix || filename.toLowerCase().split('.').pop();
   if (postfix === 'zip') {
     debug('Invalid filename:', { filename });
     throw new Error('Cowardly refusing to turn a .zip file into an object stream, turn into a csv first');
   }
 
-  const readOptions = {};
+  const { encoding } = await this.detectEncoding(options);
+  let count = 0;
+
+  debug(`Reading file ${filename} with encoding:`, encoding);
+
+  const head = null;
+  let transforms = [];
+  let stream = fs.createReadStream(filename);
 
   if (postfix === 'gz') {
     const gunzip = zlib.createGunzip();
     transforms.push(gunzip);
+    gunzip.setEncoding(encoding);
     // encoding = null;// Default encoding
     postfix = filename.toLowerCase().split('.');
     postfix = postfix[postfix.length - 2];
+    debug(`Using gunzip parser because postfix is .gz, encoding=${encoding}`);
   } else {
-    let encoding = options.encoding_override;
-    if (!encoding) {
-      if (charset === 'UTF-16LE') {
-        encoding = 'ucs2';
-      } else {
-        encoding = 'utf8';
-      }
-    }
-    readOptions.encoding = encoding;
+    stream.setEncoding(encoding);
   }
-  stream = fs.createReadStream(filename, readOptions);
 
   if (postfix === 'csv') {
     const csvTransforms = this.csvToObjectTransforms({ ...options });
@@ -218,7 +215,6 @@ Worker.prototype.objectStreamToFile = async function (options) {
     new Transform({
       objectMode: true,
       transform(d, enc, cb) {
-        debug('objectStreamToFile adding to record count');
         records += 1;
         cb(null, d);
       },

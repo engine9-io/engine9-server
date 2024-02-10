@@ -34,7 +34,6 @@ Worker.prototype.getJSONStringifyStream = function () {
     stream: new Transform({
       objectMode: true,
       transform(d, encoding, cb) {
-        debug(d);
         cb(false, `${JSON.stringify(d)}\n`);
       },
     }),
