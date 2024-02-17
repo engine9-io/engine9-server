@@ -5,6 +5,7 @@ const { Readable } = require('stream');
 const through2 = require('through2');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const { bool, toCharCodes, parseRegExp } = require('../utilities');
+const SQLTypes = require('./SQLTypes');
 
 const BaseWorker = require('./BaseWorker');
 
@@ -17,6 +18,16 @@ function Worker(worker) {
 util.inherits(Worker, BaseWorker);
 Worker.metadata = {
   alias: 'sql',
+};
+
+Worker.defaultColumn = {
+  name: '',
+  type: '',
+  column_type: '',
+  length: null,
+  nullable: true,
+  column_default: null,
+  auto_increment: false,
 };
 
 Worker.prototype.connect = async function connect() {
@@ -50,8 +61,8 @@ Worker.prototype.query = async function (_sql) {
   let sql = _sql;
   if (typeof _sql !== 'string') sql = _sql.sql;
   const knex = await this.connect();
-  const [data, fields] = await knex.raw(sql);
-  return { data, fields };
+  const [data, columns] = await knex.raw(sql);
+  return { data, columns };
 };
 Worker.prototype.query.metadata = {
   options: {
@@ -120,7 +131,7 @@ Worker.prototype.escapeTable = function escapeTable(t) {
 };
 
 Worker.prototype.indexes = async function indexes({ table, unique, primary }) {
-  let sql = `SELECT index_name,group_concat(column_name order by seq_in_index) as fields, not(non_unique) as \`unique\` 
+  let sql = `SELECT index_name,group_concat(column_name order by seq_in_index) as columns, not(non_unique) as \`unique\` 
     FROM INFORMATION_SCHEMA.STATISTICS where TABLE_SCHEMA = database() 
     and table_name='${this.escapeTable(table)}'`;
   if (bool(unique, false)) {
@@ -138,7 +149,7 @@ Worker.prototype.indexes = async function indexes({ table, unique, primary }) {
     table,
     indexes: d[0].map((i) => ({
       index_name: i.INDEX_NAME || i.index_name,
-      fields: i.fields,
+      columns: i.columns,
       primary: (i.INDEX_NAME || i.index_name) === 'PRIMARY',
       unique: !!i.unique,
     })),
@@ -153,17 +164,19 @@ Worker.prototype.indexes.metadata = {
   },
 };
 
-Worker.prototype.describe = async function describe({ table }) {
+Worker.prototype.describe = async function describe(opts) {
+  const { table } = opts;
+  if (!table) throw new Error(`No table provided to describe with opts ${Object.keys(opts)}`);
   const sql = `select database() as db,column_name,column_type,data_type,is_nullable,column_default,extra,character_maximum_length,extra FROM information_schema.columns WHERE  table_schema = Database() AND table_name = '${this.escapeTable(table)}' order by ORDINAL_POSITION`;
 
   const cols = (await this.query(sql)).data;
-  if (cols.length === 0) throw new Error({ message: `Could not find table ${table}`, no_fields: true });
+  if (cols.length === 0) throw new Error(`Could not find table ${table}`, { cause: 'DOES_NOT_EXIST' });
   // databases return back arbitrary capitalization from information_schema
   cols.forEach((c) => { Object.keys(c).forEach((k) => { c[k.toUpperCase()] = c[k]; }); });
 
   const results = {};
   results.database = cols[0].db;
-  results.fields = cols.map((d) => {
+  results.columns = cols.map((d) => {
     let columnDefault = d.COLUMN_DEFAULT;
     const extra = d.EXTRA.toUpperCase();
     const onUpdate = 'ON UPDATE CURRENT_TIMESTAMP';
@@ -178,7 +191,7 @@ Worker.prototype.describe = async function describe({ table }) {
       column_default: columnDefault,
       auto_increment: (d.EXTRA || '').toUpperCase().indexOf('AUTO_INCREMENT') >= 0,
     };
-    return o;
+    return SQLTypes.mysql.dialectToStandard(o, Worker.defaultColumn);
   });
   return results;
 };
@@ -316,20 +329,33 @@ Worker.prototype.getSQLName = function (n) {
   return n.trim().replace(/[^0-9a-zA-Z_-]/g, '_').toLowerCase();
 };
 
+// The name of the knex methods is ... inconsistent
+function getKnexMethodAndArgumentsFromColumnType(col) {
+  let method = (col.column_type.split('(')[0]);
+  const args = (col.column_type.match(/^.*\((.+)\)$/)?.[1] || '').split(',').map((d) => d.trim()).filter(Boolean);
+  if (method === 'int') {
+    method = 'integer';
+  }
+  return { method, args };
+}
+
 Worker.prototype.createTable = async function ({ table: name, columns, timestamps = true }) {
   const knex = await this.connect();
   await knex.schema.createTable(name, (table) => {
     const noTypes = columns.filter((c) => !c.data_type);
-    if (noTypes.length > 0) throw new Error(`No data_types for columns: ${columns.map((d) => d.name).join()}`);
+    if (noTypes.length > 0) throw new Error(`No data_type for columns: ${columns.map((d) => d.name).join()}`);
     const invalidTypes = columns.filter((c) => typeof table[c.data_type] !== 'function');
     if (invalidTypes.length > 0) throw new Error(`Invalid columns types: ${invalidTypes.map((c) => c.data_type).join()}`);
-    columns.forEach((c) => {
-      let functionName = c.data_type;
-      // So odd that the function names don't match the data_type fields
-      if (functionName === 'int') functionName = 'integer';
 
-      if (c.has_auto_increment) table.increments(c.name);
-      else table[functionName](c.name);
+    columns.forEach((c) => {
+      const { method, args } = getKnexMethodAndArgumentsFromColumnType(c);
+
+      // So odd that the function names don't match the data_type columns
+      if (c.auto_increment) {
+        table.increments(c.name);
+      } else {
+        table[method].apply(table, [c.name, ...args]);
+      }
     });
     const primaries = columns.filter((d) => d.is_primary_key).map((c) => c.name);
     if (primaries.length > 0) table.primary(primaries);
@@ -362,8 +388,8 @@ Worker.prototype.createInsertSql = function (options) {
   sql += ` into ${table} (${columns.map((d) => knex.raw('??', d.name)).join(',')}) values ${rows.join(',')}`;
 
   if (bool(options.upsert, false)) {
-    sql += ` ${worker.onDuplicate()} ${columns.map((field) => {
-      const n = field.name;
+    sql += ` ${worker.onDuplicate()} ${columns.map((column) => {
+      const n = column.name;
 
       return `${knex.raw('??', n)}=${worker.onDuplicateFieldValue(knex.raw('??', n))}`;
     }).filter(Boolean).join(',')}`;
@@ -396,10 +422,10 @@ Worker.prototype.insertFromStream = async function (options) {
     const batchSize = parseInt(options.batchSize || 3, 10);
     const counter = 0;
 
-    let fields = null;
+    let columns = null;
     let rows = [];
     let sqlCounter = 0;
-    function getIncludedObjectFields(o) {
+    function getIncludedObjectColumns(o) {
       return desc.columns.filter((f) => {
         // set the database appropriate name as well
         const sqlName = worker.getSQLName(f.name);
@@ -433,46 +459,46 @@ Worker.prototype.insertFromStream = async function (options) {
       if (sqlCounter === 1) {
         debug('Insert from stream to table ', table, desc.columns.map((d) => d.name)?.join(','));
       }
-      if (fields == null) {
-        const includedObjectFields = getIncludedObjectFields(o);
-        debug(`Running insertFromStream with fields ${includedObjectFields.map((d) => `${d.name}(nullable:${d.nullable})`).join(',')}`, 'sample object:', o);
-        if (includedObjectFields.length === 0) {
-          const msg = `insertFromStream to table ${table}: No fields found in object with keys: ${Object.keys(o).map((d) => `${d} unicode:${JSON.stringify(toCharCodes(d))}`)} that matches table description with fields:${desc.columns.map((d) => `${d.name} unicode:${JSON.stringify(toCharCodes(d.name))}`).join()}`;
+      if (columns == null) {
+        const includedObjectColumns = getIncludedObjectColumns(o);
+        debug(`Running insertFromStream with columns ${includedObjectColumns.map((d) => `${d.name}(nullable:${d.nullable})`).join(',')}`, 'sample object:', o);
+        if (includedObjectColumns.length === 0) {
+          const msg = `insertFromStream to table ${table}: No columns found in object with keys: ${Object.keys(o).map((d) => `${d} unicode:${JSON.stringify(toCharCodes(d))}`)} that matches table description with columns:${desc.columns.map((d) => `${d.name} unicode:${JSON.stringify(toCharCodes(d.name))}`).join()}`;
           debug(JSON.stringify(desc));
           debug('Lookup table:', o);
           debug(msg);
           return cb(msg);
         }
 
-        fields = includedObjectFields;
+        columns = includedObjectColumns;
       }
 
       if (rows.length >= batchSize) {
         /* Check to make sure we've got data in the right order here */
-        const includedObjectFields = getIncludedObjectFields(o);
-        const fieldNames = fields.map((d) => d.name).join();
+        const includedObjectColumns = getIncludedObjectColumns(o);
+        const columnNames = columns.map((d) => d.name).join();
         const databaseFieldNames = desc.columns.map((d) => d.name).join();
-        const objectFieldNames = includedObjectFields.map((d) => d.name).join();
-        if (fieldNames !== objectFieldNames) {
+        const objectFieldNames = includedObjectColumns.map((d) => d.name).join();
+        if (columnNames !== objectFieldNames) {
           debug(
             `Creating an insert with ${rows.length} rows, compare:`,
             {
               table: options.table,
               databaseFieldNames,
-              fields: fieldNames,
+              columns: columnNames,
               objectFieldNames,
-              fieldsAreEqual: fieldNames === objectFieldNames,
+              columnsAreEqual: columnNames === objectFieldNames,
               rowLength: (rows.length >= batchSize),
               object: o,
-              undefinedFields: Object.keys(o).filter((k) => o[k] === undefined).join(','),
+              undefinedColumns: Object.keys(o).filter((k) => o[k] === undefined).join(','),
             },
           );
-          throw new Error("Cowardly failing, this is a developer issue. Inserting field names don't match exactly the available object field names, you probably have an undefined value inbound, check logs.");
+          throw new Error("Cowardly failing, this is a developer issue. Inserting column names don't match exactly the available object column names, you probably have an undefined value inbound, check logs.");
         }
         if (rows.length > 0) {
           try {
             const sql = worker.createInsertSql({
-              knex, table, columns: fields, rows,
+              knex, table, columns, rows,
             });
             if ((counter % 50000 === 0) || (counter < 1000 && counter % 200 === 0)) debug(`Inserting ${rows.length} rows, Total:${counter}`);
 
@@ -482,10 +508,10 @@ Worker.prototype.insertFromStream = async function (options) {
           }
         }
         rows = [];
-        fields = includedObjectFields;
+        columns = includedObjectColumns;
       }
 
-      const values = fields.map((def) => {
+      const values = columns.map((def) => {
         let val = o[def.name];
         if (val === undefined) val = o[worker.getSQLName(def.name)];// check the SQLized name
 
@@ -493,7 +519,7 @@ Worker.prototype.insertFromStream = async function (options) {
         try {
           v = worker.stringToType(val, def.data_type, def.length, def.nullable, nullAsString);
         } catch (e) {
-          throw new Error(`Error with field ${def.name}: ${e}`);
+          throw new Error(`Error with column ${def.name}: ${e}`);
         }
 
         return knex.raw('?', [v]);
@@ -506,7 +532,7 @@ Worker.prototype.insertFromStream = async function (options) {
       if (rows.length > 0) {
         try {
           const complete = worker.createInsertSql({
-            knex, table, columns: fields, rows,
+            knex, table, columns, rows,
           });
           this.push(complete);
         } catch (e) {

@@ -1,55 +1,58 @@
-const defaultColumn = {
-  name: '',
-  column_type: '',
-  length: null,
-  nullable: true,
-  column_default: null,
-  auto_increment: false,
-};
-
-const mysqlTypes = {
-  id: { column_type: 'bigint', auto_increment: true },
-  string: { column_type: 'varchar(255)', length: 255 },
-  person_id: { column_type: 'bigint', is_nullable: false },
-  int: { column_type: 'int' },
-  bigint: { column_type: 'bigint' },
+const mysqlTypes = [
+  { type: 'id', column_type: 'bigint', auto_increment: true },
+  { type: 'string', column_type: 'varchar(255)', length: 255 },
+  { type: 'person_id', column_type: 'bigint', is_nullable: false },
+  { type: 'int', column_type: 'int' },
+  { type: 'bigint', column_type: 'bigint' },
   /* decimal(19,2) is chosen for currency
   as 4 digit currencies are rare enough to warrant another type */
-  currency: { column_type: 'decimal(19,2)' },
-  decimal: { column_type: 'decimal(19,4)' },
-  double: { column_type: 'double' },
-  text: { column_type: 'text' },
-  date_created: {
+  { type: 'currency', column_type: 'decimal(19,2)' },
+  { type: 'decimal', column_type: 'decimal(19,4)' },
+  { type: 'double', column_type: 'double' },
+  { type: 'text', column_type: 'text' },
+  {
+    type: 'date_created',
     column_type: 'timestamp',
     column_default: 'CURRENT_TIMESTAMP',
     nullable: false,
   },
-  last_modified: {
+  {
+    type: 'last_modified',
     column_type: 'timestamp',
     column_default: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
     nullable: false,
   },
-  url: { column_type: 'text' },
-  date: { column_type: 'date' },
-  datetime: { column_type: 'datetime' },
-  time: { column_type: 'time' },
-
-};
+  { type: 'url', column_type: 'text' },
+  { type: 'date', column_type: 'date' },
+  { type: 'datetime', column_type: 'datetime' },
+  { type: 'time', column_type: 'time' },
+];
 module.exports = {
   mysql: {
-    types: mysqlTypes,
-    toColumn(o) {
+    standardToDialect(o, defaultColumn) {
       const output = { ...defaultColumn };
-      let lookupType = o;
+      let standardType = o;
       if (typeof o === 'object') {
-        lookupType = o.type;
+        standardType = o.type;
       }
-      if (!lookupType) throw new Error('You must specify a type for');
-      const lookup = mysqlTypes[lookupType];
+      if (!standardType) throw new Error('You must specify a type for');
+      const lookup = mysqlTypes.find((d) => d.type === standardType);
       if (lookup) {
-        return Object.assign(output, lookup);
+        return Object.assign(output, lookup, { type: standardType });
       }
-      throw new Error(`Invalid type:${lookupType}`);
+      throw new Error(`Invalid type:${standardType}`);
+    },
+    dialectToStandard(o, defaultColumn) {
+      const output = { ...defaultColumn, ...o };
+      const typeDef = mysqlTypes.find(
+        (type) => Object.keys(type).every((k) => {
+          if (k === 'name') return true;
+          return type[k] === output.k;
+        }),
+      );
+      if (!typeDef) throw new Error(`Could not find type that matches ${JSON.stringify(o)}`);
+
+      return Object.assign(output, typeDef);
     },
   },
 };

@@ -1,0 +1,141 @@
+{
+    "database": "steamengine",
+    "columns": [
+        {
+            "name": "type_id",
+            "column_type": "bigint",
+            "length": null,
+            "nullable": false,
+            "column_default": null,
+            "auto_increment": true
+        },
+        {
+            "name": "type_person_id",
+            "column_type": "bigint",
+            "length": null,
+            "nullable": false,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_int",
+            "column_type": "int",
+            "length": null,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_bigint",
+            "column_type": "bigint",
+            "length": null,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_currency",
+            "column_type": "decimal(19,2)",
+            "length": null,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_decimal",
+            "column_type": "decimal(19,2)",
+            "length": null,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_double",
+            "column_type": "double",
+            "length": null,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_string",
+            "column_type": "varchar(255)",
+            "length": 255,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_string_32",
+            "column_type": "varchar(32)",
+            "length": 32,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_string_default",
+            "column_type": "varchar(32)",
+            "length": 32,
+            "nullable": false,
+            "column_default": "default_val",
+            "auto_increment": false
+        },
+        {
+            "name": "type_text",
+            "column_type": "text",
+            "length": 65535,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_date_created",
+            "column_type": "timestamp",
+            "length": null,
+            "nullable": false,
+            "column_default": "CURRENT_TIMESTAMP",
+            "auto_increment": false
+        },
+        {
+            "name": "type_last_modified",
+            "column_type": "timestamp",
+            "length": null,
+            "nullable": false,
+            "column_default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+            "auto_increment": false
+        },
+        {
+            "name": "type_date",
+            "column_type": "date",
+            "length": null,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_datetime",
+            "column_type": "datetime",
+            "length": null,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_time",
+            "column_type": "time",
+            "length": null,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        },
+        {
+            "name": "type_url",
+            "column_type": "text",
+            "length": 65535,
+            "nullable": true,
+            "column_default": null,
+            "auto_increment": false
+        }
+    ]
+}

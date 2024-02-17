@@ -7,7 +7,6 @@ const debug = require('debug')('SQLWorker');
 const fs = require('fs');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const SQLWorker = require('./SQLWorker');
-const SQLTypes = require('./SQLTypes');
 
 function Worker(worker) {
   SQLWorker.call(this, worker);
@@ -15,11 +14,11 @@ function Worker(worker) {
 
 util.inherits(Worker, SQLWorker);
 Worker.metadata = {
-  alias: 'sql',
+  alias: 'schema',
 };
 
 /*
-  Retrieves, validates, and expands a schema to a standard for the correct database.
+  Retrieves, validates, and expands a schema to the global standard.
   Will throw an error if there's a problem with it
 */
 Worker.prototype.standardize = async function ({ schema: _schema }) {
@@ -37,7 +36,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
     }
   }
   // Create a deep copy, but clear out any functions, etc, those will need to be
-  // handled elsewhere if they're included, this method is for database modifications
+  // handled elsewhere if they're included, this method is for database work
   try {
     const standardSchema = JSON.parse(JSON.stringify(schema));
     const invalidTables = [];
@@ -49,7 +48,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
         let name = key;
         if (Array.isArray(columns)) name = col.name;
         try {
-          return { ...SQLTypes.mysql.toColumn(col), name };
+          return { ...SQLWorker.defaultColumn, name };
         } catch (e) {
           invalidColumns.push({ ...col, name });
           return null;
@@ -73,34 +72,51 @@ Worker.prototype.standardize.metadata = {
   },
 };
 
-Worker.prototype.diff = async function ({ table, _schema }) {
-  const schema = await this.standardize({ schema: _schema });
-  const desc = await this.describe({ table });
-
-  const dbLookup = desc.columns.reduce((o, col) => Object.assign(o, { [col.name]: col }), {});
-
-  let schemaArray = schema.columns;
-  if (!Array.isArray(schema)) {
-    schemaArray = Object.entries(schema)
-      .reduce((a, [name, v]) => a.concat(Object.assign(v, { name })), []);
-  }
-  // const schemaLookup = schemaArray.reduce((o, col) => Object.assign(o, { [o.name]: o }, {}));
-  const differences = schemaArray.map((c) => {
-    const dbColumn = dbLookup[c.name];
-    if (!dbColumn) return { differences: 'new', ...c };
-    const differenceKeys = Object.keys(c).reduce((out, k) => {
-      if (c[k] !== dbColumn[k]) {
-        debug(c.name, k, c[k], '!=', dbColumn[k]);
-        out[k] = c[k];
+Worker.prototype.diff = async function (opts) {
+  const { prefix = '' } = opts;
+  const schema = await this.standardize(opts);
+  const tablePrefix = `${prefix}${(prefix && prefix.slice(-1) !== '_') ? '_' : ''}`;
+  const diffTables = await Promise.all(
+    schema.tables.map(async ({ name: table, columns: schemaColumns }) => {
+      let desc = null;
+      try {
+        desc = await this.describe({ table: tablePrefix + table });
+      } catch (e) {
+        debug('Error: Cause:', e.cause, 'Error:', e);
+        if (e?.cause === 'DOES_NOT_EXIST') {
+          desc = { columns: [], indexes: [] };
+          return { table, columns: [], exists: false };
+        }
+        throw e;
       }
-      return out;
-    }, {});
-    if (Object.keys(differenceKeys).length > 0) {
-      return { differences: differenceKeys, ...c };
-    }
-    return null;
-  }).filter(Boolean);
-  return { differences };
+      if (!desc.columns) {
+        debug(desc);
+        throw new Error('No columns in describe table');
+      }
+
+      const dbLookup = desc.columns.reduce((o, col) => Object.assign(o, { [col.name]: col }), {});
+
+      const differences = schemaColumns.map((c) => {
+        const dbColumn = dbLookup[c.name];
+        if (!dbColumn) return { differences: 'new', ...c };
+        const differenceKeys = Object.keys(c).reduce((out, k) => {
+          if (c[k] !== dbColumn[k]) {
+            debug(c.name, k, c[k], '!=', dbColumn[k]);
+            out[k] = c[k];
+          }
+          return out;
+        }, {});
+        if (Object.keys(differenceKeys).length > 0) {
+          return { differences: differenceKeys, ...c };
+        }
+        return null;
+      }).filter(Boolean);
+      if (differences.length === 0) return null;
+      return { table, columns: differences };
+    }),
+  );
+
+  return { tables: diffTables };
 };
 
 Worker.prototype.diff.metadata = {
@@ -108,6 +124,12 @@ Worker.prototype.diff.metadata = {
     table: {},
     schema: { description: 'Either a schema object, or a path to a schema file' },
   },
+};
+
+Worker.prototype.deploy = async function (opts) {
+  const { tables } = await this.diff(opts);
+  if (tables.length === 0) return { no_changes: true };
+  return { tables };
 };
 
 module.exports = Worker;
