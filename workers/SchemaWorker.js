@@ -44,13 +44,20 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
       const invalidColumns = [];
       const columns = table.columns || [];
       table.columns = Object.keys(columns).map((key) => {
-        const col = columns[key];
+        let col = columns[key];
+        if (typeof col === 'string') col = { type: col };
+
         let name = key;
         if (Array.isArray(columns)) name = col.name;
+        if (col.column_type) {
+          invalidColumns.push({ ...col, name, error: 'column_type is reserved for sql dialect' });
+        }
         try {
-          return { ...SQLWorker.defaultColumn, name };
+          return {
+            ...SQLWorker.defaultStandardColumn, ...col, name,
+          };
         } catch (e) {
-          invalidColumns.push({ ...col, name });
+          invalidColumns.push({ ...col, name, error: e });
           return null;
         }
       }).filter(Boolean);
@@ -73,19 +80,18 @@ Worker.prototype.standardize.metadata = {
 };
 
 Worker.prototype.diff = async function (opts) {
-  const { prefix = '' } = opts;
   const schema = await this.standardize(opts);
-  const tablePrefix = `${prefix}${(prefix && prefix.slice(-1) !== '_') ? '_' : ''}`;
+  const { prefix = '' } = opts;
+  if (prefix && prefix.slice(-1) !== '_') throw new Error(`A prefix should end with '_', it is ${prefix}`);
   const diffTables = await Promise.all(
     schema.tables.map(async ({ name: table, columns: schemaColumns }) => {
       let desc = null;
       try {
-        desc = await this.describe({ table: tablePrefix + table });
+        desc = await this.describe({ table: prefix + table });
       } catch (e) {
-        debug('Error: Cause:', e.cause, 'Error:', e);
         if (e?.cause === 'DOES_NOT_EXIST') {
           desc = { columns: [], indexes: [] };
-          return { table, columns: [], exists: false };
+          return { table, columns: schemaColumns, exists: false };
         }
         throw e;
       }
@@ -129,7 +135,21 @@ Worker.prototype.diff.metadata = {
 Worker.prototype.deploy = async function (opts) {
   const { tables } = await this.diff(opts);
   if (tables.length === 0) return { no_changes: true };
+  const { prefix = '' } = opts;
+  debug('Creating tables, including:', tables[0]);
+  await Promise.all(
+    tables.map(async ({ table, columns }) => {
+      debug(`Creating table ${prefix}${table}`);
+      return this.createTable({ table: prefix + table, columns });
+    }),
+  );
+
   return { tables };
+};
+Worker.prototype.deploy.metadata = {
+  options: {
+    schema: { description: 'Either a schema object, or a path to a schema file' },
+  },
 };
 
 module.exports = Worker;

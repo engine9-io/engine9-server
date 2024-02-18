@@ -9,7 +9,7 @@ create table test_types
         type_double double,
         type_string varchar(255),
         type_string_32 varchar(32),
-        type_string_default varchar(32) not null default "default_val",
+        type_string_with_default_val varchar(32) not null default "default_val",
         type_text text,
         type_date_created timestamp not null default current_timestamp,
         type_last_modified timestamp not null default current_timestamp on update current_timestamp,

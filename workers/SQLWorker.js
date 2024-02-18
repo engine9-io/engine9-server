@@ -20,10 +20,9 @@ Worker.metadata = {
   alias: 'sql',
 };
 
-Worker.defaultColumn = {
+Worker.defaultStandardColumn = {
   name: '',
   type: '',
-  column_type: '',
   length: null,
   nullable: true,
   column_default: null,
@@ -329,35 +328,29 @@ Worker.prototype.getSQLName = function (n) {
   return n.trim().replace(/[^0-9a-zA-Z_-]/g, '_').toLowerCase();
 };
 
-// The name of the knex methods is ... inconsistent
-function getKnexMethodAndArgumentsFromColumnType(col) {
-  let method = (col.column_type.split('(')[0]);
-  const args = (col.column_type.match(/^.*\((.+)\)$/)?.[1] || '').split(',').map((d) => d.trim()).filter(Boolean);
-  if (method === 'int') {
-    method = 'integer';
-  }
-  return { method, args };
-}
-
-Worker.prototype.createTable = async function ({ table: name, columns, timestamps = true }) {
+Worker.prototype.createTable = async function ({ table: name, columns, timestamps = false }) {
+  if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
   const knex = await this.connect();
   await knex.schema.createTable(name, (table) => {
-    const noTypes = columns.filter((c) => !c.data_type);
-    if (noTypes.length > 0) throw new Error(`No data_type for columns: ${columns.map((d) => d.name).join()}`);
-    const invalidTypes = columns.filter((c) => typeof table[c.data_type] !== 'function');
-    if (invalidTypes.length > 0) throw new Error(`Invalid columns types: ${invalidTypes.map((c) => c.data_type).join()}`);
+    const noTypes = columns.filter((c) => !c.type);
+    if (noTypes.length > 0) throw new Error(`No type for columns: ${columns.map((d) => d.name).join()}`);
 
     columns.forEach((c) => {
-      const { method, args } = getKnexMethodAndArgumentsFromColumnType(c);
-
-      // So odd that the function names don't match the data_type columns
-      if (c.auto_increment) {
-        table.increments(c.name);
-      } else {
-        table[method].apply(table, [c.name, ...args]);
+      const {
+        method, args, defaultValue, defaultRaw,
+      } = SQLTypes.mysql.standardToKnex(c);
+      debug(`Adding knex method ${method} for column ${c.name}`);
+      const m = table[method].apply(table, [c.name, ...args]);
+      if (defaultValue !== undefined) {
+        m.defaultTo(defaultValue);
+      } else if (defaultRaw !== undefined) {
+        const allowedRaw = ['CURRENT_TIMESTAMP',
+          'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'];
+        if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`Invalid knex raw value:${defaultRaw}`);
+        m.defaultTo(knex.raw(defaultRaw));
       }
     });
-    const primaries = columns.filter((d) => d.is_primary_key).map((c) => c.name);
+    const primaries = columns.filter((d) => d.primary_key).map((c) => c.name);
     if (primaries.length > 0) table.primary(primaries);
     if (timestamps) table.timestamps();
   });
