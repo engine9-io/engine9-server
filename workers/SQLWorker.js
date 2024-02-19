@@ -362,7 +362,6 @@ Worker.prototype.createTable = async function ({ table: name, columns, timestamp
       } else {
         m.notNullable();
       }
-      console.log('Setting default value to ', defaultValue);
       if (defaultRaw !== undefined) {
         const allowedRaw = ['CURRENT_TIMESTAMP',
           'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'];
