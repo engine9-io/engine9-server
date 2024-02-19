@@ -6,6 +6,7 @@
       columns: {
         type_id: 'id',
         type_person_id: 'person_id',
+        type_foreign_id: 'foreign_id',
         type_int: 'int',
         type_bigint: 'bigint',
         type_currency: 'currency',
@@ -14,12 +15,13 @@
         type_string: 'string',
         type_string_32: { type: 'string', length: 32 },
         type_text: 'text',
-        type_date_created: 'date_created',
-        type_last_modified: 'last_modified',
+        
         type_url: 'url',
         type_date: 'date',
         type_datetime: 'datetime',
         type_time: 'time',
+        type_date_created: 'date_created',
+        type_last_modified: 'last_modified',
       },
     },
   ],

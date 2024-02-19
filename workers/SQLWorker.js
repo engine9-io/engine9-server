@@ -190,7 +190,7 @@ Worker.prototype.describe = async function describe(opts) {
       column_default: columnDefault,
       auto_increment: (d.EXTRA || '').toUpperCase().indexOf('AUTO_INCREMENT') >= 0,
     };
-    return SQLTypes.mysql.dialectToStandard(o, Worker.defaultColumn);
+    return SQLTypes.mysql.dialectToStandard(o, {} || Worker.defaultColumn);
   });
   return results;
 };
@@ -337,10 +337,18 @@ Worker.prototype.createTable = async function ({ table: name, columns, timestamp
 
     columns.forEach((c) => {
       const {
-        method, args, defaultValue, defaultRaw,
+        method, args, nullable, unsigned, defaultValue, defaultRaw,
       } = SQLTypes.mysql.standardToKnex(c);
-      debug(`Adding knex method ${method} for column ${c.name}`);
+      debug(`Adding knex for column ${c.name}`, {
+        method, args, nullable, unsigned, defaultValue, defaultRaw,
+      });
       const m = table[method].apply(table, [c.name, ...args]);
+      if (unsigned) m.unsigned();
+      if (nullable) {
+        m.nullable();
+      } else {
+        m.notNullable();
+      }
       if (defaultValue !== undefined) {
         m.defaultTo(defaultValue);
       } else if (defaultRaw !== undefined) {

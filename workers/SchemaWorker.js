@@ -7,6 +7,7 @@ const debug = require('debug')('SQLWorker');
 const fs = require('fs');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const SQLWorker = require('./SQLWorker');
+const SQLTypes = require('./SQLTypes');
 
 function Worker(worker) {
   SQLWorker.call(this, worker);
@@ -52,9 +53,10 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
         if (col.column_type) {
           invalidColumns.push({ ...col, name, error: 'column_type is reserved for sql dialect' });
         }
+        const typeDetails = SQLTypes.getType(col.type) || {};
         try {
           return {
-            ...SQLWorker.defaultStandardColumn, ...col, name,
+            ...SQLWorker.defaultStandardColumn, ...typeDetails, ...col, name,
           };
         } catch (e) {
           invalidColumns.push({ ...col, name, error: e });
@@ -106,9 +108,10 @@ Worker.prototype.diff = async function (opts) {
         const dbColumn = dbLookup[c.name];
         if (!dbColumn) return { differences: 'new', ...c };
         const differenceKeys = Object.keys(c).reduce((out, k) => {
+          if (k === 'type') return out;
           if (c[k] !== dbColumn[k]) {
             debug(c.name, k, c[k], '!=', dbColumn[k]);
-            out[k] = c[k];
+            out[k] = { schema: c[k], db: dbColumn[k] };
           }
           return out;
         }, {});
@@ -122,7 +125,7 @@ Worker.prototype.diff = async function (opts) {
     }),
   );
 
-  return { tables: diffTables };
+  return { tables: diffTables.filter(Boolean) };
 };
 
 Worker.prototype.diff.metadata = {
@@ -136,7 +139,7 @@ Worker.prototype.deploy = async function (opts) {
   const { tables } = await this.diff(opts);
   if (tables.length === 0) return { no_changes: true };
   const { prefix = '' } = opts;
-  debug('Creating tables, including:', tables[0]);
+  debug(`Creating ${tables.length} tables, including`, tables[0]);
   await Promise.all(
     tables.map(async ({ table, columns }) => {
       debug(`Creating table ${prefix}${table}`);

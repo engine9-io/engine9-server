@@ -1,12 +1,15 @@
 const mysqlTypes = [
   {
-    type: 'id', column_type: 'bigint', auto_increment: true, knex_method: 'bigIncrements',
+    type: 'id', column_type: 'bigint', unsigned: true, nullable: false, auto_increment: true, knex_method: 'bigIncrements',
   },
   {
-    type: 'string', column_type: 'varchar(255)', length: 255, knex_method: 'string', knex_args: ((o) => ([o.length || 255])),
+    type: 'person_id', column_type: 'bigint', unsigned: true, nullable: false, knex_method: 'bigint',
   },
   {
-    type: 'person_id', column_type: 'bigint', is_nullable: false, knex_method: 'bigint',
+    type: 'foreign_id', column_type: 'bigint', unsigned: true, nullable: false, knex_method: 'bigint',
+  },
+  {
+    type: 'string', column_type: 'varchar', length: 255, knex_method: 'string', knex_args: ((o) => ([o.length || 255])),
   },
   { type: 'int', column_type: 'int', knex_method: 'integer' },
   { type: 'bigint', column_type: 'bigint', knex_method: 'bigint' },
@@ -19,7 +22,9 @@ const mysqlTypes = [
     type: 'decimal', column_type: 'decimal(19,4)', knex_method: 'decimal', knex_args: (() => ([19, 4])),
   },
   { type: 'double', column_type: 'double', knex_method: 'double' },
-  { type: 'text', column_type: 'text', knex_method: 'text' },
+  {
+    type: 'text', column_type: 'text', length: 65535, knex_method: 'text',
+  },
   {
     type: 'date_created',
     column_type: 'timestamp',
@@ -35,11 +40,11 @@ const mysqlTypes = [
     nullable: false,
     knex_method: 'timestamp',
     knex_default_raw: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
-
   },
   {
     type: 'url',
     column_type: 'text',
+    length: 65535,
     knex_method: 'text',
   },
   { type: 'date', column_type: 'date', knex_method: 'date' },
@@ -47,6 +52,9 @@ const mysqlTypes = [
   { type: 'time', column_type: 'time', knex_method: 'time' },
 ];
 module.exports = {
+  getType(type) {
+    return mysqlTypes.find((t) => t.type === type);
+  },
   mysql: {
     standardToDialect(o, defaultColumn) {
       const output = { ...defaultColumn };
@@ -69,6 +77,8 @@ module.exports = {
       return {
         method: typeDef.knex_method,
         args: typeof typeDef.knex_args === 'function' ? typeDef.knex_args(col) : (typeDef.knex_args || []),
+        unsigned: typeDef.unsigned || false,
+        nullable: typeDef.nullable === undefined ? true : typeDef.nullable,
         defaultValue: col.default_value !== undefined ? col.default_value : typeDef.knex_default,
         // raw values should always be defined strings in this file, not a function
         defaultRaw: typeDef.knex_default_raw,
@@ -78,16 +88,23 @@ module.exports = {
       const input = { ...defaultColumn, ...o };
       // test first for strings
       if (input.column_type.indexOf('varchar') === 0) {
-        // this is a string
-        input.type = 'string';
-        return input;
+        // this is a string, which can have all the variations
+        input.column_type = 'varchar';
+        return { ...mysqlTypes.find((t) => t.type === 'string'), ...input };
+      }
+      if (input.column_type.slice(-9).toLowerCase() === ' unsigned') {
+        input.column_type = input.column_type.slice(0, -9);
+        input.unsigned = true;
       }
       const typeDef = mysqlTypes.find(
         (type) => {
-          const unmatchedAttributes = Object.keys(type).filter((attr) => {
-            if (attr === 'type') return false;
-            return type[attr] !== input[attr];
-          });
+          const unmatchedAttributes = Object.keys(type).map((attr) => {
+            if (attr === 'type' || attr.indexOf('knex_') === 0) return false;// ignore these
+            if (type[attr] === input[attr]) {
+              return false;
+            }
+            return `${attr}:${type[attr]} !== ${input[attr]}`;
+          }).filter(Boolean);
           if (unmatchedAttributes.length > 0) {
             console.error(`Did not match ${type.type} because of attributes ${unmatchedAttributes.join()}`);
             return false;
@@ -95,7 +112,7 @@ module.exports = {
           return true;
         },
       );
-      if (!typeDef) throw new Error(`Could not find type that matches ${JSON.stringify(o)}`);
+      if (!typeDef) throw new Error(`Could not find type that matches ${JSON.stringify(input)}`);
 
       return Object.assign(input, typeDef);
     },
