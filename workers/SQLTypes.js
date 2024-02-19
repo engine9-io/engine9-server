@@ -106,7 +106,6 @@ module.exports = {
             return `${attr}:${type[attr]} !== ${input[attr]}`;
           }).filter(Boolean);
           if (unmatchedAttributes.length > 0) {
-            console.error(`Did not match ${type.type} because of attributes ${unmatchedAttributes.join()}`);
             return false;
           }
           return true;
