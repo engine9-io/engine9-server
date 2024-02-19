@@ -6,7 +6,7 @@
             "column_type": "bigint",
             "length": null,
             "nullable": false,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": true
         },
         {
@@ -14,7 +14,7 @@
             "column_type": "bigint",
             "length": null,
             "nullable": false,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -22,7 +22,7 @@
             "column_type": "int",
             "length": null,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -30,7 +30,7 @@
             "column_type": "bigint",
             "length": null,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -38,7 +38,7 @@
             "column_type": "decimal(19,2)",
             "length": null,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -46,7 +46,7 @@
             "column_type": "decimal(19,2)",
             "length": null,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -54,7 +54,7 @@
             "column_type": "double",
             "length": null,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -62,7 +62,7 @@
             "column_type": "varchar(255)",
             "length": 255,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -70,7 +70,7 @@
             "column_type": "varchar(32)",
             "length": 32,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -78,7 +78,7 @@
             "column_type": "varchar(32)",
             "length": 32,
             "nullable": false,
-            "column_default": "default_val",
+            "default_value": "default_val",
             "auto_increment": false
         },
         {
@@ -86,7 +86,7 @@
             "column_type": "text",
             "length": 65535,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -94,7 +94,7 @@
             "column_type": "timestamp",
             "length": null,
             "nullable": false,
-            "column_default": "CURRENT_TIMESTAMP",
+            "default_value": "CURRENT_TIMESTAMP",
             "auto_increment": false
         },
         {
@@ -102,7 +102,7 @@
             "column_type": "timestamp",
             "length": null,
             "nullable": false,
-            "column_default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+            "default_value": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
             "auto_increment": false
         },
         {
@@ -110,7 +110,7 @@
             "column_type": "date",
             "length": null,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -118,7 +118,7 @@
             "column_type": "datetime",
             "length": null,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -126,7 +126,7 @@
             "column_type": "time",
             "length": null,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         },
         {
@@ -134,7 +134,7 @@
             "column_type": "text",
             "length": 65535,
             "nullable": true,
-            "column_default": null,
+            "default_value": null,
             "auto_increment": false
         }
     ]

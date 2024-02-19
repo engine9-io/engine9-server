@@ -6,7 +6,7 @@ const mysqlTypes = [
     type: 'person_id', column_type: 'bigint', unsigned: true, nullable: false, knex_method: 'bigint',
   },
   {
-    type: 'foreign_id', column_type: 'bigint', unsigned: true, nullable: false, knex_method: 'bigint',
+    type: 'foreign_id', column_type: 'bigint', unsigned: true, nullable: false, default_value: 0, knex_method: 'bigint',
   },
   {
     type: 'string', column_type: 'varchar', length: 255, knex_method: 'string', knex_args: ((o) => ([o.length || 255])),
@@ -28,7 +28,7 @@ const mysqlTypes = [
   {
     type: 'date_created',
     column_type: 'timestamp',
-    column_default: 'CURRENT_TIMESTAMP',
+    default_value: 'CURRENT_TIMESTAMP',
     nullable: false,
     knex_method: 'timestamp',
     knex_default_raw: 'CURRENT_TIMESTAMP',
@@ -36,7 +36,7 @@ const mysqlTypes = [
   {
     type: 'last_modified',
     column_type: 'timestamp',
-    column_default: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+    default_value: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
     nullable: false,
     knex_method: 'timestamp',
     knex_default_raw: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',

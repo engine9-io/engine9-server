@@ -25,7 +25,7 @@ Worker.defaultStandardColumn = {
   type: '',
   length: null,
   nullable: true,
-  column_default: null,
+  default_value: null,
   auto_increment: false,
 };
 
@@ -176,10 +176,23 @@ Worker.prototype.describe = async function describe(opts) {
   const results = {};
   results.database = cols[0].db;
   results.columns = cols.map((d) => {
-    let columnDefault = d.COLUMN_DEFAULT;
+    let defaultValue = d.COLUMN_DEFAULT;
     const extra = d.EXTRA.toUpperCase();
     const onUpdate = 'ON UPDATE CURRENT_TIMESTAMP';
-    if (extra.indexOf(onUpdate) >= 0) columnDefault = (`${columnDefault || ''} ${onUpdate}`).trim();
+    if (extra.indexOf(onUpdate) >= 0) defaultValue = (`${defaultValue || ''} ${onUpdate}`).trim();
+    if (defaultValue !== null) {
+      const type = d.COLUMN_TYPE.toUpperCase();
+      if (type.indexOf('INT') === 0
+      || type.indexOf('BIGINT') === 0) {
+        defaultValue = parseInt(defaultValue, 10);
+      } else if (type.indexOf('FLOAT') === 0
+            || type.indexOf('DOUBLE') === 0
+            || type.indexOf('DECIMAL') === 0
+      ) {
+        defaultValue = parseFloat(defaultValue, 10);
+      }
+    }
+
     const o = {
     // raw: d,
       name: d.COLUMN_NAME,
@@ -187,7 +200,7 @@ Worker.prototype.describe = async function describe(opts) {
       length: d.CHARACTER_MAXIMUM_LENGTH,
       nullable: d.IS_NULLABLE.toUpperCase() === 'YES',
       // extra: d.EXTRA, //not standardized
-      column_default: columnDefault,
+      default_value: defaultValue,
       auto_increment: (d.EXTRA || '').toUpperCase().indexOf('AUTO_INCREMENT') >= 0,
     };
     return SQLTypes.mysql.dialectToStandard(o, {} || Worker.defaultColumn);
@@ -339,7 +352,7 @@ Worker.prototype.createTable = async function ({ table: name, columns, timestamp
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       } = SQLTypes.mysql.standardToKnex(c);
-      debug(`Adding knex for column ${c.name}`, {
+      debug(`Adding knex for column ${c.name}`, c, {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       });
       const m = table[method].apply(table, [c.name, ...args]);
@@ -349,13 +362,14 @@ Worker.prototype.createTable = async function ({ table: name, columns, timestamp
       } else {
         m.notNullable();
       }
-      if (defaultValue !== undefined) {
-        m.defaultTo(defaultValue);
-      } else if (defaultRaw !== undefined) {
+      console.log('Setting default value to ', defaultValue);
+      if (defaultRaw !== undefined) {
         const allowedRaw = ['CURRENT_TIMESTAMP',
           'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'];
         if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`Invalid knex raw value:${defaultRaw}`);
         m.defaultTo(knex.raw(defaultRaw));
+      } else if (defaultValue !== undefined) {
+        m.defaultTo(defaultValue);
       }
     });
     const primaries = columns.filter((d) => d.primary_key).map((c) => c.name);
