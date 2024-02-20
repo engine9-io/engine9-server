@@ -3,10 +3,13 @@ const mysqlTypes = [
     type: 'id', column_type: 'bigint', unsigned: true, nullable: false, auto_increment: true, knex_method: 'bigIncrements',
   },
   {
-    type: 'person_id', column_type: 'bigint', unsigned: true, nullable: false, knex_method: 'bigint',
+    // person id is a very specific foreign id
+    // person ids .. should they be nullable??
+    type: 'person_id', column_type: 'bigint', unsigned: true, nullable: true, knex_method: 'bigint',
   },
   {
-    type: 'foreign_id', column_type: 'bigint', unsigned: true, nullable: false, default_value: 0, knex_method: 'bigint',
+    // foreign ids can be nullable
+    type: 'foreign_id', column_type: 'bigint', unsigned: true, nullable: true, knex_method: 'bigint',
   },
   {
     type: 'string', column_type: 'varchar', length: 255, knex_method: 'string', knex_args: ((o) => ([o.length || 255])),

@@ -93,7 +93,7 @@ Worker.prototype.diff = async function (opts) {
       } catch (e) {
         if (e?.cause === 'DOES_NOT_EXIST') {
           desc = { columns: [], indexes: [] };
-          return { table, columns: schemaColumns, exists: false };
+          return { table, differences: 'missing', columns: schemaColumns };
         }
         throw e;
       }
@@ -121,7 +121,7 @@ Worker.prototype.diff = async function (opts) {
         return null;
       }).filter(Boolean);
       if (differences.length === 0) return null;
-      return { table, columns: differences };
+      return { table, differences: 'columns', columns: differences };
     }),
   );
 
@@ -141,9 +141,20 @@ Worker.prototype.deploy = async function (opts) {
   const { prefix = '' } = opts;
   debug(`Creating ${tables.length} tables, including`, tables[0]);
   await Promise.all(
-    tables.map(async ({ table, columns }) => {
-      debug(`Creating table ${prefix}${table}`);
-      return this.createTable({ table: prefix + table, columns });
+    tables.map(async ({ table, differences, columns }) => {
+      const diffs = Array.isArray(differences) ? differences : [differences];
+      await Promise.all(
+        diffs.map(async (difference) => {
+          if (difference === 'missing') {
+            debug(`Creating table ${prefix}${table}`);
+            return this.createTable({ table: prefix + table, columns });
+          } if (difference === 'columns') {
+            debug(`Altering table ${prefix}${table}`);
+            return this.alterTable({ table: prefix + table, columns });
+          }
+          return { table, difference, did_nothing: true };
+        }),
+      );
     }),
   );
 
