@@ -384,6 +384,48 @@ Worker.prototype.createTable.metadata = {
   },
 };
 
+Worker.prototype.altereTable = async function ({ table: name, columns }) {
+  if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
+  const knex = await this.connect();
+  await knex.schema.alterTable(name, (table) => {
+    const noTypes = columns.filter((c) => !c.type);
+    if (noTypes.length > 0) throw new Error(`No type for columns: ${columns.map((d) => d.name).join()}`);
+
+    columns.forEach((c) => {
+      const {
+        method, args, nullable, unsigned, defaultValue, defaultRaw,
+      } = SQLTypes.mysql.standardToKnex(c);
+      debug(`Adding knex for column ${c.name}`, c, {
+        method, args, nullable, unsigned, defaultValue, defaultRaw,
+      });
+      const m = table[method].apply(table, [c.name, ...args]);
+      if (unsigned) m.unsigned();
+      if (nullable) {
+        m.nullable();
+      } else {
+        m.notNullable();
+      }
+      if (defaultRaw !== undefined) {
+        const allowedRaw = ['CURRENT_TIMESTAMP',
+          'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'];
+        if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`Invalid knex raw value:${defaultRaw}`);
+        m.defaultTo(knex.raw(defaultRaw));
+      } else if (defaultValue !== undefined) {
+        m.defaultTo(defaultValue);
+      }
+    });
+    const primaries = columns.filter((d) => d.primary_key).map((c) => c.name);
+    if (primaries.length > 0) table.primary(primaries);
+  });
+  return { altered: true, table: name };
+};
+Worker.prototype.createTable.metadata = {
+  options: {
+    table: {},
+    columns: {},
+  },
+};
+
 Worker.prototype.onDuplicate = function () { return 'on duplicate key update'; };
 Worker.prototype.onDuplicateFieldValue = function (f) { return `VALUES(${f})`; };
 

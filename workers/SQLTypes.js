@@ -4,8 +4,11 @@ const mysqlTypes = [
   },
   {
     // person id is a very specific foreign id
-    // person ids .. should they be nullable??
-    type: 'person_id', column_type: 'bigint', unsigned: true, nullable: true, knex_method: 'bigint',
+    // person_id type definition is ALWAYS the same, regardless if it's a primary key or not
+    // that way we never have to deal with null cases, and different platforms can rely on it having
+    // a non-null value
+    // Even though there's situations where it's not set, that value is then 0
+    type: 'person_id', column_type: 'bigint', unsigned: true, nullable: false, default_value: 0, knex_method: 'bigint',
   },
   {
     // foreign ids can be nullable
