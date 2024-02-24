@@ -85,7 +85,7 @@ Worker.prototype.getFilename = function (options) {
 
   if (hasTilda) {
     if (f.indexOf('/') !== 0) f = `/${f}`;
-    const prefix = `${process.env.STEAMENGINE_HOME.replace('/server', '')}/accounts/`;
+    const prefix = `${process.env.ENGINE9_HOME.replace('/server', '')}/accounts/`;
     f = prefix + worker.accountId + f;
   }
 

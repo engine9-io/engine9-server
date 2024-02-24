@@ -10,7 +10,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true); // support direct calls, mostly for testing
     const url = new URL(origin);
-    if (url.hostname === 'localhost' || url.hostname.endsWith('steamengine.io')) {
+    if (url.hostname === 'localhost' || url.hostname.endsWith('engine9.io')) {
       return callback(null, true);
     }
     return callback(new Error('Invalid CORS domain'));

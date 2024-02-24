@@ -17,10 +17,10 @@ const modelMap = new Map();
 modelMap.set('person', Person);
 
 function knexConfigForTenant(accountId) {
-  if (accountId === 'steamengine') {
+  if (accountId === 'engine9') {
     return {
       client: 'mysql2',
-      connection: process.env.STEAMENGINE_DATABASE_CONNECTION_STRING,
+      connection: process.env.ENGINE9_DATABASE_CONNECTION_STRING,
     };
   }
   throw new Error(`Account ${accountId} not supported`);
@@ -28,16 +28,16 @@ function knexConfigForTenant(accountId) {
 
 function getKnexForRequest(req) {
   // the account_id comes from authentication step, or in the headers,
-  // NOT the url parameters, steamengine is the default
-  const headerAccountId = req.get('STEAMENGINE_ACCOUNT_ID');
-  const accountId = headerAccountId || 'steamengine';
+  // NOT the url parameters, engine9 is the default
+  const headerAccountId = req.get('ENGINE9_ACCOUNT_ID');
+  const accountId = headerAccountId || 'engine9';
 
   let knex = knexCache.get(accountId);
 
   if (!knex) {
     const config = knexConfigForTenant(accountId);
     if (!config) {
-      if (!headerAccountId) throw new Error('No STEAMENGINE_ACCOUNT_ID header');
+      if (!headerAccountId) throw new Error('No ENGINE9_ACCOUNT_ID header');
       throw new Error(`Could not find config for account ${headerAccountId}`);
     }
     knex = Knex(config);

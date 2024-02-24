@@ -35,12 +35,12 @@ Worker.prototype.connect = async function connect() {
   if (!this.accountId) throw new Error('accountId is required');
 
   let config = null;
-  if (accountId === 'steamengine') {
-    const s = process.env.STEAMENGINE_DATABASE_CONNECTION_STRING;
-    if (!s) throw new Error('Could not find environment variable \'STEAMENGINE_DATABASE_CONNECTION_STRING\'');
+  if (accountId === 'engine9') {
+    const s = process.env.ENGINE9_DATABASE_CONNECTION_STRING;
+    if (!s) throw new Error('Could not find environment variable \'ENGINE9_DATABASE_CONNECTION_STRING\'');
     config = {
       client: 'mysql2',
-      connection: process.env.STEAMENGINE_DATABASE_CONNECTION_STRING,
+      connection: process.env.ENGINE9_DATABASE_CONNECTION_STRING,
     };
   } else {
     throw new Error('Unsupported account:', accountId);

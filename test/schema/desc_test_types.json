@@ -1,5 +1,5 @@
 {
-    "database": "steamengine",
+    "database": "engine9",
     "columns": [
         {
             "name": "type_id",

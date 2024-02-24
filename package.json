@@ -1,7 +1,7 @@
 {
-  "name": "@steamengine/server",
+  "name": "@engine9/server",
   "version": "1.0.0",
-  "description": "Steam Engine CRM Server",
+  "description": "Engine9 CRM Server",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

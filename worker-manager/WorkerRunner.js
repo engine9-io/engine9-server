@@ -313,10 +313,10 @@ function getAccountId(cb) {
     accountId = String(argv.accountId);
   } else if (argv.a) {
     accountId = String(argv.a);
-  } else if (process.env.STEAMENGINE_ACCOUNT_ID) {
-    accountId = process.env.STEAMENGINE_ACCOUNT_ID;
+  } else if (process.env.ENGINE9_ACCOUNT_ID) {
+    accountId = process.env.ENGINE9_ACCOUNT_ID;
   } else {
-    accountId = 'steamengine';
+    accountId = 'engine9';
   }
   if (!accountId.match(/^[a-zA-Z0-9_-]+$/)) throw new Error(`invalid accountId=${accountId}`);
   debug(`Using accountId=${accountId} in environment ${process.env.NODE_ENV} with debug ${process.env.DEBUG}`);
