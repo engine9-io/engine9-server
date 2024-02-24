@@ -29,6 +29,12 @@ const mysqlTypes = [
   },
   { type: 'double', column_type: 'double', knex_method: 'double' },
   {
+    type: 'boolean',
+    column_type: 'tinyint(1)',
+    nullable: true,
+    knex_method: 'boolean',
+  },
+  {
     type: 'text', column_type: 'text', length: 65535, knex_method: 'text',
   },
   {

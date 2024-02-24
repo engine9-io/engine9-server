@@ -28,8 +28,11 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
   if (typeof _schema === 'object') {
     schema = _schema;
   } else {
-    const content = await fs.promises.readFile(_schema);
+    let content = await fs.promises.readFile(_schema);
     if (!content) throw new Error(`No content found for ${_schema}`);
+    content = content.toString().trim();
+    if (content.indexOf('module.exports = ') === 0) { content = content.slice(17); }
+    if (content.slice(-1) === ';') { content = content.slice(0, -1); }
     try {
       schema = JSON5.parse(content);
     } catch (error) {

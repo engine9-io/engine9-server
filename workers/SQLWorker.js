@@ -182,7 +182,9 @@ Worker.prototype.describe = async function describe(opts) {
     if (extra.indexOf(onUpdate) >= 0) defaultValue = (`${defaultValue || ''} ${onUpdate}`).trim();
     if (defaultValue !== null) {
       const type = d.COLUMN_TYPE.toUpperCase();
-      if (type.indexOf('INT') === 0
+      if (type === 'TINYINT(1)') {
+        defaultValue = defaultValue === '1';
+      } else if (type.indexOf('INT') === 0
       || type.indexOf('BIGINT') === 0) {
         defaultValue = parseInt(defaultValue, 10);
       } else if (type.indexOf('FLOAT') === 0
@@ -384,7 +386,7 @@ Worker.prototype.createTable.metadata = {
   },
 };
 
-Worker.prototype.altereTable = async function ({ table: name, columns }) {
+Worker.prototype.alterTable = async function ({ table: name, columns }) {
   if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
   const knex = await this.connect();
   await knex.schema.alterTable(name, (table) => {
@@ -395,7 +397,7 @@ Worker.prototype.altereTable = async function ({ table: name, columns }) {
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       } = SQLTypes.mysql.standardToKnex(c);
-      debug(`Adding knex for column ${c.name}`, c, {
+      debug(`Altering column ${c.name}`, c, {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       });
       const m = table[method].apply(table, [c.name, ...args]);
