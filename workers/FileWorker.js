@@ -3,8 +3,9 @@ const fs = require('node:fs');
 const fsp = fs.promises;
 const zlib = require('node:zlib');
 const { promisify } = require('node:util');
-const util = require('node:util');
-const { Transform } = require('node:stream');
+const util = require('util');
+const { Readable, Transform } = require('node:stream');
+
 const { pipeline } = require('node:stream/promises');
 const debug = require('debug')('FileWorker');
 // const through2 = require('through2');
@@ -21,6 +22,7 @@ function Worker(worker) {
 }
 
 util.inherits(Worker, BaseWorker);
+
 Worker.metadata = {
   alias: 'file',
 };
@@ -291,6 +293,18 @@ Worker.prototype.testTransform.metadata = {
   options: {
     filename: true,
   },
+};
+
+/* Get a stream from an actual stream, or an array, or a file */
+Worker.prototype.getStream = async function ({ stream } = {}) {
+  if (!stream) throw new Error('No stream provided');
+  if (typeof stream === 'object') return stream;
+  if (Array.isArray(stream)) {
+    return Readable.from(stream);
+  }
+
+  const { stream: fileStream } = await this.fileToObjectStream({ filename: stream });
+  return fileStream;
 };
 
 module.exports = Worker;

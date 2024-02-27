@@ -31,7 +31,8 @@ const mysqlTypes = [
   {
     type: 'boolean',
     column_type: 'tinyint(1)',
-    nullable: true,
+    // nullable: true, //don't set this, otherwise we can't look up type boolean
+    //  Defaults to nullable anyhow
     knex_method: 'boolean',
   },
   {
@@ -85,12 +86,19 @@ module.exports = {
       // The name of the knex methods is ... inconsistent
       const { type } = col;
       const typeDef = mysqlTypes.find((t) => t.type === type);
+      let { nullable } = col;
+      if (nullable === undefined) {
+        nullable = typeDef.nullable;
+      }
+      if (nullable === undefined) {
+        nullable = true;
+      }
 
       return {
         method: typeDef.knex_method,
         args: typeof typeDef.knex_args === 'function' ? typeDef.knex_args(col) : (typeDef.knex_args || []),
         unsigned: typeDef.unsigned || false,
-        nullable: typeDef.nullable === undefined ? true : typeDef.nullable,
+        nullable,
         defaultValue: col.default_value !== undefined ? col.default_value : typeDef.knex_default,
         // raw values should always be defined strings in this file, not a function
         defaultRaw: typeDef.knex_default_raw,

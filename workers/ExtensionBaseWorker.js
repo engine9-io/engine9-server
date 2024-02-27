@@ -10,11 +10,12 @@ function Worker(worker) {
 util.inherits(Worker, BaseWorker);
 
 /*
-  Core method that takes an extension configuration, creates all the environment variables, including SQL, etc
+  Core method that takes an extension configuration,
+  creates all the environment variables, including SQL, etc
 */
 
 const validPaths = /^[a-zA-Z-_]+$/; // Don't allow dots or anything crazy in path names - simple simple
-Worker.prototype.compileExtension = async function compileStream({ extensionPath }) {
+Worker.prototype.compileExtension = async function ({ extensionPath }) {
   if (!extensionPath?.match(validPaths)) throw new Error(`Invalid extension path: ${extensionPath}`);
   // eslint-disable-next-line import/no-dynamic-require,global-require
   const config = require(`./${extensionPath}/engine9_extension.js`);
@@ -52,6 +53,12 @@ Worker.prototype.compileExtension = async function compileStream({ extensionPath
     });
     return { streams };
   });
+};
+
+Worker.prototype.compileTransform = async function ({ path }) {
+  // eslint-disable-next-line import/no-dynamic-require,global-require
+  const transform = require(path);
+  return transform;
 };
 
 module.exports = Worker;

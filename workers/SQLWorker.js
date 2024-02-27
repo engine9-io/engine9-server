@@ -397,7 +397,7 @@ Worker.prototype.alterTable = async function ({ table: name, columns }) {
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       } = SQLTypes.mysql.standardToKnex(c);
-      debug(`Altering column ${c.name}`, c, {
+      debug(`Altering column ${c.name}`, c, 'Knex opts=', {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       });
       const m = table[method].apply(table, [c.name, ...args]);
@@ -415,7 +415,9 @@ Worker.prototype.alterTable = async function ({ table: name, columns }) {
       } else if (defaultValue !== undefined) {
         m.defaultTo(defaultValue);
       }
+      m.alter();
     });
+    debug('Finished assigning columns');
     const primaries = columns.filter((d) => d.primary_key).map((c) => c.name);
     if (primaries.length > 0) table.primary(primaries);
   });
