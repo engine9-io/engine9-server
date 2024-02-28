@@ -146,7 +146,7 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   return batch;
 };
 
-Worker.prototype.appendPersonId = async function ({ batch }) {
+Worker.prototype.appendPersonIds = async function ({ batch }) {
   const itemsWithNoIds = batch.filter((o) => !o.person_id);
   if (itemsWithNoIds.length === 0) return batch;
   const allIdentifiers = itemsWithNoIds.reduce((a, b) => a.concat(b.identifiers || []), []);
@@ -179,43 +179,44 @@ Worker.prototype.appendPersonId = async function ({ batch }) {
   return batch;
 };
 
-Worker.prototype.testAppendPersonId = async function () {
-  const batch = [
-    { email: 'x@y.com' },
-    { email: 'x@y.com' },
-    { email: 'y@z.com' },
-  ];
-  for (let i = 0; i < 300; i += 1) {
-    batch.push({ email: `${i % 50}@y.com` });
-  }
-  batch.forEach((d) => {
-    d.identifiers = [{ type: 'email', value: d.email }];
-  });
-  const output = await this.appendPersonId({ batch });
-  return output;
-};
-Worker.prototype.testAppendPersonId.metadata = {
-  options: {},
-};
-
-Worker.prototype.loadPeople = async function ({ batch: _batch }) {
+Worker.prototype.ingestPeople = async function ({ batch: _batch, doNotInsert }) {
   const batch = _batch;
   const identifierPaths = [
     '../core_extensions/person_email/transforms/inbound/append_identifiers.js',
   ];
-  const transforms = identifierPaths.map((path) => this.compileTransform({ path }));
-  transforms.forEach(async (transform) => {
-    await transform(batch);
-  });
+  // assign identifiers to the batch
+  await Promise.all(
+    identifierPaths.map(async (path) => {
+      const transform = await this.compileTransform({ path });
+      if (typeof transform !== 'function') {
+        throw new Error(`Invalid transform path, not a function:${path}`);
+      }
+      return transform(batch);
+    }),
+  );
+  // assign person ids
+  await this.appendPersonIds({ batch });
 
-  /*
-  1) get data
-  2) Deduplicate, including inserting new people, thus getting everyone a person_id
-  3) Go through and deduplicate the other items
-  4) Insert and update
-  */
+  const tableTransforms = [
+    '../core_extensions/person_email/transforms/inbound/extract_tables.js',
+  ];
+  const tables = {};
+  // assign identifiers to the batch
+  await Promise.all(
+    tableTransforms.map(async (path) => {
+      const transform = await this.compileTransform({ path });
+
+      const batchTables = await transform(batch);
+      console.log('Transform returned ', batchTables);
+      Object.keys(batchTables).forEach((table) => {
+        tables[table] = (tables[table] || []).concat(batchTables[table]);
+      });
+    }),
+  );
+  if (doNotInsert) return tables;
+  return tables;
 };
-Worker.prototype.loadPeople.metadata = {
+Worker.prototype.ingestPeople.metadata = {
   options: {
     stream: {},
     filename: {},
