@@ -1,6 +1,7 @@
 const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
 const crypto = require('node:crypto');
+// const { setTimeout: sleep } = require('node:timers/promises');
 
 const through2 = require('through2');
 // const fs = require('fs');
@@ -73,15 +74,27 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
     },
     {},
   );
-  const sqlWorker = new SQLWorker(this);
-  const knex = await sqlWorker.connect();
+  const { knex } = this;
 
-  /* lock starts here */
-  knex.raw('lock table person_identifiers write');
+  if (!knex) {
+    throw new Error('No knex instance created');
+  }
+
+  /*
+  We're locking the tables so we can ensure that multiple threads against the database
+  won't cause identical identifiers to be inserted.  Without it the same identifier could
+  have 2 separate person_ids, which defeats the purpose
+  */
+  await knex.raw('lock tables person write,person_identifiers write');
   /* First check to see if any new IDS have slotted in here */
   const existingIds = await knex.select('*')
     .from('person_identifiers')
     .where('value', 'in', Object.keys(identifierMap));
+  debug('Found ', existingIds, '.... sleeping');
+  /* If we want to test the logic here, we can sleep after the query to wait
+  for the conflicting thread to catch up to the problem zone
+  */
+  // await sleep(5000);
   existingIds.forEach((row) => {
     (identifierMap[row.value] || []).forEach((item) => {
       item.person_id = row.person_id;
@@ -92,19 +105,17 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   const tempIds = Object.keys(batch.filter((item) => item.temp_id)
     .reduce((a, b) => { a[b.temp_id] = b; return a; }, {}));
   // Insert the right number of records
-  debug('Looking to insert ', tempIds);
+
   const toInsert = tempIds.map(() => ({ id: null }));
-  debug('Looking to insert ', toInsert.length, 'records');
+
   if (toInsert.length > 0) {
     const response = await knex.table('person')
       .insert(toInsert);
-    debug('Response from insert is:', { tempIds, response });
     let currentId = response[0];
     const tempIdToPersonIdLookup = {};
     tempIds.forEach((t) => {
       tempIdToPersonIdLookup[t] = currentId;
       currentId += 1;
-      debug('Lookup is ', tempIds, tempIdToPersonIdLookup);
     });
 
     // Assign the person_ids to the batch,
@@ -113,7 +124,6 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
     batch.forEach((item) => {
       if (!item.person_id) {
         item.person_id = tempIdToPersonIdLookup[item.temp_id];
-        debug('Assigned a person id identifier to', item);
         if (!item.person_id) throw new Error(`Unusual error, could not find temp_id:${item.temp_id}`);
         delete item.temp_id;
         (item.identifiers || []).forEach((id) => {
@@ -127,12 +137,11 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
     });
     const identifiersToInsert = Object.values(personIdentifersToInsert);
     if (identifiersToInsert.length > 0) {
-      debug('Inserting ', { identifiersToInsert });
       await knex.table('person_identifiers')
         .insert(identifiersToInsert);
     }
   }
-  knex.raw('unlock table');
+  await knex.raw('unlock tables');
   /* Finished locking */
   return batch;
 };
@@ -141,8 +150,13 @@ Worker.prototype.appendPersonId = async function ({ batch }) {
   const itemsWithNoIds = batch.filter((o) => !o.person_id);
   if (itemsWithNoIds.length === 0) return batch;
   const allIdentifiers = itemsWithNoIds.reduce((a, b) => a.concat(b.identifiers || []), []);
-  const sqlWorker = new SQLWorker(this);
-  const knex = await sqlWorker.connect();
+  let { knex } = this;
+
+  if (!knex) {
+    const sqlWorker = new SQLWorker(this);
+    this.knex = await sqlWorker.connect();
+    knex = this.knex;
+  }
   const existingIds = await knex.select('*')
     .from('person_identifiers')
     .where('value', 'in', allIdentifiers.map((d) => d.value));
@@ -172,8 +186,8 @@ Worker.prototype.appendPersonId = async function ({ batch }) {
 Worker.prototype.testAppendPersonId = async function () {
   const batch = [
     { email: 'x@y.com' },
-    { email: 'x@y.com' },
-    { email: 'y@z.com' },
+    // { email: 'x@y.com' },
+    // { email: 'y@z.com' },
   ];
   batch.forEach((d) => {
     d.identifiers = [{ type: 'email', value: d.email }];
