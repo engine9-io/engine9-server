@@ -167,13 +167,9 @@ Worker.prototype.appendPersonId = async function ({ batch }) {
     },
     {},
   );
-  debug('Existing item lookup=', lookup);
   batch.forEach((item) => {
     if (item.person_id) return;
-    const matchingValue = (item.identifiers || []).find((id) => {
-      debug('looking up value:', id.value);
-      return lookup[id.value];
-    })?.value;
+    const matchingValue = (item.identifiers || []).find((id) => lookup[id.value])?.value;
     if (matchingValue) item.person_id = lookup[matchingValue];
   });
   const itemsWithNoExistingIds = batch.filter((o) => !o.person_id);
@@ -186,9 +182,12 @@ Worker.prototype.appendPersonId = async function ({ batch }) {
 Worker.prototype.testAppendPersonId = async function () {
   const batch = [
     { email: 'x@y.com' },
-    // { email: 'x@y.com' },
-    // { email: 'y@z.com' },
+    { email: 'x@y.com' },
+    { email: 'y@z.com' },
   ];
+  for (let i = 0; i < 300; i += 1) {
+    batch.push({ email: `${i % 50}@y.com` });
+  }
   batch.forEach((d) => {
     d.identifiers = [{ type: 'email', value: d.email }];
   });
