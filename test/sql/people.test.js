@@ -29,8 +29,8 @@ test('Ids are assigned by email', async () => {
 test('Good tables are returned', async () => {
   const sqlWorker = new SQLWorker({ accountId: 'engine9' });
   const knex = await sqlWorker.connect();
-  const worker1 = new PersonWorker({ accountId: 'engine9' });
-  worker1.knex = knex;
+  const personWorker = new PersonWorker({ accountId: 'engine9' });
+  personWorker.knex = knex;
 
   const batch = [
     { email: 'x@y.com' },
@@ -41,9 +41,8 @@ test('Good tables are returned', async () => {
   batch.forEach((d) => {
     d.identifiers = [{ type: 'email', value: d.email }];
   });
-  const out = await worker1.ingestPeople({ batch, doNotInsert: true });
+  const out = await personWorker.ingestPeople({ batch, doNotInsert: true });
 
   knex.destroy();
-  console.log('Table output:', out);
   assert.ok(out?.person_email?.length > 0, 'No person_email records');
 });

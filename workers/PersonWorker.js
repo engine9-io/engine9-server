@@ -179,7 +179,7 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
   return batch;
 };
 
-Worker.prototype.ingestPeople = async function ({ batch: _batch, doNotInsert }) {
+Worker.prototype.upsertPeople = async function ({ batch: _batch, doNotInsert }) {
   const batch = _batch;
   const identifierPaths = [
     '../core_extensions/person_email/transforms/inbound/append_identifiers.js',
@@ -198,7 +198,9 @@ Worker.prototype.ingestPeople = async function ({ batch: _batch, doNotInsert }) 
   await this.appendPersonIds({ batch });
 
   const tableTransforms = [
+    '../core_extensions/person_name/transforms/inbound/extract_tables.js',
     '../core_extensions/person_email/transforms/inbound/extract_tables.js',
+    '../core_extensions/person_address/transforms/inbound/extract_tables.js',
   ];
   const tables = {};
   // assign identifiers to the batch
@@ -207,7 +209,6 @@ Worker.prototype.ingestPeople = async function ({ batch: _batch, doNotInsert }) 
       const transform = await this.compileTransform({ path });
 
       const batchTables = await transform(batch);
-      console.log('Transform returned ', batchTables);
       Object.keys(batchTables).forEach((table) => {
         tables[table] = (tables[table] || []).concat(batchTables[table]);
       });
@@ -216,7 +217,7 @@ Worker.prototype.ingestPeople = async function ({ batch: _batch, doNotInsert }) 
   if (doNotInsert) return tables;
   return tables;
 };
-Worker.prototype.ingestPeople.metadata = {
+Worker.prototype.upsertPeople.metadata = {
   options: {
     stream: {},
     filename: {},
