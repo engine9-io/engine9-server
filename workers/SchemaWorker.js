@@ -3,11 +3,12 @@
   as opposed to DML work
 */
 const util = require('util');
-const debug = require('debug')('SQLWorker');
+const debug = require('debug')('SchemaWorker');
 const fs = require('fs');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const SQLWorker = require('./SQLWorker');
 const SQLTypes = require('./SQLTypes');
+const { ErrorWithMetadata: Error } = require('./Errors');
 
 function Worker(worker) {
   SQLWorker.call(this, worker);
@@ -28,7 +29,21 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
   if (typeof _schema === 'object') {
     schema = _schema;
   } else {
-    let content = await fs.promises.readFile(_schema);
+    let content = null;
+    if (_schema.indexOf('@engine9-interfaces/') === 0) {
+      const name = _schema.slice('@engine9-interfaces/'.length);
+      if (!name.match(/^[a-z0-9_-]+$/)) throw new Error('Invalid schema name');
+      const uri = `https://raw.githubusercontent.com/engine9-io/engine9-interfaces/main/${name}/schema.js`;
+      const r = await fetch(uri);
+      if (r.status >= 300) {
+        debug('GET', r.status, uri);
+        throw new Error(`Could not find schema ${_schema}`);
+      }
+      content = await r.text();
+    } else {
+      content = await fs.promises.readFile(_schema);
+    }
+
     if (!content) throw new Error(`No content found for ${_schema}`);
     content = content.toString().trim();
     if (content.indexOf('module.exports = ') === 0) { content = content.slice(17); }
@@ -36,6 +51,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
     try {
       schema = JSON5.parse(content);
     } catch (error) {
+      debug(content);
       throw new Error(`Invalid content at ${_schema}, ${error.message}`);
     }
   }
@@ -70,6 +86,10 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
         invalidTables.push({ ...table }, { invalidColumns });
         return false;
       }
+      table.indexes = (table.indexes || []).map((d) => ({
+        columns: (typeof d.columns === 'string') ? d.columns.split(',').map((x) => x.trim()) : d.columns,
+        unique: d.unique || false,
+      }));
       return table;
     });
     return standardSchema;
@@ -80,7 +100,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
 };
 Worker.prototype.standardize.metadata = {
   options: {
-    schema: { description: 'Schema object or file path' },
+    schema: { description: 'Schema object,file path, or @engine9-interfaces/<interface_name>' },
   },
 };
 
@@ -89,14 +109,16 @@ Worker.prototype.diff = async function (opts) {
   const { prefix = '' } = opts;
   if (prefix && prefix.slice(-1) !== '_') throw new Error(`A prefix should end with '_', it is ${prefix}`);
   const diffTables = await Promise.all(
-    schema.tables.map(async ({ name: table, columns: schemaColumns }) => {
+    schema.tables.map(async ({ name: table, columns: schemaColumns, indexes: schemaIndexes }) => {
       let desc = null;
       try {
         desc = await this.describe({ table: prefix + table });
       } catch (e) {
         if (e?.cause === 'DOES_NOT_EXIST') {
           desc = { columns: [], indexes: [] };
-          return { table, differences: 'missing', columns: schemaColumns };
+          return {
+            table, differences: 'missing', columns: schemaColumns, indexes: schemaIndexes,
+          };
         }
         throw e;
       }
@@ -105,15 +127,24 @@ Worker.prototype.diff = async function (opts) {
         throw new Error('No columns in describe table');
       }
 
+      const indexes = await this.indexes({ table: prefix + table });
+      const missingIndexes = schemaIndexes.filter((x) => !indexes.find((tableIndex) => {
+        if (x.unique !== tableIndex.unique) return false;
+        if (!Array.isArray(x.columns)) throw new Error('Non-array columns in indexes', schema);
+        if (x.columns.join() !== tableIndex.columns.join()) return false;
+        return true;
+      }));
+
       const dbLookup = desc.columns.reduce((o, col) => Object.assign(o, { [col.name]: col }), {});
 
-      const differences = schemaColumns.map((c) => {
+      const columnDifferences = schemaColumns.map((c) => {
         const dbColumn = dbLookup[c.name];
         if (!dbColumn) return { differences: 'new', ...c };
         const differenceKeys = Object.keys(c).reduce((out, k) => {
-          if (k === 'type') return out;
+          // Ignore these attributes
+          if (['type', 'description'].indexOf(k) >= 0) return out;
           if (c[k] !== dbColumn[k]) {
-            debug(c.name, k, c[k], '!=', dbColumn[k]);
+            // debug(c.name, k, c[k], '!=', dbColumn[k]);
             out[k] = { schema: c[k], db: dbColumn[k] };
           }
           return out;
@@ -123,8 +154,19 @@ Worker.prototype.diff = async function (opts) {
         }
         return null;
       }).filter(Boolean);
-      if (differences.length === 0) return null;
-      return { table, differences: 'columns', columns: differences };
+
+      const out = { table, differences: [] };
+      if (columnDifferences.length > 0) {
+        out.differences.push('columns');
+        out.columns = columnDifferences;
+      }
+      if (missingIndexes.length > 0) {
+        out.differences.push('indexes');
+        out.indexes = missingIndexes;
+      }
+      if (out.differences.length === 0) return null;
+
+      return out;
     }),
   );
 
@@ -142,19 +184,23 @@ Worker.prototype.deploy = async function (opts) {
   const { tables } = await this.diff(opts);
   if (tables.length === 0) return { no_changes: true };
   const { prefix = '' } = opts;
-  debug(`Creating ${tables.length} tables, including`, tables[0]);
+  debug(`Creating ${tables.length} tables, including`, JSON.stringify(tables[0], null, 4));
   await Promise.all(
-    tables.map(async ({ table, differences, columns }) => {
+    tables.map(async ({
+      table, differences, columns = [], indexes = [],
+    }) => {
       const diffs = Array.isArray(differences) ? differences : [differences];
       await Promise.all(
         diffs.map(async (difference) => {
           if (difference === 'missing') {
             debug(`Creating table ${prefix}${table}`);
-            return this.createTable({ table: prefix + table, columns });
-          } if (difference === 'columns') {
-            debug(`Altering table ${prefix}${table}`);
-            return this.alterTable({ table: prefix + table, columns });
+            return this.createTable({ table: prefix + table, columns, indexes });
           }
+          if (columns.length > 0 || indexes.length > 0) {
+            debug(`Altering table ${prefix}${table}`);
+            return this.alterTable({ table: prefix + table, columns, indexes });
+          }
+
           return { table, difference, did_nothing: true };
         }),
       );

@@ -16,7 +16,7 @@ function Worker(worker) {
 
 util.inherits(Worker, ExtensionBaseWorker);
 
-Worker.prototype.getPeopleStream = async function () {
+Worker.prototype.getOutboundStream = async function () {
   const sqlWorker = new SQLWorker(this);
   const emailExtension = this.compileExtension({ extension_path: 'core_extensions/person_email' });
   const stream = await sqlWorker.stream({ sql: 'select * from person' });
@@ -36,7 +36,7 @@ Worker.prototype.getPeopleStream = async function () {
   return { filename };
 };
 
-Worker.prototype.getPeopleStream.metadata = {};
+Worker.prototype.getOutboundStream.metadata = {};
 
 /*
   Okay, assigning ids is the one thing that we need to parallelize.
@@ -179,7 +179,7 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
   return batch;
 };
 
-Worker.prototype.upsertPeople = async function ({ batch: _batch, doNotInsert }) {
+Worker.prototype.upsertBatch = async function ({ batch: _batch, doNotInsert }) {
   const batch = _batch;
   const identifierPaths = [
     '../core_extensions/person_email/transforms/inbound/append_identifiers.js',
@@ -217,10 +217,51 @@ Worker.prototype.upsertPeople = async function ({ batch: _batch, doNotInsert }) 
   if (doNotInsert) return tables;
   return tables;
 };
-Worker.prototype.upsertPeople.metadata = {
+
+Worker.prototype.upsert = async function ({ batch: _batch, doNotInsert }) {
+  const batch = _batch;
+  const identifierPaths = [
+    '../core_extensions/person_email/transforms/inbound/append_identifiers.js',
+  ];
+  // assign identifiers to the batch
+  await Promise.all(
+    identifierPaths.map(async (path) => {
+      const transform = await this.compileTransform({ path });
+      if (typeof transform !== 'function') {
+        throw new Error(`Invalid transform path, not a function:${path}`);
+      }
+      return transform(batch);
+    }),
+  );
+  // assign person ids
+  await this.appendPersonIds({ batch });
+
+  const tableTransforms = [
+    '../core_extensions/person_name/transforms/inbound/extract_tables.js',
+    '../core_extensions/person_email/transforms/inbound/extract_tables.js',
+    '../core_extensions/person_address/transforms/inbound/extract_tables.js',
+  ];
+  const tables = {};
+  // assign identifiers to the batch
+  await Promise.all(
+    tableTransforms.map(async (path) => {
+      const transform = await this.compileTransform({ path });
+
+      const batchTables = await transform(batch);
+      Object.keys(batchTables).forEach((table) => {
+        tables[table] = (tables[table] || []).concat(batchTables[table]);
+      });
+    }),
+  );
+  if (doNotInsert) return tables;
+  return tables;
+};
+
+Worker.prototype.upsert.metadata = {
   options: {
     stream: {},
     filename: {},
+    batch_size: {},
   },
 };
 

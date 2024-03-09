@@ -13,6 +13,12 @@ require('dotenv').config({ path: '.env' });
 
 function Worker(worker) {
   BaseWorker.call(this, worker);
+  this.auth = {
+    ENGINE9_DATABASE_CONNECTION_STRING:
+    process.env.ENGINE9_DATABASE_CONNECTION_STRING,
+    ...worker.auth,
+  };
+  this.accountId = worker.accountId;
 }
 
 util.inherits(Worker, BaseWorker);
@@ -32,19 +38,16 @@ Worker.defaultStandardColumn = {
 Worker.prototype.connect = async function connect() {
   if (this.knex) return this.knex;
   const { accountId } = this;
-  if (!this.accountId) throw new Error('accountId is required');
+  if (!accountId) throw new Error('accountId is required');
 
   let config = null;
-  if (accountId === 'engine9') {
-    const s = process.env.ENGINE9_DATABASE_CONNECTION_STRING;
-    if (!s) throw new Error('Could not find environment variable \'ENGINE9_DATABASE_CONNECTION_STRING\'');
-    config = {
-      client: 'mysql2',
-      connection: process.env.ENGINE9_DATABASE_CONNECTION_STRING,
-    };
-  } else {
-    throw new Error('Unsupported account:', accountId);
-  }
+
+  const s = this.auth.ENGINE9_DATABASE_CONNECTION_STRING;
+  if (!s) throw new Error('Could not find environment variable \'ENGINE9_DATABASE_CONNECTION_STRING\'');
+  config = {
+    client: 'mysql2',
+    connection: s,
+  };
 
   this.knex = Knex(config);
   return this.knex;
@@ -144,15 +147,12 @@ Worker.prototype.indexes = async function indexes({ table, unique, primary }) {
 
   const d = await knex.raw(sql);
 
-  return {
-    table,
-    indexes: d[0].map((i) => ({
-      index_name: i.INDEX_NAME || i.index_name,
-      columns: i.columns,
-      primary: (i.INDEX_NAME || i.index_name) === 'PRIMARY',
-      unique: !!i.unique,
-    })),
-  };
+  return d[0].map((i) => ({
+    index_name: i.INDEX_NAME || i.index_name,
+    columns: i.columns.split(','),
+    primary: (i.INDEX_NAME || i.index_name) === 'PRIMARY',
+    unique: !!i.unique,
+  }));
 };
 
 Worker.prototype.indexes.metadata = {
@@ -343,7 +343,9 @@ Worker.prototype.getSQLName = function (n) {
   return n.trim().replace(/[^0-9a-zA-Z_-]/g, '_').toLowerCase();
 };
 
-Worker.prototype.createTable = async function ({ table: name, columns, timestamps = false }) {
+Worker.prototype.createTable = async function ({
+  table: name, columns, timestamps = false, indexes = [],
+}) {
   if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
   const knex = await this.connect();
   await knex.schema.createTable(name, (table) => {
@@ -375,6 +377,13 @@ Worker.prototype.createTable = async function ({ table: name, columns, timestamp
     });
     const primaries = columns.filter((d) => d.primary_key).map((c) => c.name);
     if (primaries.length > 0) table.primary(primaries);
+    indexes.forEach((x) => {
+      if (x.unique) {
+        table.unique(x.columns);
+      } else {
+        table.index(x.columns);
+      }
+    });
     if (timestamps) table.timestamps();
   });
   return { created: true, table: name };
@@ -386,8 +395,7 @@ Worker.prototype.createTable.metadata = {
   },
 };
 
-Worker.prototype.alterTable = async function ({ table: name, columns }) {
-  if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
+Worker.prototype.alterTable = async function ({ table: name, columns = [], indexes = [] }) {
   const knex = await this.connect();
   await knex.schema.alterTable(name, (table) => {
     const noTypes = columns.filter((c) => !c.type);
@@ -400,33 +408,44 @@ Worker.prototype.alterTable = async function ({ table: name, columns }) {
       debug(`Altering column ${c.name}`, c, 'Knex opts=', {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       });
-      const m = table[method].apply(table, [c.name, ...args]);
-      if (unsigned) m.unsigned();
+      const column = table[method].apply(table, [c.name, ...args]);
+      if (unsigned) column.unsigned();
       if (nullable) {
-        m.nullable();
+        column.nullable();
       } else {
-        m.notNullable();
+        column.notNullable();
       }
       if (defaultRaw !== undefined) {
         const allowedRaw = ['CURRENT_TIMESTAMP',
           'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'];
         if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`Invalid knex raw value:${defaultRaw}`);
-        m.defaultTo(knex.raw(defaultRaw));
+        column.defaultTo(knex.raw(defaultRaw));
       } else if (defaultValue !== undefined) {
-        m.defaultTo(defaultValue);
+        column.defaultTo(defaultValue);
       }
-      m.alter();
+      if (c.differences === 'new') {
+        // knex by default adds it in
+      } else {
+        column.alter();
+      }
     });
-    debug('Finished assigning columns');
     const primaries = columns.filter((d) => d.primary_key).map((c) => c.name);
     if (primaries.length > 0) table.primary(primaries);
+    indexes.forEach((x) => {
+      if (x.unique) {
+        table.unique(x.columns);
+      } else {
+        table.index(x.columns);
+      }
+    });
   });
   return { altered: true, table: name };
 };
-Worker.prototype.createTable.metadata = {
+Worker.prototype.alterTable.metadata = {
   options: {
     table: {},
     columns: {},
+    indexes: {},
   },
 };
 
