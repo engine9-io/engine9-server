@@ -41,6 +41,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
       }
       content = await r.text();
     } else {
+      debug('schema does not start with @engine9-interfaces/, trying local file ');
       content = await fs.promises.readFile(_schema);
     }
 

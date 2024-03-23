@@ -418,17 +418,16 @@ WorkerRunner.prototype.run = function run() {
   async.autoInject({
     accountId: (cb) => getAccountId(cb),
     WorkerConstructor: (accountId, cb) => runner.getWorkerConstructor({ accountId }, cb),
-    environment: (WorkerConstructor, cb) => {
+    defaultEnvironment: (WorkerConstructor, cb) => {
       runner.getWorkerEnvironment({ argv, WorkerConstructor }, cb);
     },
-    method: (environment, WorkerConstructor, cb) => runner.getMethod(WorkerConstructor, cb),
+    method: (defaultEnvironment, WorkerConstructor, cb) => runner.getMethod(WorkerConstructor, cb),
     _options: (method, cb) => runner.getOptionValues(method, cb),
-    _workerInstance: (_options, WorkerConstructor, environment, instanceCallback) => {
+    _workerInstance: (_options, WorkerConstructor, defaultEnvironment, instanceCallback) => {
       try {
-        debug('Constructing the worker instance');
-        const workerInstance = new WorkerConstructor(environment);
-        Object.entries(environment || {}).forEach(([k, v]) => {
-          workerInstance[k] = v;
+        const workerInstance = new WorkerConstructor(defaultEnvironment);
+        Object.entries(defaultEnvironment || {}).forEach(([k, v]) => {
+          workerInstance[k] = workerInstance[k] || v;
         });
         return instanceCallback(null, workerInstance);
       } catch (e) {

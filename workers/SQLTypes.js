@@ -41,18 +41,18 @@ const mysqlTypes = [
   {
     type: 'date_created',
     column_type: 'timestamp',
-    default_value: 'CURRENT_TIMESTAMP',
+    default_value: 'current_timestamp()',
     nullable: false,
     knex_method: 'timestamp',
-    knex_default_raw: 'CURRENT_TIMESTAMP',
+    knex_default_raw: 'current_timestamp()',
   },
   {
     type: 'last_modified',
     column_type: 'timestamp',
-    default_value: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+    default_value: 'current_timestamp() on update current_timestamp()',
     nullable: false,
     knex_method: 'timestamp',
-    knex_default_raw: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+    knex_default_raw: 'current_timestamp() on update current_timestamp()',
   },
   {
     type: 'url',
@@ -112,10 +112,15 @@ module.exports = {
         input.column_type = 'varchar';
         return { ...mysqlTypes.find((t) => t.type === 'string'), ...input };
       }
+
       if (input.column_type.slice(-9).toLowerCase() === ' unsigned') {
         input.column_type = input.column_type.slice(0, -9);
         input.unsigned = true;
       }
+      if (input.column_type.indexOf('bigint') === 0) {
+        input.column_type = 'bigint';
+      }
+      const log = [];
       const typeDef = mysqlTypes.find(
         (type) => {
           const unmatchedAttributes = Object.keys(type).map((attr) => {
@@ -126,12 +131,15 @@ module.exports = {
             return `${attr}:${type[attr]} !== ${input[attr]}`;
           }).filter(Boolean);
           if (unmatchedAttributes.length > 0) {
+            log.push({ type: type.type, unmatchedAttributes });
             return false;
           }
           return true;
         },
       );
-      if (!typeDef) throw new Error(`Could not find type that matches ${JSON.stringify(input)}`);
+      if (!typeDef) {
+        throw new Error(`Could not find type that matches ${JSON.stringify(input)} \n${log.map((s) => JSON.stringify(s)).join('\n')}`);
+      }
 
       return Object.assign(input, typeDef);
     },

@@ -41,7 +41,6 @@ Worker.prototype.connect = async function connect() {
   if (!accountId) throw new Error('accountId is required');
 
   let config = null;
-
   const s = this.auth.ENGINE9_DATABASE_CONNECTION_STRING;
   if (!s) throw new Error('Could not find environment variable \'ENGINE9_DATABASE_CONNECTION_STRING\'');
   config = {
@@ -166,7 +165,7 @@ Worker.prototype.indexes.metadata = {
 Worker.prototype.describe = async function describe(opts) {
   const { table } = opts;
   if (!table) throw new Error(`No table provided to describe with opts ${Object.keys(opts)}`);
-  const sql = `select database() as db,column_name,column_type,data_type,is_nullable,column_default,extra,character_maximum_length,extra FROM information_schema.columns WHERE  table_schema = Database() AND table_name = '${this.escapeTable(table)}' order by ORDINAL_POSITION`;
+  const sql = `select database() as DB,COLUMN_NAME,COLUMN_TYPE,DATA_TYPE,IS_NULLABLE,COLUMN_DEFAULT,CHARACTER_MAXIMUM_LENGTH,EXTRA FROM information_schema.columns WHERE  table_schema = Database() AND table_name = '${this.escapeTable(table)}' order by ORDINAL_POSITION`;
 
   const cols = (await this.query(sql)).data;
   if (cols.length === 0) throw new Error(`Could not find table ${table}`, { cause: 'DOES_NOT_EXIST' });
@@ -174,12 +173,13 @@ Worker.prototype.describe = async function describe(opts) {
   cols.forEach((c) => { Object.keys(c).forEach((k) => { c[k.toUpperCase()] = c[k]; }); });
 
   const results = {};
-  results.database = cols[0].db;
+  results.database = cols[0].DB;
   results.columns = cols.map((d) => {
     let defaultValue = d.COLUMN_DEFAULT;
-    const extra = d.EXTRA.toUpperCase();
-    const onUpdate = 'ON UPDATE CURRENT_TIMESTAMP';
-    if (extra.indexOf(onUpdate) >= 0) defaultValue = (`${defaultValue || ''} ${onUpdate}`).trim();
+    const extra = d.EXTRA;
+    const onUpdate = 'on update current_timestamp()';
+    if (extra.toLowerCase().indexOf(onUpdate) >= 0) defaultValue = (`${defaultValue || ''} ${onUpdate}`).trim();
+    if (defaultValue === 'NULL') defaultValue = null;
     if (defaultValue !== null) {
       const type = d.COLUMN_TYPE.toUpperCase();
       if (type === 'TINYINT(1)') {
@@ -367,9 +367,9 @@ Worker.prototype.createTable = async function ({
         m.notNullable();
       }
       if (defaultRaw !== undefined) {
-        const allowedRaw = ['CURRENT_TIMESTAMP',
-          'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'];
-        if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`Invalid knex raw value:${defaultRaw}`);
+        const allowedRaw = ['current_timestamp()',
+          'current_timestamp() ON UPDATE current_timestamp()'];
+        if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`alter table: Invalid knex raw value:'${defaultRaw}'`);
         m.defaultTo(knex.raw(defaultRaw));
       } else if (defaultValue !== undefined) {
         m.defaultTo(defaultValue);
@@ -416,9 +416,9 @@ Worker.prototype.alterTable = async function ({ table: name, columns = [], index
         column.notNullable();
       }
       if (defaultRaw !== undefined) {
-        const allowedRaw = ['CURRENT_TIMESTAMP',
-          'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'];
-        if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`Invalid knex raw value:${defaultRaw}`);
+        const allowedRaw = ['current_timestamp()',
+          'current_timestamp() ON UPDATE current_timestamp()'];
+        if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`alterTable: Invalid knex raw value:'${defaultRaw}'`);
         column.defaultTo(knex.raw(defaultRaw));
       } else if (defaultValue !== undefined) {
         column.defaultTo(defaultValue);
