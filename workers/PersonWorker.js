@@ -230,9 +230,10 @@ Worker.prototype.upsertBatch = async function ({ batch: _batch, doNotInsert }) {
   return tables;
 };
 
-Worker.prototype.upsert = async function ({ stream, filename, batch_size = 500 }) {
+Worker.prototype.upsert = async function ({ stream, filename, batch_size: batchSize = 500 }) {
   const fileWorker = new FileWorker(this);
   const inStream = await fileWorker.getStream({ stream, filename });
+  debug(batchSize);
   return inStream;
 /*  await pipeline(
     // do batching
