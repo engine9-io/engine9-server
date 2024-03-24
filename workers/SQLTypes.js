@@ -110,6 +110,11 @@ module.exports = {
       if (input.column_type.indexOf('varchar') === 0) {
         // this is a string, which can have all the variations
         input.column_type = 'varchar';
+        if (input.default_value
+          && typeof input.default_value === 'string'
+          && input.default_value.match(/^'.*'$/)) {
+          input.default_value = input.default_value.slice(1, -1);
+        }
         return { ...mysqlTypes.find((t) => t.type === 'string'), ...input };
       }
 
@@ -119,6 +124,9 @@ module.exports = {
       }
       if (input.column_type.indexOf('bigint') === 0) {
         input.column_type = 'bigint';
+      }
+      if (input.column_type.indexOf('int') === 0) {
+        input.column_type = 'int';
       }
       const log = [];
       const typeDef = mysqlTypes.find(

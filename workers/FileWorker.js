@@ -296,15 +296,16 @@ Worker.prototype.testTransform.metadata = {
 };
 
 /* Get a stream from an actual stream, or an array, or a file */
-Worker.prototype.getStream = async function ({ stream } = {}) {
-  if (!stream) throw new Error('No stream provided');
-  if (typeof stream === 'object') return stream;
-  if (Array.isArray(stream)) {
-    return Readable.from(stream);
+Worker.prototype.getStream = async function ({ stream, filename } = {}) {
+  if (stream) {
+    if (typeof stream === 'object') return stream;
+    if (Array.isArray(stream)) {
+      return Readable.from(stream);
+    }
+    throw new Error(`Invalid stream type:${typeof stream}`);
   }
 
-  const { stream: fileStream } = await this.fileToObjectStream({ filename: stream });
-  return fileStream;
+  return this.fileToObjectStream({ filename });
 };
 
 module.exports = Worker;

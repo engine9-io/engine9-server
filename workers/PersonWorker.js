@@ -7,6 +7,7 @@ const through2 = require('through2');
 // const fs = require('fs');
 const debug = require('debug')('PersonWorker');
 const SQLWorker = require('./SQLWorker');
+const FileWorker = require('./FileWorker');
 
 const ExtensionBaseWorker = require('./ExtensionBaseWorker');
 
@@ -181,21 +182,32 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
 
 Worker.prototype.upsertBatch = async function ({ batch: _batch, doNotInsert }) {
   const batch = _batch;
+  if (!batch) throw new Error('upsert requires a batch');
+
+  const transforms = [];
   const identifierPaths = [
     '../core_extensions/person_email/transforms/inbound/append_identifiers.js',
   ];
-  // assign identifiers to the batch
-  await Promise.all(
-    identifierPaths.map(async (path) => {
-      const transform = await this.compileTransform({ path });
-      if (typeof transform !== 'function') {
-        throw new Error(`Invalid transform path, not a function:${path}`);
-      }
-      return transform(batch);
-    }),
-  );
-  // assign person ids
-  await this.appendPersonIds({ batch });
+
+  // eslint-disable-next-line no-restricted-syntax
+  for (const path of identifierPaths) {
+    // eslint-disable-next-line no-await-in-loop
+    const transform = await this.compileTransform({ path });
+    transforms.push({ transform });
+  }
+
+  transforms.push({ transform: this.appendPersonIds });
+
+  // eslint-disable-next-line no-restricted-syntax
+  for (const { transform } of transforms) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await transform({ batch });
+    } catch (e) {
+      debug('Bad batch:', batch);
+      throw e;
+    }
+  }
 
   const tableTransforms = [
     '../core_extensions/person_name/transforms/inbound/extract_tables.js',
@@ -218,43 +230,20 @@ Worker.prototype.upsertBatch = async function ({ batch: _batch, doNotInsert }) {
   return tables;
 };
 
-Worker.prototype.upsert = async function ({ batch: _batch, doNotInsert }) {
-  const batch = _batch;
-  const identifierPaths = [
-    '../core_extensions/person_email/transforms/inbound/append_identifiers.js',
-  ];
-  // assign identifiers to the batch
-  await Promise.all(
-    identifierPaths.map(async (path) => {
-      const transform = await this.compileTransform({ path });
-      if (typeof transform !== 'function') {
-        throw new Error(`Invalid transform path, not a function:${path}`);
-      }
-      return transform(batch);
+Worker.prototype.upsert = async function ({ stream, filename, batch_size = 500 }) {
+  const fileWorker = new FileWorker(this);
+  const inStream = await fileWorker.getStream({ stream, filename });
+  return inStream;
+/*  await pipeline(
+    // do batching
+    stream,
+    emailExtension,
+    through2.obj((o, enc, cb) => {
+      debug('Through2:', o);
+      cb(null, `${JSON.stringify(o)}\n`);
     }),
-  );
-  // assign person ids
-  await this.appendPersonIds({ batch });
-
-  const tableTransforms = [
-    '../core_extensions/person_name/transforms/inbound/extract_tables.js',
-    '../core_extensions/person_email/transforms/inbound/extract_tables.js',
-    '../core_extensions/person_address/transforms/inbound/extract_tables.js',
-  ];
-  const tables = {};
-  // assign identifiers to the batch
-  await Promise.all(
-    tableTransforms.map(async (path) => {
-      const transform = await this.compileTransform({ path });
-
-      const batchTables = await transform(batch);
-      Object.keys(batchTables).forEach((table) => {
-        tables[table] = (tables[table] || []).concat(batchTables[table]);
-      });
-    }),
-  );
-  if (doNotInsert) return tables;
-  return tables;
+    fileStream,
+  ); */
 };
 
 Worker.prototype.upsert.metadata = {

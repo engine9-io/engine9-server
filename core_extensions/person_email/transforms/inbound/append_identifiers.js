@@ -1,6 +1,6 @@
 const { createHmac } = require('node:crypto');
 
-module.exports = async function (batch) {
+module.exports = async function ({ batch }) {
   const ids = [];
   batch.forEach((e) => {
     e.identifiers = e.identifiers || [];

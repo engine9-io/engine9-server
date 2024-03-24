@@ -368,8 +368,8 @@ Worker.prototype.createTable = async function ({
       }
       if (defaultRaw !== undefined) {
         const allowedRaw = ['current_timestamp()',
-          'current_timestamp() ON UPDATE current_timestamp()'];
-        if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`alter table: Invalid knex raw value:'${defaultRaw}'`);
+          'current_timestamp() on update current_timestamp()'];
+        if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`createTable: Invalid knex raw value:'${defaultRaw}'`);
         m.defaultTo(knex.raw(defaultRaw));
       } else if (defaultValue !== undefined) {
         m.defaultTo(defaultValue);
