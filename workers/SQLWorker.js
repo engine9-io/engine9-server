@@ -130,6 +130,11 @@ Worker.prototype.escapeTable = function escapeTable(t) {
   if (!t.match(tableNameMatch)) throw new Error(`Invalid table name: ${t}`);
   return t;
 };
+const fieldNameMatch = /^[a-zA-Z0-9_]+$/;
+Worker.prototype.escapeColumn = function escapeColumn(t) {
+  if (!t.match(fieldNameMatch)) throw new Error(`Invalid field name: ${t}`);
+  return t;
+};
 
 Worker.prototype.indexes = async function indexes({ table, unique, primary }) {
   let sql = `SELECT index_name,group_concat(column_name order by seq_in_index) as columns, not(non_unique) as \`unique\` 
@@ -452,36 +457,39 @@ Worker.prototype.alterTable.metadata = {
 Worker.prototype.onDuplicate = function () { return 'on duplicate key update'; };
 Worker.prototype.onDuplicateFieldValue = function (f) { return `VALUES(${f})`; };
 
-Worker.prototype.createInsertSql = function (options) {
+Worker.prototype.buildInsertSql = function (options) {
   const worker = this;
   const {
-    knex, table, columns, rows,
+    knex, table, columns, rows, upsert = false, ignoreDupes = false, returning = [],
   } = options;
 
   if (columns.length === 0) throw new Error('no columns set before createInsert was called');
   let sql = 'INSERT';
-  if (bool(options.ignore_dupes, false)) {
+  if (bool(ignoreDupes, false)) {
     sql += ' ignore ';
   }
 
   sql += ` into ${table} (${columns.map((d) => knex.raw('??', d.name)).join(',')}) values ${rows.join(',')}`;
 
-  if (bool(options.upsert, false)) {
+  if (bool(upsert, false)) {
     sql += ` ${worker.onDuplicate()} ${columns.map((column) => {
       const n = column.name;
 
       return `${knex.raw('??', n)}=${worker.onDuplicateFieldValue(knex.raw('??', n))}`;
     }).filter(Boolean).join(',')}`;
+
+    // Not everything supports returning fields, but if it does ...
+    if (returning.length > 0) sql += ` returning ${returning.map((d) => this.escapeColumn(d))}`;
   }
 
   return sql;
 };
 
 Worker.prototype.insertFromStream = async function (options) {
+  const worker = this;
   const desc = await this.describe(options);
   const knex = await this.connect();
   return new Promise((resolve, reject) => {
-    const worker = this;
     const table = this.escapeTable(options.table);
     let { stream } = options;
     if (!stream) {
@@ -596,7 +604,7 @@ Worker.prototype.insertFromStream = async function (options) {
 
         let v = null;
         try {
-          v = worker.stringToType(val, def.data_type, def.length, def.nullable, nullAsString);
+          v = worker.stringToType(val, def.column_type, def.length, def.nullable, nullAsString);
         } catch (e) {
           throw new Error(`Error with column ${def.name}: ${e}`);
         }
@@ -654,6 +662,61 @@ Worker.prototype.insertFromStream.metadata = {
     table: {},
     stream: {},
   },
+};
+
+/* Standard tables have an id field that is used to */
+Worker.prototype.upsertArray = async function ({ table, array }) {
+  if (!Array.isArray(array)) throw new Error('an array is required to upsert');
+  if (array.length === 0) return [];
+
+  const desc = await this.describe({ table });
+  const knex = await this.connect();
+
+  // Use the first object to define the columns we're trying to upsert
+  // Otherwise we have to do much less efficient per-item updates.
+  // If you need to only specify some values, a previous deduplication
+  // run should pre-populate the correct values
+  const includedColumns = desc.columns.filter((f) => array[0][f.name] !== undefined);
+  const rows = array.map((o) => {
+    const values = includedColumns.map((def) => {
+      const val = o[def.name];
+
+      let v = null;
+      try {
+        v = this.stringToType(val, def.column_type, def.length, def.nullable);
+      } catch (e) {
+        throw new Error(`Error with column '${def.name}': ${e}, object=${JSON.stringify(o)}`);
+      }
+
+      return knex.raw('?', [v]);
+    });
+
+    return `(${values.join(',')})`;
+  });
+  const sql = this.buildInsertSql({
+    knex, table, columns: includedColumns, rows, upsert: true, returning: ['id'],
+  });
+  const { data } = await this.query(sql);
+  data.forEach((d, i) => {
+    if (array[i].id && d.id !== array[i].id) throw new Error(`There was a problem upserting object with id ${array[i].id},invalid id returned`);
+    array[i].id = d.id;
+  });
+  return array;
+};
+
+Worker.prototype.drop = async function ({ table }) {
+  if (!table) throw new Error('table is required');
+
+  return this.query(`drop table if exists ${this.escapeTable(table)}`);
+};
+
+Worker.prototype.drop.metadata = {
+  bot: true,
+  options: { table: { required: true } },
+};
+
+Worker.prototype.destroy = function () {
+  if (this.knex) this.knex.destroy();
 };
 
 module.exports = Worker;

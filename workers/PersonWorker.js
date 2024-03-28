@@ -9,13 +9,13 @@ const debug = require('debug')('PersonWorker');
 const SQLWorker = require('./SQLWorker');
 const FileWorker = require('./FileWorker');
 
-const ExtensionBaseWorker = require('./ExtensionBaseWorker');
+const PluginBaseWorker = require('./PluginBaseWorker');
 
 function Worker(worker) {
-  ExtensionBaseWorker.call(this, worker);
+  PluginBaseWorker.call(this, worker);
 }
 
-util.inherits(Worker, ExtensionBaseWorker);
+util.inherits(Worker, PluginBaseWorker);
 
 Worker.prototype.getOutboundStream = async function () {
   const sqlWorker = new SQLWorker(this);

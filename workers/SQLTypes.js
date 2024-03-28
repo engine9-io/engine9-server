@@ -17,6 +17,16 @@ const mysqlTypes = [
   {
     type: 'string', column_type: 'varchar', length: 255, knex_method: 'string', knex_args: ((o) => ([o.length || 255])),
   },
+  {
+    type: 'hash',
+    column_type: 'varchar',
+    length: 64,
+    nullable: false,
+    default_value: '',
+    knex_method: 'string',
+    knex_args: ((o) => ([o.length || 64])),
+  },
+
   { type: 'int', column_type: 'int', knex_method: 'integer' },
   { type: 'bigint', column_type: 'bigint', knex_method: 'bigint' },
   /* decimal(19,2) is chosen for currency
@@ -86,6 +96,7 @@ module.exports = {
       // The name of the knex methods is ... inconsistent
       const { type } = col;
       const typeDef = mysqlTypes.find((t) => t.type === type);
+      if (!typeDef) throw new Error(`Could not find type ${type}`);
       let { nullable } = col;
       if (nullable === undefined) {
         nullable = typeDef.nullable;

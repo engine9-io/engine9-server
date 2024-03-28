@@ -1,7 +1,12 @@
 const util = require('util');
+const fs = require('node:fs');
+
+const fsp = fs.promises;
+const JSON5 = require('json5');// Useful for parsing extended JSON
 
 const BaseWorker = require('./BaseWorker');
 const SQLWorker = require('./SQLWorker');
+const FileWorker = require('./FileWorker');
 
 function Worker(worker) {
   BaseWorker.call(this, worker);
@@ -10,15 +15,15 @@ function Worker(worker) {
 util.inherits(Worker, BaseWorker);
 
 /*
-  Core method that takes an extension configuration,
+  Core method that takes an plugin configuration,
   creates all the environment variables, including SQL, etc
 */
 
 const validPaths = /^[a-zA-Z-_]+$/; // Don't allow dots or anything crazy in path names - simple simple
-Worker.prototype.compileExtension = async function ({ extensionPath }) {
-  if (!extensionPath?.match(validPaths)) throw new Error(`Invalid extension path: ${extensionPath}`);
+Worker.prototype.compilePlugin = async function ({ pluginPath }) {
+  if (!pluginPath?.match(validPaths)) throw new Error(`Invalid plugin path: ${pluginPath}`);
   // eslint-disable-next-line import/no-dynamic-require,global-require
-  const config = require(`./${extensionPath}/engine9_extension.js`);
+  const config = require(`./${pluginPath}/engine9_plugin.js`);
 
   let sqlConnection = null;
 
@@ -56,9 +61,38 @@ Worker.prototype.compileExtension = async function ({ extensionPath }) {
 };
 
 Worker.prototype.compileTransform = async function ({ path }) {
+  if (path === 'upsertTables') {
+  }
   // eslint-disable-next-line import/no-dynamic-require,global-require
   const transform = require(path);
   return transform;
+};
+
+Worker.prototype.compilePipeline = async function ({ pipeline: _pipeline }) {
+  let pipeline = null;
+  if (typeof _pipeline === 'string') {
+    pipeline = JSON5.parse(await fsp.readFile(_pipeline));
+  } else {
+    pipeline = _pipeline;
+  }
+  const transforms = Promise.all(pipeline.transforms.map((t) => this.compileTransform(t)));
+  return transforms;
+};
+
+Worker.prototype.testPipeline = async function ({ stream, filename }) {
+  const fileWorker = new FileWorker(this);
+  const inStream = await fileWorker.getStream({ stream, filename });
+  return inStream;
+  /*  await pipeline(
+    // do batching
+    stream,
+    emailExtension,
+    through2.obj((o, enc, cb) => {
+      debug('Through2:', o);
+      cb(null, `${JSON.stringify(o)}\n`);
+    }),
+    fileStream,
+  ); */
 };
 
 module.exports = Worker;
