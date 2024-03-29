@@ -41,7 +41,10 @@ Worker.prototype.connect = async function connect() {
   if (!accountId) throw new Error('accountId is required');
 
   let config = null;
-  const s = this.auth.ENGINE9_DATABASE_CONNECTION_STRING;
+  let s = this.auth.ENGINE9_DATABASE_CONNECTION_STRING;
+  if (accountId === 'test') {
+    s = this.auth.ENGINE9_TEST_DATABASE_CONNECTION_STRING;
+  }
   if (!s) throw new Error('Could not find environment variable \'ENGINE9_DATABASE_CONNECTION_STRING\'');
   config = {
     client: 'mysql2',
