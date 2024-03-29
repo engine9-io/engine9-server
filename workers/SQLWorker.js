@@ -16,6 +16,8 @@ function Worker(worker) {
   this.auth = {
     ENGINE9_DATABASE_CONNECTION_STRING:
     process.env.ENGINE9_DATABASE_CONNECTION_STRING,
+    ENGINE9_TEST_DATABASE_CONNECTION_STRING:
+    process.env.ENGINE9_TEST_DATABASE_CONNECTION_STRING,
     ...worker.auth,
   };
   this.accountId = worker.accountId;
@@ -44,8 +46,10 @@ Worker.prototype.connect = async function connect() {
   let s = this.auth.ENGINE9_DATABASE_CONNECTION_STRING;
   if (accountId === 'test') {
     s = this.auth.ENGINE9_TEST_DATABASE_CONNECTION_STRING;
+    if (!s) throw new Error('Could not find environment variable \'ENGINE9_TEST_DATABASE_CONNECTION_STRING\'');
   }
   if (!s) throw new Error('Could not find environment variable \'ENGINE9_DATABASE_CONNECTION_STRING\'');
+
   config = {
     client: 'mysql2',
     connection: s,
@@ -74,7 +78,7 @@ Worker.prototype.query.metadata = {
   },
 };
 
-Worker.prototype.tables = async function f(options) {
+Worker.prototype.tables = async function f(options = {}) {
   let sql = 'select TABLE_NAME from information_schema.tables where table_schema=';
   if (options.database) {
     sql += this.escapeValue(options.database);
@@ -707,6 +711,11 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
   return array;
 };
 
+Worker.prototype.upsertTables = async function ({ tablesToUpsert }) {
+  return Promise.all(Object.keys(tablesToUpsert)
+    .map((table) => this.upsertArray({ table, array: tablesToUpsert[table] })));
+};
+
 Worker.prototype.drop = async function ({ table }) {
   if (!table) throw new Error('table is required');
 
@@ -716,10 +725,6 @@ Worker.prototype.drop = async function ({ table }) {
 Worker.prototype.drop.metadata = {
   bot: true,
   options: { table: { required: true } },
-};
-
-Worker.prototype.destroy = function () {
-  if (this.knex) this.knex.destroy();
 };
 
 module.exports = Worker;

@@ -180,29 +180,32 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
   return batch;
 };
 
+const pipelineConfig = {
+  transforms: [
+    { transform: 'engine9-interfaces/person_email/transforms/inbound/extract_identifiers.js' },
+    { transform: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js' },
+    { transform: 'person.appendPersonIds' },
+    { transform: 'engine9-interfaces/person_email/transforms/inbound/extract_tables.js' },
+    { transform: 'engine9-interfaces/person_address/transforms/inbound/extract_tables.js' },
+    { transform: 'sql.upsertTables' },
+  ],
+};
+
 Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
   const batch = _batch;
   if (!batch) throw new Error('upsert requires a batch');
-  const sqlWorker = new SQLWorker(this);
-  const pipelineConfig = {
-    transforms: [
-      { transform: '../../engine9-interfaces/person_email/transforms/inbound/append_identifiers.js' },
-      { transform: this.appendPersonIds },
-      { transform: '../../person_name/transforms/inbound/extract_tables.js' },
-      { transform: '../../engine9-interfaces/person_email/transforms/inbound/extract_tables.js' },
-      { transform: '../../engine9-interfaces/person_address/transforms/inbound/extract_tables.js' },
-      { transform: sqlWorker.upsertArray },
-    ],
-  };
-  const { transforms } = this.compilePipeline(pipelineConfig);
 
+  const { transforms } = await this.compilePipeline(pipelineConfig);
+
+  const tablesToUpsert = {};
   // eslint-disable-next-line no-restricted-syntax
-  for (const { transform } of transforms) {
+  for (const { transform, options } of transforms) {
     try {
       // eslint-disable-next-line no-await-in-loop
-      await transform({ batch });
+      await transform({ batch, tablesToUpsert, options });
     } catch (e) {
       debug('Bad batch:', batch);
+      this.destroy();
       throw e;
     }
   }

@@ -62,20 +62,37 @@ Worker.prototype.compilePlugin = async function ({ pluginPath }) {
 
 Worker.prototype.compileTransform = async function ({ transform }) {
   if (typeof transform === 'function') return transform;
+  if (transform === 'person.appendPersonIds') {
+    return (opts) => this.appendPersonIds(opts);
+  } if (transform === 'sql.upsertTables') {
+    if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
+    return (opts) => this.sqlWorker.upsertTables(opts);
+  }
+
   // eslint-disable-next-line import/no-dynamic-require,global-require
   return require(transform);
 };
 
-Worker.prototype.compilePipeline = async function ({ pipeline: _pipeline }) {
+Worker.prototype.compilePipeline = async function (_pipeline) {
+  if (!_pipeline) throw new Error('pipeline is a required attribute');
   let pipeline = null;
   if (typeof _pipeline === 'string') {
     pipeline = JSON5.parse(await fsp.readFile(_pipeline));
   } else {
     pipeline = _pipeline;
   }
+  pipeline.transforms = pipeline.transforms || [];
 
-  const transforms = Promise.all(pipeline.transforms.map(({ transform }) => this.compileTransform({ transform })));
-  return { transforms };
+  const compiledTransforms = await Promise.all(pipeline.transforms
+    .map(({ transform }) => this.compileTransform({ transform })));
+
+  const output = {
+    transforms: compiledTransforms.map((transform, i) => ({
+      transform,
+      options: pipeline.transforms[i].options,
+    })),
+  };
+  return output;
 };
 
 Worker.prototype.testPipeline = async function ({ stream, filename }) {

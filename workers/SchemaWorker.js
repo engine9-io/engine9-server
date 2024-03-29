@@ -28,6 +28,10 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
   let schema = null;
   if (typeof _schema === 'object') {
     schema = _schema;
+  } else if (typeof _schema === 'string' && _schema.indexOf('engine9-interfaces/') === 0) {
+    // This is a local version, not a github version
+    // eslint-disable-next-line import/no-dynamic-require,global-require
+    schema = require(`${_schema}${_schema.slice(-1) === '/' ? '' : '/'}schema.js`);
   } else {
     let content = null;
     if (_schema.indexOf('@engine9-interfaces/') === 0) {

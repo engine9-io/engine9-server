@@ -100,4 +100,9 @@ Worker.prototype.getFilename.metadata = {
   options: { filename: { required: true } },
 };
 
+// Clean up database pools
+Worker.prototype.destroy = function () {
+  if (typeof this.knex?.destroy === 'function') this.knex.destroy();
+};
+
 module.exports = Worker;
