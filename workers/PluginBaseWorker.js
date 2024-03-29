@@ -60,12 +60,10 @@ Worker.prototype.compilePlugin = async function ({ pluginPath }) {
   });
 };
 
-Worker.prototype.compileTransform = async function ({ path }) {
-  if (path === 'upsertTables') {
-  }
+Worker.prototype.compileTransform = async function ({ transform }) {
+  if (typeof transform === 'function') return transform;
   // eslint-disable-next-line import/no-dynamic-require,global-require
-  const transform = require(path);
-  return transform;
+  return require(transform);
 };
 
 Worker.prototype.compilePipeline = async function ({ pipeline: _pipeline }) {
@@ -75,8 +73,9 @@ Worker.prototype.compilePipeline = async function ({ pipeline: _pipeline }) {
   } else {
     pipeline = _pipeline;
   }
-  const transforms = Promise.all(pipeline.transforms.map((t) => this.compileTransform(t)));
-  return transforms;
+
+  const transforms = Promise.all(pipeline.transforms.map(({ transform }) => this.compileTransform({ transform })));
+  return { transforms };
 };
 
 Worker.prototype.testPipeline = async function ({ stream, filename }) {

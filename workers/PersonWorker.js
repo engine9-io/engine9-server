@@ -180,23 +180,21 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
   return batch;
 };
 
-Worker.prototype.upsertBatch = async function ({ batch: _batch, doNotInsert }) {
+Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
   const batch = _batch;
   if (!batch) throw new Error('upsert requires a batch');
-
-  const transforms = [];
-  const identifierPaths = [
-    '../core_extensions/person_email/transforms/inbound/append_identifiers.js',
-  ];
-
-  // eslint-disable-next-line no-restricted-syntax
-  for (const path of identifierPaths) {
-    // eslint-disable-next-line no-await-in-loop
-    const transform = await this.compileTransform({ path });
-    transforms.push({ transform });
-  }
-
-  transforms.push({ transform: this.appendPersonIds });
+  const sqlWorker = new SQLWorker(this);
+  const pipelineConfig = {
+    transforms: [
+      { transform: '../../engine9-interfaces/person_email/transforms/inbound/append_identifiers.js' },
+      { transform: this.appendPersonIds },
+      { transform: '../../person_name/transforms/inbound/extract_tables.js' },
+      { transform: '../../engine9-interfaces/person_email/transforms/inbound/extract_tables.js' },
+      { transform: '../../engine9-interfaces/person_address/transforms/inbound/extract_tables.js' },
+      { transform: sqlWorker.upsertArray },
+    ],
+  };
+  const { transforms } = this.compilePipeline(pipelineConfig);
 
   // eslint-disable-next-line no-restricted-syntax
   for (const { transform } of transforms) {
@@ -208,26 +206,7 @@ Worker.prototype.upsertBatch = async function ({ batch: _batch, doNotInsert }) {
       throw e;
     }
   }
-
-  const tableTransforms = [
-    '../core_extensions/person_name/transforms/inbound/extract_tables.js',
-    '../core_extensions/person_email/transforms/inbound/extract_tables.js',
-    '../core_extensions/person_address/transforms/inbound/extract_tables.js',
-  ];
-  const tables = {};
-  // assign identifiers to the batch
-  await Promise.all(
-    tableTransforms.map(async (path) => {
-      const transform = await this.compileTransform({ path });
-
-      const batchTables = await transform(batch);
-      Object.keys(batchTables).forEach((table) => {
-        tables[table] = (tables[table] || []).concat(batchTables[table]);
-      });
-    }),
-  );
-  if (doNotInsert) return tables;
-  return tables;
+  return batch;
 };
 
 Worker.prototype.upsert = async function ({ stream, filename, batch_size: batchSize = 500 }) {
