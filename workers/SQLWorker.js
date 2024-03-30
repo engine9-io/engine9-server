@@ -65,23 +65,26 @@ Worker.prototype.ok = async function f() {
 Worker.prototype.ok.metadata = {
   options: {},
 };
-Worker.prototype.query = async function (_sql) {
+Worker.prototype.query = async function (_sql, bindings = []) {
   let sql = _sql;
   if (typeof _sql !== 'string') sql = _sql.sql;
   const knex = await this.connect();
-  const [data, columns] = await knex.raw(sql);
+  const [data, columns] = await knex.raw(sql, bindings);
   return { data, columns };
 };
 Worker.prototype.query.metadata = {
   options: {
     sql: {},
+    bindings: { description: 'Array of escapable values' },
   },
 };
 
 Worker.prototype.tables = async function f(options = {}) {
   let sql = 'select TABLE_NAME from information_schema.tables where table_schema=';
+  const bindings = [];
   if (options.database) {
-    sql += this.escapeValue(options.database);
+    sql += '?';
+    bindings.push(options.database);
   } else {
     sql += 'database()';
   }
@@ -91,7 +94,7 @@ Worker.prototype.tables = async function f(options = {}) {
     sql += " and table_type='BASE TABLE'";
   }
 
-  let d = await this.query(sql);
+  let d = await this.query(sql, bindings);
   d = d.data.map((t) => t.TABLE_NAME || t.table_name);
   d.sort((a, b) => (a < b ? -1 : 1));
 
@@ -723,6 +726,16 @@ Worker.prototype.drop = async function ({ table }) {
 };
 
 Worker.prototype.drop.metadata = {
+  bot: true,
+  options: { table: { required: true } },
+};
+Worker.prototype.truncate = async function ({ table }) {
+  if (!table) throw new Error('table is required');
+
+  return this.query(`truncate table ${this.escapeTable(table)}`);
+};
+
+Worker.prototype.truncate.metadata = {
   bot: true,
   options: { table: { required: true } },
 };

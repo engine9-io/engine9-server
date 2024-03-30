@@ -60,17 +60,41 @@ Worker.prototype.compilePlugin = async function ({ pluginPath }) {
   });
 };
 
-Worker.prototype.compileTransform = async function ({ transform }) {
-  if (typeof transform === 'function') return transform;
-  if (transform === 'person.appendPersonIds') {
-    return (opts) => this.appendPersonIds(opts);
-  } if (transform === 'sql.upsertTables') {
+/* Compiles the transform exclusively, bindings are handled elsewhere */
+Worker.prototype.compileTransform = async function ({ transform, path, options }) {
+  if (typeof transform === 'function') {
+    return {
+      path: 'custom_transform',
+      bindings: {},
+      transform,
+    };
+  }
+  if (transform) throw new Error('transform should be a function');
+  if (path === 'person.appendPersonIds') {
+    return {
+      path,
+      bindings: {},
+      transform: (opts) => this.appendPersonIds(opts),
+    };
+  } if (path === 'sql.upsertTables') {
     if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
-    return (opts) => this.sqlWorker.upsertTables(opts);
+    return {
+      path,
+      bindings: {
+        tablesToUpsert: { type: 'sql.tablesToUpsert' },
+      },
+      transform: (opts) => this.sqlWorker.upsertTables(opts),
+    };
   }
 
   // eslint-disable-next-line import/no-dynamic-require,global-require
-  return require(transform);
+  const f = require(path);
+  if (typeof f === 'function') return { path, bindings: {}, transform: f };
+  return {
+    path,
+    bindings: f.bindings || {},
+    transform: f.transform,
+  };
 };
 
 Worker.prototype.compilePipeline = async function (_pipeline) {
@@ -83,16 +107,61 @@ Worker.prototype.compilePipeline = async function (_pipeline) {
   }
   pipeline.transforms = pipeline.transforms || [];
 
-  const compiledTransforms = await Promise.all(pipeline.transforms
-    .map(({ transform }) => this.compileTransform({ transform })));
+  const transforms = await Promise.all(pipeline.transforms
+    .map(({ transform, path, options }) => this.compileTransform({ transform, path, options })));
 
-  const output = {
-    transforms: compiledTransforms.map((transform, i) => ({
-      transform,
-      options: pipeline.transforms[i].options,
-    })),
-  };
-  return output;
+  return { transforms };
+};
+
+Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) {
+  const tablesToUpsert = {};
+
+  // eslint-disable-next-line no-restricted-syntax
+  for (const {
+    transform, bindings, options, path,
+  } of pipeline.transforms) {
+    try {
+      if (!path) {
+        throw new Error(`no path found in ${JSON.stringify({
+          transform, bindings, options, path,
+        })}`);
+      }
+      const cleanPath = path.replace(/^[a-zA-Z/_-]*/, '_');
+      const transformParams = { batch, options };
+      const bindingNames = Object.keys(bindings);
+      // eslint-disable-next-line no-await-in-loop
+      await Promise.all(bindingNames.map(async (name) => {
+        const binding = bindings[name];
+        if (!binding.type) throw new Error(`type is required for binding ${name}`);
+        if (binding.type === 'sql.query') {
+          if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
+          if (!binding.columns) throw new Error(`columns are required for binding ${name}`);
+          if (binding.columns.length !== 1) throw new Error(`Currently only one column is allowed for sql.query bindings, found ${binding.columns.length} for ${name}`);
+          const values = new Set();
+          batch.forEach((b) => {
+            const v = b[binding.columns[0]];
+            if (v) values.add(v);
+          });
+          if (values.length === 0) {
+            transformParams[name] = [];
+            return;
+          }
+          const sql = `/* ${cleanPath} */ select * from ${this.sqlWorker.escapeTable(binding.table)}`
+          + ` where ${this.sqlWorker.escapeColumn(binding.columns[0])} in (${[...values].map(() => '?').join(',')})`;
+          const { data } = await this.sqlWorker.query(sql, [...values]);
+          transformParams[name] = data;
+        } else if (binding.type === 'sql.tablesToUpsert') {
+          transformParams[name] = tablesToUpsert;
+        }
+      }));
+
+      // eslint-disable-next-line no-await-in-loop
+      await transform(transformParams);
+    } catch (e) {
+      this.destroy();
+      throw e;
+    }
+  }
 };
 
 Worker.prototype.testPipeline = async function ({ stream, filename }) {

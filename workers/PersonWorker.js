@@ -182,12 +182,12 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
 
 const pipelineConfig = {
   transforms: [
-    { transform: 'engine9-interfaces/person_email/transforms/inbound/extract_identifiers.js' },
-    { transform: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js' },
-    { transform: 'person.appendPersonIds' },
-    { transform: 'engine9-interfaces/person_email/transforms/inbound/extract_tables.js' },
-    { transform: 'engine9-interfaces/person_address/transforms/inbound/extract_tables.js' },
-    { transform: 'sql.upsertTables' },
+    { path: 'engine9-interfaces/person_email/transforms/inbound/extract_identifiers.js' },
+    { path: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js' },
+    { path: 'person.appendPersonIds' },
+    { path: 'engine9-interfaces/person_email/transforms/inbound/extract_tables.js' },
+    { path: 'engine9-interfaces/person_address/transforms/inbound/extract_tables.js' },
+    { path: 'sql.upsertTables' },
   ],
 };
 
@@ -195,20 +195,10 @@ Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
   const batch = _batch;
   if (!batch) throw new Error('upsert requires a batch');
 
-  const { transforms } = await this.compilePipeline(pipelineConfig);
+  const compiledPipeline = await this.compilePipeline(pipelineConfig);
 
-  const tablesToUpsert = {};
-  // eslint-disable-next-line no-restricted-syntax
-  for (const { transform, options } of transforms) {
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      await transform({ batch, tablesToUpsert, options });
-    } catch (e) {
-      debug('Bad batch:', batch);
-      this.destroy();
-      throw e;
-    }
-  }
+  await this.executeCompiledPipeline({ pipeline: compiledPipeline, batch });
+
   return batch;
 };
 

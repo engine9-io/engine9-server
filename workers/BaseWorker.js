@@ -7,16 +7,17 @@ const { mkdirp } = require('mkdirp');
 
 const { Transform } = require('node:stream');
 
-function Worker(worker) {
-  if (worker) {
-    this.accountId = String(worker.accountId);
-    this.log = worker.log;
-    this.progress = worker.progress;
-    this.warn = worker.warn;
-    if (worker.worker_id) this.worker_id = worker.worker_id;
-    if (worker.auth) this.auth = worker.auth;
-    if (worker.checkpoint) this.checkpoint = worker.checkpoint;
-    if (worker.status_code) this.status_code = worker.status_code;
+function Worker(config) {
+  if (config) {
+    this.accountId = String(config.accountId);
+    this.log = config.log;
+    this.progress = config.progress;
+    this.warn = config.warn;
+    if (config.config_id) this.config_id = config.config_id;
+    if (config.auth) this.auth = config.auth;
+    if (config.checkpoint) this.checkpoint = config.checkpoint;
+    if (config.status_code) this.status_code = config.status_code;
+    if (config.knex) this.knex = config.knex;
   }
 
   this.metadata = this.constructor.metadata || {};
