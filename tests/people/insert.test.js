@@ -35,7 +35,7 @@ describe('Deploy schemas and upsert people', async () => {
     await Promise.all(tables.map((table) => schemaWorker.truncate({ table })));
   }
 
-  before(clearDB);
+  // before(clearDB);
 
   after(async () => {
     debug('Destroying person and schema worker');
