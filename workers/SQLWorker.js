@@ -135,14 +135,20 @@ Worker.prototype.tables.metadata = {
   options: {},
 };
 
+Worker.prototype.escapeValue = function escapeValue(t) {
+  return SQLTypes.mysql.escapeValue(t);
+};
+
 const tableNameMatch = /^[a-zA-Z0-9_]+$/;
 Worker.prototype.escapeTable = function escapeTable(t) {
   if (!t.match(tableNameMatch)) throw new Error(`Invalid table name: ${t}`);
   return t;
 };
-const fieldNameMatch = /^[a-zA-Z0-9_]+$/;
+// Engine 9 follows a very restrictive column name standard, intended for cross-compatability
+// Thus, escaping column names is mostly about validating they're following the rules
+const columnNameMatch = /^[a-zA-Z0-9_]+$/;
 Worker.prototype.escapeColumn = function escapeColumn(t) {
-  if (!t.match(fieldNameMatch)) throw new Error(`Invalid field name: ${t}`);
+  if (!t.match(columnNameMatch)) throw new Error(`Invalid field name: ${t}`);
   return t;
 };
 
@@ -229,6 +235,10 @@ Worker.prototype.describe.metadata = {
   options: {
     table: { required: true },
   },
+};
+
+Worker.prototype.getSupportedSQLFunctions = function () {
+  return SQLTypes.mysql.supportedFunctions();
 };
 
 Worker.prototype.stream = async function describe({ sql }) {

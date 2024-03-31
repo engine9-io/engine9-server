@@ -30,10 +30,10 @@ function walkNodes(options, parsed) {
   return internal(parsed);
 }
 const toSqlHandlers = {
-  column: (node, { tableFn, fieldFn, defaultTable }) => {
+  column: (node, { tableFn, columnFn, defaultTable }) => {
     const { table = defaultTable, name } = node;
-    if (table) return `${tableFn(table)}.${fieldFn(name)}`;
-    return fieldFn(name);
+    if (table) return `${tableFn(table)}.${columnFn(name)}`;
+    return columnFn(name);
   },
   operator: (node, { internal }) => {
     const { left, right, operator } = node;
@@ -48,7 +48,7 @@ const toSqlHandlers = {
   },
   decimal: (node) => parseFloat(node.value),
   string: (node, { valueFn }) => valueFn(node.string),
-  identifier: (node, fieldFn) => fieldFn(node.value),
+  identifier: (node, columnFn) => columnFn(node.value),
   distinct: ({ operand }, { internal }) => `distinct ${internal(operand)}`,
   ifnull: (node, { internal }) => {
     const { value, rest } = node;
@@ -166,12 +166,12 @@ const toSqlHandlers = {
   data_type: ({ data_type }) => data_type,
 };
 
-const required = ['fieldFn', 'valueFn', 'tableFn', 'functions', 'date_expr'];
+const required = ['columnFn', 'valueFn', 'tableFn', 'functions', 'date_expr'];
 function toSql(options, parsed) {
   const missing = required.filter((x) => !options[x]);
   if (missing.length) throw new Error(`${missing.join(', ')} are required parameters`);
   const {
-    defaultTable, fieldFn, tableFn, valueFn, functions,
+    defaultTable, columnFn, tableFn, valueFn, functions,
   } = options;
 
   Object.keys(functions).forEach((fn) => {
@@ -181,7 +181,7 @@ function toSql(options, parsed) {
   return walkNodes({
     handlers: toSqlHandlers,
     defaultTable,
-    fieldFn,
+    columnFn,
     tableFn,
     valueFn,
     functions,

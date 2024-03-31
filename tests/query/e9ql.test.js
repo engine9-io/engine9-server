@@ -20,7 +20,7 @@ function assertParse(x, expected) {
   it(`should parse \`${x}\``, () => {
     const parsed = parse(x);
     const back = toSql({
-      fieldFn: ((f) => f),
+      columnFn: ((f) => f),
       tableFn: ((f) => f),
       valueFn: ((f) => {
         // eslint-disable-next-line eqeqeq
@@ -50,7 +50,7 @@ function roundTrip(x, expected, evalTests) {
   it(`should parse \`${x}\``, () => {
     const parsed = parse(x);
     const back = toSql({
-      fieldFn: ((f) => f),
+      columnFn: ((f) => f),
       tableFn: ((f) => f),
       valueFn: ((f) => {
         // eslint-disable-next-line eqeqeq
@@ -66,7 +66,7 @@ function roundTrip(x, expected, evalTests) {
   it(`should parse \`${x}\` to same structure`, () => {
     const parsed = parse(x);
     const back = toSql({
-      fieldFn: ((f) => f),
+      columnFn: ((f) => f),
       tableFn: ((f) => f),
       valueFn: ((f) => {
         // eslint-disable-next-line eqeqeq
@@ -225,7 +225,7 @@ function testAnalysis(baseTable, e9ql, expected) {
       e9ql,
       baseTable,
 
-      fieldFn: ((f) => f),
+      columnFn: ((f) => f),
       tableFn: ((f) => f),
       valueFn: ((f) => {
         // eslint-disable-next-line eqeqeq

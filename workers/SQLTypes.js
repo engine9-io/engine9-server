@@ -1,3 +1,5 @@
+const mysql = require('mysql2');
+
 const mysqlTypes = [
   {
     type: 'id', column_type: 'bigint', unsigned: true, nullable: false, auto_increment: true, knex_method: 'bigIncrements',
@@ -74,6 +76,7 @@ const mysqlTypes = [
   { type: 'datetime', column_type: 'datetime', knex_method: 'datetime' },
   { type: 'time', column_type: 'time', knex_method: 'time' },
 ];
+
 module.exports = {
   getType(type) {
     return mysqlTypes.find((t) => t.type === type);
@@ -162,5 +165,209 @@ module.exports = {
 
       return Object.assign(input, typeDef);
     },
+    escapeValue(value) {
+      return mysql.escape(value);
+    },
+
+    supportedFunctions() {
+      const scope = this;
+      const columnNameMatch = /^[a-zA-Z0-9_]+$/;
+      function escapeColumn(t) {
+        if (!t.match(columnNameMatch)) throw new Error(`Invalid column name: ${t}`);
+        return t;
+      }
+      this.getDayFunction = function (_column, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = this.escapeField(column);
+        return `DATE(${column})`;
+      };
+
+      this.getQuarterFunction = function (_column, skipEscape) {
+        let column = _column;
+        // Works on legacy SQLServer and modern
+        if (!skipEscape) column = this.escapeField(column);
+        return `CONCAT(YEAR(${column}),'-Q',QUARTER(${column}))`;
+      };
+
+      this.getStartOfQuarterFunction = function (_column, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = this.escapeField(column);
+        return `MAKEDATE(YEAR(${column}), 1) + INTERVAL QUARTER(${column})-1 QUARTER`;
+      };
+
+      this.getDateIntervalFunction = function (column, days) {
+        return `${this.escapeField(column)}+ interval ${days} day`;
+      };
+
+      this.getHourIntervalFunction = function (column, hours) {
+        return `${this.escapeField(column)}+ interval ${hours} hour`;
+      };
+
+      // Short date function -- particularly for
+      // Google that mishandles date/datetime types in mysql, and needs YYYYMMDD format
+      this.getShortDateFunction = function (_column, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = this.escapeField(column);
+        return `DATE_FORMAT(${column},'%Y%m%d')`;
+      };
+
+      this.getWeekFunction = function (_column, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = this.escapeField(column);
+        return `FROM_DAYS(TO_DAYS(${column}) -MOD(TO_DAYS(${column}) -1, 7))`;
+      };
+
+      this.getMonthNameFunction = function (_column, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = this.escapeField(column);
+        return `MONTHNAME(${column})`;
+      };
+
+      /*
+      Gets the timezone, defaults to the timezone from this bot
+      */
+      this.getTimezoneFunction = function (_column, timezone, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = this.escapeField(column);
+        const tz = timezone || (this.auth || {}).timezone || 'America/New_York';
+        return `CONVERT_TZ(${column},'UTC',${this.escapeValue(tz)})`;
+      };
+
+      this.getMonthFunction = function (_column, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = this.escapeField(column);
+        return `DATE_ADD(LAST_DAY(DATE_SUB(${column}, interval 31 day)), interval 1 day)`;
+      };
+
+      this.getStartOfYearFunction = function (_column, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = this.escapeField(column);
+        return `CONCAT(YEAR(${column}),'-01-01')`;
+      };
+
+      this.getYearFunction = function (_column, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = this.escapeField(column);
+        return `YEAR(${column})`;
+      };
+
+      /* Calculate the fiscal year from a date */
+      this.getFiscalYearFunction = function (_column, fiscalYear, skipEscape) {
+        let column = _column;
+        if (!fiscalYear) return scope.getYearFunction(column, skipEscape);
+        const { month, day } = scope.getFiscalYearUtilities(fiscalYear);
+        if (month === 1 && day === 1) return scope.getYearFunction(column, skipEscape);
+        if (!skipEscape) column = escapeColumn(column);
+        return `year(${column} + interval ${13 - month} month - interval ${day - 1} day)`;
+      };
+
+      this.getDayOfYearFunction = function (_column, skipEscape) {
+        let column = _column;
+        if (!skipEscape) column = escapeColumn(column);
+        return `DAYOFYEAR(${column})`;
+      };
+
+      this.getDayOfFiscalYearFunction = function (_column, fiscalYear, skipEscape) {
+        let column = _column;
+        if (!fiscalYear) return scope.getYearFunction(column, skipEscape);
+        const { month, day } = scope.getFiscalYearUtilities(fiscalYear);
+        if (month === 1 && day === 1) return scope.getDayOfYearFunction(column, skipEscape);
+        if (!skipEscape) column = escapeColumn(column);
+        return this.getDayDiffFunction(column, `CONCAT(${this.getFiscalYearFunction(column, fiscalYear, true)}-1,'-${fiscalYear}')`);
+      };
+
+      this.getNowFunction = function () {
+        return 'NOW()';
+      };
+      this.getDayDiffFunction = function (a, b) {
+        return `DATEDIFF(${a},${b})`;
+      };
+
+      this.getDateFunction = function (x) {
+        return `DATE(${x})`;
+      };
+
+      this.getHashV1Function = function (x) {
+        return `sha2(lower(trim(coalesce(${x},''))),256)`;
+      };
+      this.getEmailDomainFunction = function (x) {
+        return `COALESCE(LOWER(SUBSTRING(${x}, LOCATE('@', ${x}) + 1)),'')`;
+      };
+
+      this.getDateSubFunction = function (date, value, type) {
+        return `date_sub(${date}, interval ${value} ${type})`;
+      };
+
+      this.getDateArithmeticFunction = function (date, operator, value, intervalType) {
+        let fn = 'date_add';
+        if (operator === '-') fn = 'date_sub';
+        return `${fn}(${date}, interval ${value} ${intervalType})`;
+      };
+
+      this.getStringIndexOfFunction = function (str, find, pos) {
+        if (pos == null) return `LOCATE(${str},${find})`;
+        return `LOCATE(${str},${find},${pos})`;
+      };
+
+      this.getFullTextBoolean = function (column, match) {
+        return `MATCH(${column}) against (${match} IN BOOLEAN MODE)`;
+      };
+
+      this.getUUIDFunction = function () { return 'UUID()'; };
+
+      this.getIfNullFunction = function (check, value) {
+        return `IFNULL(${check}, ${value})`;
+      };
+
+      this.getCastIntFunction = function (value) {
+        return `CAST(${value} AS UNSIGNED)`;
+      };
+
+      this.getTrimFunction = function (value) {
+        return `TRIM(${value})`;
+      };
+      this.getConcatFunction = function (...rest) {
+        let value = rest;
+        if (value.length === 1 && Array.isArray(value[0])) [value] = value;
+        return `CONCAT(${value.join(',')})`;
+      };
+      this.getShaLength40Function = function (_value) {
+        let value = _value;
+        if (Array.isArray(value)) {
+          value = this.getConcatFunction(value);
+        }
+        return `UPPER(SHA(${value}))`;
+      };
+      this.getRegexpFunction = function (value, pattern) {
+        return `${value} regexp ${pattern}`;
+      };
+      const functions = {
+        DISTINCT: 1,
+
+        COUNT: 1,
+        SUM: 1,
+        AVG: 1,
+        MIN: 1,
+        MAX: 1,
+
+        NONE: (x) => x,
+        DAY: (x) => this.getDayFunction(x, true),
+        WEEK: (x) => this.getWeekFunction(x, true),
+        MONTH: (x) => this.getMonthFunction(x, true),
+        YEAR: (x) => this.getYearFunction(x, true),
+        FISCAL_YEAR: (x) => this.getFiscalYearFunction(x, this.fiscalYear || '01-01', true),
+        DAY_OF_YEAR: (x) => this.getDayOfYearFunction(x, true),
+        DAY_OF_FISCAL_YEAR: (x) => this.getDayOfFiscalYearFunction(x, this.fiscalYear || '01-01', true),
+        NOW: () => this.getNowFunction(),
+        DATE: (x) => this.getDateFunction(x),
+        LOCATE: ([x, y, z]) => this.getStringIndexOfFunction(x, y, z),
+        FULLTEXT_BOOLEAN: ([x, y]) => this.getFullTextBoolean(x, y),
+        REGEXP_LIKE: ([x, y]) => this.getRegexpFunction(x, y),
+        NULLIF: 1,
+        IFNULL: 1,
+      };
+      return functions;
+    },
+
   },
 };
