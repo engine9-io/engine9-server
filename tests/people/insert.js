@@ -14,8 +14,6 @@ describe('Deploy schemas and upsert people', async () => {
 
   const personWorker = new PersonWorker({ accountId, knex });
   const schemaWorker = new SchemaWorker({ accountId, knex });
-
-  debug('Finished constructors');
   async function rebuildDB() {
     debug('Dropping tables');
     const { tables } = await schemaWorker.tables();
@@ -35,7 +33,10 @@ describe('Deploy schemas and upsert people', async () => {
     await Promise.all(tables.map((table) => schemaWorker.truncate({ table })));
   }
 
-  // before(clearDB);
+  before(async () => {
+    await rebuildDB();
+    await clearDB();
+  });
 
   after(async () => {
     debug('Destroying person and schema worker');

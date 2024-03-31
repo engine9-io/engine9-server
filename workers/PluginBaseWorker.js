@@ -61,7 +61,7 @@ Worker.prototype.compilePlugin = async function ({ pluginPath }) {
 };
 
 /* Compiles the transform exclusively, bindings are handled elsewhere */
-Worker.prototype.compileTransform = async function ({ transform, path, options }) {
+Worker.prototype.compileTransform = async function ({ transform, path }) {
   if (typeof transform === 'function') {
     return {
       path: 'custom_transform',

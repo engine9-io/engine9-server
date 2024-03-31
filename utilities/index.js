@@ -102,6 +102,27 @@ function toCharCodes(x) {
   return Array.from(x).filter(Boolean).map((d) => d.charCodeAt(0));
 }
 
+function getIntArray(s, nonZeroLength) {
+  let a = s || [];
+  if (typeof a === 'number') a = [a];
+
+  if (typeof s === 'string') a = s.split(',');
+  a = a.filter((x) => (parseInt(x, 10) === s)).map((x) => parseInt(x, 10));
+  if (nonZeroLength && a.length === 0) a = [0];
+  return a;
+}
+
+function getStringArray(s, nonZeroLength) {
+  let a = s || [];
+  if (typeof a === 'number') a = String(a);
+  if (typeof a === 'string') a = [a];
+
+  if (typeof s === 'string') a = s.split(',');
+  a = a.map((x) => x.toString().trim()).filter(Boolean);
+  if (nonZeroLength && a.length === 0) a = [0];
+  return a;
+}
+
 module.exports = {
-  bool, parseRegExp, relativeDate, toCharCodes,
+  bool, parseRegExp, relativeDate, toCharCodes, getIntArray, getStringArray,
 };
