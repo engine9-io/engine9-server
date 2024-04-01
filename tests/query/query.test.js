@@ -16,6 +16,7 @@ describe('Test Query builder', async () => {
   after(async () => {
     queryWorker.destroy();
   });
+
   it('should build a query from an object with e9ql', async () => {
     const query = {
       table: 'person',
@@ -35,25 +36,33 @@ describe('Test Query builder', async () => {
     const { data } = await queryWorker.query(sql);
     debug('Results of ', sql, data);
   });
-/*
-  //subqueries not working with aliases right now
+
+  // subqueries not working with aliases right now
   it('should build a query with a valid subquery', async () => {
     const sql = await queryWorker.buildSqlFromQuery({
-      table: 'person',
+      table: 'subquery_1',
       subquery: {
         table: 'person_email',
         fields: [
+          { e9ql: 'person_id', alias: 'person_id' },
           { e9ql: 'count(*)', alias: 'emails' },
         ],
         group_by: [{ e9ql: 'person_id' }],
+        alias: 'subquery_1',
       },
-      fields: [
-        { table: 'person_email', e9ql: "case when person_email.emails>1 then 'multi-email' else 'one-email' end", alias: 'level' },
-        { e9ql: 'count(summary_table.person_id_int)', alias: 'people' },
+      columns: [
+        {
+          e9ql: `case when subquery_1.emails>1
+          then 'multi-email' else 'one-email' end`,
+          alias: 'level',
+        },
+        { e9ql: 'count(person_id)', alias: 'people' },
       ],
-      group_by: [{ e9ql: "case when person_email.emails>1 then 'multi-email' else 'one-email' end" }],
+      group_by: [{
+        e9ql: `case when subquery_1.emails>1
+        then 'multi-email' else 'one-email' end`,
+      }],
     });
-    debug(sql);
+    debug(typeof sql, '%o', sql);
   });
-  */
 });

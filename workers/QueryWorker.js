@@ -11,15 +11,6 @@ function Worker(worker) {
 
 util.inherits(Worker, SQLWorker);
 
-function asPromise(wrapper) {
-  return new Promise((resolve, reject) => {
-    wrapper((e, r) => {
-      if (e) return reject(e);
-      return resolve(r);
-    });
-  });
-}
-
 Worker.prototype.withAnalysis = function (options) {
   const worker = this;
   const {
@@ -89,7 +80,7 @@ Worker.prototype.buildSqlFromQuery = async function (options) {
     const tableDefs = {};
     if (typeof subquery === 'object') {
       // this may be a subtable/subquery
-      const alias = baseTable;
+      const alias = subquery.alias || baseTable;
       if (!alias) throw new Error('Subqueries require a table name');
       if (alias.indexOf('${') >= 0) throw new Error('When using subqueries, the non-subquery table act as an alias, and cannot have a merge column');
       // prefill so we don't check for the existence of this non-existing table
@@ -101,7 +92,6 @@ Worker.prototype.buildSqlFromQuery = async function (options) {
     }
 
     async function getTableDef({ table }) {
-      debug(`Calling getTableDef for ${table}`);
       if (!tableDefs[table]) {
         tableDefs[table] = await dbWorker.describe({ table });
       }
