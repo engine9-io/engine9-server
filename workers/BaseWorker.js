@@ -30,12 +30,56 @@ function Worker(config) {
   }
 }
 
-Worker.prototype.getJSONStringifyStream = function () {
+Worker.prototype.logSome = function (prefix, records, start) {
+  function getRate() {
+    if (start) {
+      const ms = (new Date().getTime() - start);
+      return `${((records * 1000) / ms).toFixed(1)}/second`;
+    }
+    return '';
+  }
+
+  if (records <= 5) {
+    debug(prefix, records, getRate());
+  } else if (records <= 100 && records % 10 === 0) {
+    debug(prefix, records, getRate());
+  } else if (records <= 1000 && records % 100 === 0) {
+    debug(prefix, records, getRate());
+  } else if (records <= 10000 && records % 1000 === 0) {
+    debug(prefix, records, getRate());
+  } else if (records <= 100000 && records % 5000 === 0) {
+    debug(prefix, records, getRate());
+  } else if (records % 100000 === 0) {
+    debug(prefix, records, getRate());
+  }
+};
+
+Worker.prototype.getJSONStringifyTransform = function () {
   return {
-    stream: new Transform({
+    transform: new Transform({
       objectMode: true,
       transform(d, encoding, cb) {
         cb(false, `${JSON.stringify(d)}\n`);
+      },
+    }),
+  };
+};
+
+Worker.prototype.getBatchTransform = function ({ size = 100 }) {
+  return {
+    transform: new Transform({
+      objectMode: true,
+      transform(chunk, encoding, cb) {
+        this.buffer = (this.buffer || []).concat(chunk);
+        if (this.buffer.length >= size) {
+          this.push(this.buffer);
+          this.buffer = [];
+        }
+        cb();
+      },
+      flush(cb) {
+        if (this.buffer.length > 0) this.push(this.buffer);
+        cb();
       },
     }),
   };

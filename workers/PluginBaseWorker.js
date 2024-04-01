@@ -6,7 +6,6 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 
 const BaseWorker = require('./BaseWorker');
 const SQLWorker = require('./SQLWorker');
-const FileWorker = require('./FileWorker');
 
 function Worker(worker) {
   BaseWorker.call(this, worker);
@@ -162,22 +161,6 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
       throw e;
     }
   }
-};
-
-Worker.prototype.testPipeline = async function ({ stream, filename }) {
-  const fileWorker = new FileWorker(this);
-  const inStream = await fileWorker.getStream({ stream, filename });
-  return inStream;
-  /*  await pipeline(
-    // do batching
-    stream,
-    emailExtension,
-    through2.obj((o, enc, cb) => {
-      debug('Through2:', o);
-      cb(null, `${JSON.stringify(o)}\n`);
-    }),
-    fileStream,
-  ); */
 };
 
 module.exports = Worker;

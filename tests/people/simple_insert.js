@@ -3,6 +3,7 @@ const {
 } = require('node:test');
 const debug = require('debug')('insert.test.js');
 const assert = require('node:assert');
+const { rebuildDB, truncateDB } = require('./rebuild_db');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
 const SchemaWorker = require('../../workers/SchemaWorker');
@@ -14,32 +15,17 @@ describe('Deploy schemas and upsert people', async () => {
 
   const personWorker = new PersonWorker({ accountId, knex });
   const schemaWorker = new SchemaWorker({ accountId, knex });
-  async function rebuildDB() {
-    debug('Dropping tables');
-    const { tables } = await schemaWorker.tables();
-    await Promise.all(tables.map((table) => schemaWorker.drop({ table })));
-    const schemas = [
-      { schema: 'engine9-interfaces/person' },
-      { schema: 'engine9-interfaces/person_email' },
-      { schema: 'engine9-interfaces/person_phone' },
-      { schema: 'engine9-interfaces/person_address' },
-    ];
-    debug('Deploying schemas');
-    await Promise.all(schemas.map((s) => schemaWorker.deploy(s)));
-  }
-  async function clearDB() {
-    debug('Truncating tables');
-    const { tables } = await schemaWorker.tables();
-    await Promise.all(tables.map((table) => schemaWorker.truncate({ table })));
-  }
 
   before(async () => {
-    await rebuildDB();
-    await clearDB();
+    if (process.argv.indexOf('rebuild') >= 0) {
+      await rebuildDB();
+    } else if (process.argv.indexOf('truncate') >= 0) {
+      await truncateDB();
+    }
   });
 
   after(async () => {
-    debug('Destroying person and schema worker');
+    debug('Destroying knex');
     await knex.destroy();
   });
   it('should have deployed person/person_identifiers/person_email/person_phone', async () => {

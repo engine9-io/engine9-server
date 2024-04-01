@@ -24,8 +24,9 @@ function createRandomUser() {
   };
 }
 
+const count = 1000000;
 const userArray = faker.helpers.multiple(createRandomUser, {
-  count: 1000,
+  count,
 });
 const recurs = ['', '', '', '', '', '', '', '', '', 'daily', 'weekly', 'monthly', 'monthly', 'monthly', 'monthly', 'monthly', 'quarterly', 'annually', 'annually'];
 const transactionArray = [];
@@ -33,8 +34,8 @@ const transactionArray = [];
 userArray.forEach((user) => {
   if (Math.random() > 0.3) return null;
   const { email } = user;
-  const count = Math.random() * 10;
-  for (let i = 0; i < count; i += 1) {
+  const transCount = Math.random() * 10;
+  for (let i = 0; i < transCount; i += 1) {
     transactionArray.push({
       email,
       transaction_date: faker.date.past().toISOString(),
@@ -47,8 +48,8 @@ userArray.forEach((user) => {
 
 Readable.from(userArray)
   .pipe(stringify({ header: true }))
-  .pipe(fs.createWriteStream(`${__dirname}/fake_people.csv`));
+  .pipe(fs.createWriteStream(`${__dirname}/${count}_fake_people.csv`));
 
 Readable.from(transactionArray)
   .pipe(stringify({ header: true }))
-  .pipe(fs.createWriteStream(`${__dirname}/fake_transactions.csv`));
+  .pipe(fs.createWriteStream(`${__dirname}/${count}_fake_transactions.csv`));

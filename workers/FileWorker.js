@@ -2,7 +2,6 @@ const fs = require('node:fs');
 
 const fsp = fs.promises;
 const zlib = require('node:zlib');
-const { promisify } = require('node:util');
 const util = require('util');
 const { Readable, Transform } = require('node:stream');
 
@@ -85,14 +84,32 @@ Worker.prototype.csvToObjectTransforms = function (options) {
 
 Worker.prototype.detectEncoding = async function (options) {
   if (options.encoding_override) return { encoding: options.encoding_override };
-  // Limit to only the top 1000 characters -- for perfomance
-  const bytes = 10000;
+  // Limit to only the top N bytes -- for perfomance
+  // Be wary, though, as gzip files may require a certain minimum number of bytes to decompress
+  const bytes = 64 * 1024;
   const buff = Buffer.alloc(bytes);
   const fd = await fsp.open(options.filename);
   await fd.read(buff, 0, bytes);
   let finalBuff = buff;
   if (options.filename.slice(-3) === '.gz') {
-    finalBuff = await promisify(zlib.gunzip)(buff);
+    // This code deals with scenarios where the buffer coming in may not be exactly the gzip
+    // needed chunk size.
+    finalBuff = await new Promise((resolve, reject) => {
+      const bufferBuilder = [];
+      const decompressStream = zlib.createGunzip()
+        .on('data', (chunk) => {
+          bufferBuilder.push(chunk);
+        }).on('close', () => {
+          resolve(Buffer.concat(bufferBuilder));
+        }).on('error', (err) => {
+          if (err.errno !== -5) {
+            // EOF: expected
+            reject(err);
+          }
+        });
+      decompressStream.write(buff);
+      decompressStream.end();
+    });
   }
 
   return languageEncoding(finalBuff);
@@ -221,7 +238,7 @@ Worker.prototype.objectStreamToFile = async function (options) {
         cb(null, d);
       },
     }),
-    this.getJSONStringifyStream().stream,
+    this.getJSONStringifyTransform().transform,
     fileWriterStream,
   );
   return { filename, records };
@@ -245,6 +262,12 @@ Worker.prototype.transform = async function (options) {
 
   // No longer need this
   delete options.transform;
+  if (!t) {
+    t = function (d, enc, cb) {
+      d.is_test_transform = true;
+      cb(null, d);
+    };
+  }
 
   if (!Array.isArray(t)) t = [t];
   Object.keys(t).forEach((key) => {

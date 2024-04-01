@@ -2,9 +2,8 @@ const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
 const crypto = require('node:crypto');
 // const { setTimeout: sleep } = require('node:timers/promises');
+const { Transform } = require('node:stream');
 
-const through2 = require('through2');
-// const fs = require('fs');
 const debug = require('debug')('PersonWorker');
 const SQLWorker = require('./SQLWorker');
 const FileWorker = require('./FileWorker');
@@ -26,11 +25,7 @@ Worker.prototype.getOutboundStream = async function () {
   await pipeline(
     stream,
     emailExtension,
-    // this.getJSONStringifyStream().stream,
-    through2.obj((o, enc, cb) => {
-      debug('Through2:', o);
-      cb(null, `${JSON.stringify(o)}\n`);
-    }),
+    this.getJSONStringifyTransform().transform,
     fileStream,
   );
 
@@ -47,6 +42,7 @@ Worker.prototype.getOutboundStream.metadata = {};
 */
 Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   const tempIdLookup = {};
+
   // Assign temp ids to everyone
   // This is because multiple entries in this batch could have the same ID
   batch.forEach((item) => {
@@ -102,12 +98,13 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
       delete item.temp_id;
     });
   });
-  /* Now find the list of items that still need an ID */
-  const tempIds = Object.keys(batch.filter((item) => item.temp_id)
-    .reduce((a, b) => { a[b.temp_id] = b; return a; }, {}));
-  // Insert the right number of records
+  /* Now find the deduplicated list of items that still need an ID */
+  const lookupByTempId = batch.filter((item) => item.temp_id)
+    .reduce((a, b) => { a[b.temp_id] = b; return a; }, {});
+  const tempIds = Object.keys(lookupByTempId);
 
-  const toInsert = tempIds.map(() => ({ id: null }));
+  // Insert the right number of records
+  const toInsert = tempIds.map((id) => ({ id: null, given_name: lookupByTempId[id]?.given_name || '', family_name: lookupByTempId[id]?.family_name || '' }));
 
   if (toInsert.length > 0) {
     const response = await knex.table('person')
@@ -180,21 +177,24 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
   return batch;
 };
 
-const pipelineConfig = {
-  transforms: [
-    { path: 'engine9-interfaces/person_email/transforms/inbound/extract_identifiers.js' },
-    { path: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js' },
-    { path: 'person.appendPersonIds' },
-    { path: 'engine9-interfaces/person_email/transforms/inbound/extract_tables.js' },
-    { path: 'engine9-interfaces/person_address/transforms/inbound/extract_tables.js' },
-    { path: 'sql.upsertTables' },
-  ],
+Worker.prototype.getDefaultPipelineConfig = async function () {
+  return {
+    transforms: [
+      { path: 'engine9-interfaces/person_email/transforms/inbound/extract_identifiers.js', options: { dedupe_with_email: true } },
+      { path: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js', options: { dedupe_with_phone: true } },
+      { path: 'person.appendPersonIds' },
+      { path: 'engine9-interfaces/person_email/transforms/inbound/extract_tables.js', options: {} },
+      { path: 'engine9-interfaces/person_address/transforms/inbound/extract_tables.js' },
+      { path: 'engine9-interfaces/person_segment/transforms/inbound/extract_tables.js' },
+      { path: 'sql.upsertTables' },
+    ],
+  };
 };
 
 Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
   const batch = _batch;
   if (!batch) throw new Error('upsert requires a batch');
-
+  const pipelineConfig = await this.getDefaultPipelineConfig();
   const compiledPipeline = await this.compilePipeline(pipelineConfig);
 
   await this.executeCompiledPipeline({ pipeline: compiledPipeline, batch });
@@ -203,20 +203,27 @@ Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
 };
 
 Worker.prototype.upsert = async function ({ stream, filename, batch_size: batchSize = 500 }) {
+  const worker = this;
   const fileWorker = new FileWorker(this);
   const inStream = await fileWorker.getStream({ stream, filename });
-  debug(batchSize);
-  return inStream;
-/*  await pipeline(
-    // do batching
-    stream,
-    emailExtension,
-    through2.obj((o, enc, cb) => {
-      debug('Through2:', o);
-      cb(null, `${JSON.stringify(o)}\n`);
+  const pipelineConfig = await this.getDefaultPipelineConfig();
+  const compiledPipeline = await this.compilePipeline(pipelineConfig);
+  let records = 0;
+  const start = new Date();
+
+  await pipeline(
+    inStream.stream,
+    this.getBatchTransform({ batchSize }).transform,
+    new Transform({
+      objectMode: true,
+      async transform(batch, encoding, cb) {
+        await worker.executeCompiledPipeline({ pipeline: compiledPipeline, batch });
+        records += batch.length;
+        worker.logSome('PeopleWorker upsert processed ', records, start);
+        cb();
+      },
     }),
-    fileStream,
-  ); */
+  );
 };
 
 Worker.prototype.upsert.metadata = {
