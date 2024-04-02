@@ -7,7 +7,7 @@ const debug = require('debug')('test-framework');
 const assert = require('node:assert');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-const { rebuildDB, truncateDB } = require('./rebuild_db');
+const { rebuildDB, truncateDB } = require('./test_db_modifications');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'test';
@@ -29,7 +29,7 @@ describe('Insert File of people with options', async () => {
   });
 
   it('Should be able to upsert and deduplicate people and email addresses from a file', async () => {
-    // await truncateDB({ accountId });
+    await truncateDB({ accountId });
     debug('Argv=', process.argv);
     let filename = process.argv.pop();
     if (filename.indexOf('.csv') >= 0) {
@@ -42,7 +42,7 @@ describe('Insert File of people with options', async () => {
 
     const { data } = await sqlWorker.query('select count(*) as records from person_email');
     debug('Retrieved ', data, ' from database');
-    // assert.deepEqual(data[0].records, 990, 'Does not match');
+    assert.deepEqual(data[0].records, 990, 'Does not match');
     debug('Finished up');
   });
 });

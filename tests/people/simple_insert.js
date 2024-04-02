@@ -3,7 +3,7 @@ const {
 } = require('node:test');
 const debug = require('debug')('insert.test.js');
 const assert = require('node:assert');
-const { rebuildDB, truncateDB } = require('./rebuild_db');
+const { rebuildDB, truncateDB } = require('./test_db_modifications');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
 const SchemaWorker = require('../../workers/SchemaWorker');

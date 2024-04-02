@@ -49,7 +49,7 @@ Worker.prototype.logSome = function (prefix, records, start, ...rest) {
     debug(prefix, records, getRate(), ...rest);
   } else if (records <= 100000 && records % 5000 === 0) {
     debug(prefix, records, getRate(), ...rest);
-  } else if (records % 100000 === 0) {
+  } else if (records % 20000 === 0) {
     debug(prefix, records, getRate(), ...rest);
   }
 };
