@@ -30,7 +30,7 @@ function Worker(config) {
   }
 }
 
-Worker.prototype.logSome = function (prefix, records, start) {
+Worker.prototype.logSome = function (prefix, records, start, ...rest) {
   function getRate() {
     if (start) {
       const ms = (new Date().getTime() - start);
@@ -40,17 +40,17 @@ Worker.prototype.logSome = function (prefix, records, start) {
   }
 
   if (records <= 5) {
-    debug(prefix, records, getRate());
+    debug(prefix, records, getRate(), ...rest);
   } else if (records <= 100 && records % 10 === 0) {
-    debug(prefix, records, getRate());
+    debug(prefix, records, getRate(), ...rest);
   } else if (records <= 1000 && records % 100 === 0) {
-    debug(prefix, records, getRate());
+    debug(prefix, records, getRate(), ...rest);
   } else if (records <= 10000 && records % 1000 === 0) {
-    debug(prefix, records, getRate());
+    debug(prefix, records, getRate(), ...rest);
   } else if (records <= 100000 && records % 5000 === 0) {
-    debug(prefix, records, getRate());
+    debug(prefix, records, getRate(), ...rest);
   } else if (records % 100000 === 0) {
-    debug(prefix, records, getRate());
+    debug(prefix, records, getRate(), ...rest);
   }
 };
 

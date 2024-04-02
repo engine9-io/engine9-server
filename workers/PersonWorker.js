@@ -1,14 +1,23 @@
+const { performance, PerformanceObserver } = require('node:perf_hooks');
+
 const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
 const crypto = require('node:crypto');
-// const { setTimeout: sleep } = require('node:timers/promises');
 const { Transform } = require('node:stream');
 
 const debug = require('debug')('PersonWorker');
+const debugPerformance = require('debug')('Performance');
 const SQLWorker = require('./SQLWorker');
 const FileWorker = require('./FileWorker');
-
 const PluginBaseWorker = require('./PluginBaseWorker');
+
+const perfObserver = new PerformanceObserver((items) => {
+  items.getEntries().forEach((entry) => {
+    debugPerformance('%o', entry);
+  });
+});
+
+perfObserver.observe({ entryTypes: ['measure'], buffer: true });
 
 function Worker(worker) {
   PluginBaseWorker.call(this, worker);
@@ -84,10 +93,10 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   */
   await knex.raw('lock tables person write,person_identifiers write');
   /* First check to see if any new IDS have slotted in here */
-  const existingIds = await knex.select('*')
+  const existingIds = await knex.select(['value', 'person_id'])
     .from('person_identifiers')
     .where('value', 'in', Object.keys(identifierMap));
-  debug('Found ', existingIds, '.... sleeping');
+  // debug('Found ', existingIds, '.... sleeping');
   /* If we want to test the logic here, we can sleep after the query to wait
   for the conflicting thread to catch up to the problem zone
   */
@@ -155,9 +164,11 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
     this.knex = await sqlWorker.connect();
     knex = this.knex;
   }
-  const existingIds = await knex.select('*')
+  performance.mark('start-existing-id-query');
+  const existingIds = await knex.select(['value', 'person_id'])
     .from('person_identifiers')
     .where('value', 'in', allIdentifiers.map((d) => d.value));
+  performance.mark('end-existing-id-query');
   const lookup = existingIds.reduce(
     (a, b) => {
       a[b.value] = b.person_id;
@@ -171,9 +182,15 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
     if (matchingValue) item.person_id = lookup[matchingValue];
   });
   const itemsWithNoExistingIds = batch.filter((o) => !o.person_id);
-  if (itemsWithNoExistingIds.length === 0) return batch;
+  performance.mark('start-assign-ids-blocking');
+  if (itemsWithNoExistingIds.length === 0) {
+    performance.mark('end-assign-ids-blocking');
+    return batch;
+  }
   debug('Items with no ids:', JSON.stringify(itemsWithNoExistingIds));
+
   await this.assignIdsBlocking({ batch: itemsWithNoExistingIds });
+  performance.mark('end-assign-ids-blocking');
   return batch;
 };
 
@@ -197,9 +214,9 @@ Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
   const pipelineConfig = await this.getDefaultPipelineConfig();
   const compiledPipeline = await this.compilePipeline(pipelineConfig);
 
-  await this.executeCompiledPipeline({ pipeline: compiledPipeline, batch });
+  const summary = await this.executeCompiledPipeline({ pipeline: compiledPipeline, batch });
 
-  return batch;
+  return summary;
 };
 
 Worker.prototype.upsert = async function ({ stream, filename, batch_size: batchSize = 500 }) {
@@ -210,6 +227,7 @@ Worker.prototype.upsert = async function ({ stream, filename, batch_size: batchS
   const compiledPipeline = await this.compilePipeline(pipelineConfig);
   let records = 0;
   const start = new Date();
+  const summary = { executionTime: {} };
 
   await pipeline(
     inStream.stream,
@@ -217,13 +235,22 @@ Worker.prototype.upsert = async function ({ stream, filename, batch_size: batchS
     new Transform({
       objectMode: true,
       async transform(batch, encoding, cb) {
-        await worker.executeCompiledPipeline({ pipeline: compiledPipeline, batch });
+        const batchSummary = await worker.executeCompiledPipeline(
+          { pipeline: compiledPipeline, batch },
+        );
+        Object.entries(batchSummary.executionTime).forEach(([path, val]) => {
+          summary.executionTime[path] = (summary.executionTime[path] || 0) + val;
+        });
         records += batch.length;
-        worker.logSome('PeopleWorker upsert processed ', records, start);
+        worker.logSome('PersonWorker upsert processed ', records, start, JSON.stringify(summary));
         cb();
       },
     }),
   );
+  performance.measure('existing-ids', 'start-existing-id-query', 'end-existing-id-query');
+  performance.measure('assign-ids', 'start-assign-ids-blocking', 'end-assign-ids-blocking');
+
+  return summary;
 };
 
 Worker.prototype.upsert.metadata = {

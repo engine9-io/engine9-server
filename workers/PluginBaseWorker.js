@@ -105,16 +105,19 @@ Worker.prototype.compilePipeline = async function (_pipeline) {
     pipeline = _pipeline;
   }
   pipeline.transforms = pipeline.transforms || [];
+  const transformPromises = [];
+  pipeline.transforms.forEach(({ transform, path, options }) => {
+    transformPromises.push(this.compileTransform({ transform, path, options }));
+  });
 
-  const transforms = await Promise.all(pipeline.transforms
-    .map(({ transform, path, options }) => this.compileTransform({ transform, path, options })));
+  const transforms = await Promise.all(transformPromises);
 
   return { transforms };
 };
 
 Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) {
   const tablesToUpsert = {};
-
+  const summary = { records: batch.length, executionTime: {} };
   // eslint-disable-next-line no-restricted-syntax
   for (const {
     transform, bindings, options, path,
@@ -153,14 +156,17 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
           transformParams[name] = tablesToUpsert;
         }
       }));
-
+      const start = new Date().getTime();
       // eslint-disable-next-line no-await-in-loop
       await transform(transformParams);
+      const ms = new Date().getTime() - start;
+      summary.executionTime[path] = (summary.executionTime[path] || 0) + ms;
     } catch (e) {
       this.destroy();
       throw e;
     }
   }
+  return summary;
 };
 
 module.exports = Worker;

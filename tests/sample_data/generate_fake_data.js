@@ -24,7 +24,7 @@ function createRandomUser() {
   };
 }
 
-const count = 1000000;
+const count = 100000;
 const userArray = faker.helpers.multiple(createRandomUser, {
   count,
 });

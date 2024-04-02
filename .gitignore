@@ -133,3 +133,7 @@ dist
 knexfile.js
 .my.cnf
 
+tests/people/100000_fake_people.csv.gz
+tests/people/1000000_fake_people.csv.gz
+tests/people/1000000_fake_transactions.csv.gz
+tests/people/100000_fake_transactions.csv.gz
