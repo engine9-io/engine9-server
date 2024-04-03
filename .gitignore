@@ -132,6 +132,7 @@ dist
 # knex
 knexfile.js
 .my.cnf
+config.json
 
 tests/people/100000_fake_people.csv.gz
 tests/people/1000000_fake_people.csv.gz

@@ -38,6 +38,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
       const name = _schema.slice('@engine9-interfaces/'.length);
       if (!name.match(/^[a-z0-9_-]+$/)) throw new Error('Invalid schema name');
       const uri = `https://raw.githubusercontent.com/engine9-io/engine9-interfaces/main/${name}/schema.js`;
+      debug('Fetching URI', uri);
       const r = await fetch(uri);
       if (r.status >= 300) {
         debug('GET', r.status, uri);

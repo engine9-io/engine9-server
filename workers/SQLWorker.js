@@ -14,10 +14,6 @@ require('dotenv').config({ path: '.env' });
 function Worker(worker) {
   BaseWorker.call(this, worker);
   this.auth = {
-    ENGINE9_DATABASE_CONNECTION_STRING:
-    process.env.ENGINE9_DATABASE_CONNECTION_STRING,
-    ENGINE9_TEST_DATABASE_CONNECTION_STRING:
-    process.env.ENGINE9_TEST_DATABASE_CONNECTION_STRING,
     ...worker.auth,
   };
   this.accountId = worker.accountId;
@@ -43,12 +39,8 @@ Worker.prototype.connect = async function connect() {
   if (!accountId) throw new Error('accountId is required');
 
   let config = null;
-  let s = this.auth.ENGINE9_DATABASE_CONNECTION_STRING;
-  if (accountId === 'test') {
-    s = this.auth.ENGINE9_TEST_DATABASE_CONNECTION_STRING;
-    if (!s) throw new Error('Could not find environment variable \'ENGINE9_TEST_DATABASE_CONNECTION_STRING\'');
-  }
-  if (!s) throw new Error('Could not find environment variable \'ENGINE9_DATABASE_CONNECTION_STRING\'');
+  const s = this.auth.database_connection;
+  if (!s) throw new Error('Could not find database_connection settings in auth');
 
   config = {
     client: 'mysql2',

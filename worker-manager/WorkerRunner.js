@@ -8,6 +8,15 @@ const minimist = require('minimist');
 const debug = require('debug')('WorkerRunner');
 const { relativeDate } = require('../utilities');
 
+let config = null;
+try {
+  // eslint-disable-next-line global-require
+  config = require('../config.json');
+} catch (e) {
+  debug(e);
+  throw new Error('Error loading config.json file -- make sure to create one from config.template.json before running');
+}
+
 let prompt = null;
 let winston = null;
 
@@ -327,7 +336,9 @@ function getAccountId(cb) {
 }
 
 WorkerRunner.prototype.getWorkerEnvironment = function getWorkerEnvironment(options, callback) {
-  return callback(null, { auth: {} });
+  const accountEnvironment = config.accounts?.[options.accountId] || {};
+  debug('Using environment:', accountEnvironment);
+  return callback(null, accountEnvironment);
 };
 
 WorkerRunner.prototype.run = function run() {
@@ -418,17 +429,15 @@ WorkerRunner.prototype.run = function run() {
   async.autoInject({
     accountId: (cb) => getAccountId(cb),
     WorkerConstructor: (accountId, cb) => runner.getWorkerConstructor({ accountId }, cb),
-    defaultEnvironment: (WorkerConstructor, cb) => {
-      runner.getWorkerEnvironment({ argv, WorkerConstructor }, cb);
+    environment: (accountId, WorkerConstructor, cb) => {
+      runner.getWorkerEnvironment({ accountId, argv, WorkerConstructor }, cb);
     },
-    method: (defaultEnvironment, WorkerConstructor, cb) => runner.getMethod(WorkerConstructor, cb),
+    method: (environment, WorkerConstructor, cb) => runner.getMethod(WorkerConstructor, cb),
     _options: (method, cb) => runner.getOptionValues(method, cb),
-    _workerInstance: (_options, WorkerConstructor, defaultEnvironment, instanceCallback) => {
+    _workerInstance: (_options, WorkerConstructor, environment, instanceCallback) => {
       try {
-        const workerInstance = new WorkerConstructor(defaultEnvironment);
-        Object.entries(defaultEnvironment || {}).forEach(([k, v]) => {
-          workerInstance[k] = workerInstance[k] || v;
-        });
+        // Call the constructor, which should take needed items out of the environment
+        const workerInstance = new WorkerConstructor(environment);
         return instanceCallback(null, workerInstance);
       } catch (e) {
         debug('Error creating the worker instance:', e);
