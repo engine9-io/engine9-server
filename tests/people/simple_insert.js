@@ -28,9 +28,9 @@ describe('Deploy schemas and upsert people', async () => {
     debug('Destroying knex');
     await knex.destroy();
   });
-  it('should have deployed person/person_identifiers/person_email/person_phone', async () => {
+  it('should have deployed person/person_identifier/person_email/person_phone', async () => {
     const { tables } = await schemaWorker.tables();
-    const missing = ['person', 'person_identifiers', 'person_email', 'person_address', 'person_phone'].filter((d) => !tables.find((t) => t === d));
+    const missing = ['person', 'person_identifier', 'person_email', 'person_address', 'person_phone'].filter((d) => !tables.find((t) => t === d));
     assert.equal(missing.length, 0, `Missing tables ${missing.join()}`);
   });
   it('Should be able to upsert and deduplicate people and email addresses', async () => {

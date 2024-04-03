@@ -91,10 +91,10 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   won't cause identical identifiers to be inserted.  Without it the same identifier could
   have 2 separate person_ids, which defeats the purpose
   */
-  await knex.raw('lock tables person write,person_identifiers write');
+  await knex.raw('lock tables person write,person_identifier write');
   /* First check to see if any new IDS have slotted in here */
   const existingIds = await knex.select(['value', 'person_id'])
-    .from('person_identifiers')
+    .from('person_identifier')
     .where('value', 'in', Object.keys(identifierMap));
   // debug('Found ', existingIds, '.... sleeping');
   /* If we want to test the logic here, we can sleep after the query to wait
@@ -144,7 +144,7 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
     });
     const identifiersToInsert = Object.values(personIdentifersToInsert);
     if (identifiersToInsert.length > 0) {
-      await knex.table('person_identifiers')
+      await knex.table('person_identifier')
         .insert(identifiersToInsert);
     }
   }
@@ -166,7 +166,7 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
   }
   performance.mark('start-existing-id-query');
   const existingIds = await knex.select(['value', 'person_id'])
-    .from('person_identifiers')
+    .from('person_identifier')
     .where('value', 'in', allIdentifiers.map((d) => d.value));
   performance.mark('end-existing-id-query');
   const lookup = existingIds.reduce(
