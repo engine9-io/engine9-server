@@ -337,7 +337,8 @@ function getAccountId(cb) {
 
 WorkerRunner.prototype.getWorkerEnvironment = function getWorkerEnvironment(options, callback) {
   const accountEnvironment = config.accounts?.[options.accountId] || {};
-  debug('Using environment:', accountEnvironment);
+  // don't print the environment, could have credentials
+  debug('Using environment with keys:', Object.keys(accountEnvironment));
   return callback(null, accountEnvironment);
 };
 
