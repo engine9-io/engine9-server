@@ -51,7 +51,7 @@ const mysqlTypes = [
     type: 'text', column_type: 'text', length: 65535, knex_method: 'text',
   },
   {
-    type: 'date_created',
+    type: 'created_at',
     column_type: 'timestamp',
     default_value: 'current_timestamp()',
     nullable: false,
@@ -59,7 +59,7 @@ const mysqlTypes = [
     knex_default_raw: 'current_timestamp()',
   },
   {
-    type: 'last_modified',
+    type: 'modified_at',
     column_type: 'timestamp',
     default_value: 'current_timestamp() on update current_timestamp()',
     nullable: false,

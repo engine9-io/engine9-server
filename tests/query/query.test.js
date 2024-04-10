@@ -22,14 +22,14 @@ describe('Test Query builder', async () => {
       table: 'person',
       columns: [
         // 'id',
-        { e9ql: 'YEAR(last_modified)', alias: 'year_modified' },
+        { e9ql: 'YEAR(modified_at)', alias: 'year_modified' },
         { e9ql: 'count(id)', alias: 'count' },
       ],
       conditions: [
-        { e9ql: "YEAR(last_modified)>'2020-01-01'" },
+        { e9ql: "YEAR(modified_ad)>'2020-01-01'" },
 
       ],
-      group_by: [{ e9ql: "YEAR(last_modified)>'2020-01-01'" }],
+      group_by: [{ e9ql: "YEAR(modified_at)>'2020-01-01'" }],
     };
     debug('Building sql:');
     const sql = await queryWorker.buildSqlFromQuery(query);

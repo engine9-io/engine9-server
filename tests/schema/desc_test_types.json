@@ -90,7 +90,7 @@
             "auto_increment": false
         },
         {
-            "name": "type_date_created",
+            "name": "type_created_at",
             "column_type": "timestamp",
             "length": null,
             "nullable": false,
@@ -98,7 +98,7 @@
             "auto_increment": false
         },
         {
-            "name": "type_last_modified",
+            "name": "type_modified_at",
             "column_type": "timestamp",
             "length": null,
             "nullable": false,
