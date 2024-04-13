@@ -1,5 +1,7 @@
-const util = require('util');
+const util = require('node:util');
 const fs = require('node:fs');
+
+const debug = require('debug')('PluginBaseWorker');
 
 const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
@@ -38,7 +40,7 @@ Worker.prototype.compilePlugin = async function ({ pluginPath }) {
         const parts = v.split('.');
         if (parts[0] === 'SQL') {
           if (sqlConnection === null) {
-            sqlConnection = new SQLWorker().connect();
+            sqlConnection = new SQLWorker(this).connect();
           }
           if (parts[1] === 'tables') {
             // TODO -- check allowed tables here
@@ -85,9 +87,12 @@ Worker.prototype.compileTransform = async function ({ transform, path }) {
       transform: (opts) => this.sqlWorker.upsertTables(opts),
     };
   }
+  let p = path;
+  if (path.indexOf('engine9-interfaces/') === 0) p = `../../${path}`;
+  debug(`Requiring ${p} from directory ${process.cwd()}`);
 
   // eslint-disable-next-line import/no-dynamic-require,global-require
-  const f = require(path);
+  const f = require(p);
   if (typeof f === 'function') return { path, bindings: {}, transform: f };
   return {
     path,

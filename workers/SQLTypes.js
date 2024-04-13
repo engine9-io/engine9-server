@@ -76,6 +76,7 @@ const mysqlTypes = [
   { type: 'datetime', column_type: 'datetime', knex_method: 'datetime' },
   { type: 'time', column_type: 'time', knex_method: 'time' },
 ];
+function isInt(s) { return Number.isInteger(typeof s === 'number' ? s : parseFloat(s)); }
 
 module.exports = {
   getType(type) {
@@ -167,6 +168,18 @@ module.exports = {
     },
     escapeValue(value) {
       return mysql.escape(value);
+    },
+    addLimit(_query, limit, offset) {
+      if (!limit) return _query;
+      let query = _query;
+      // make sure it's an integer, and defined
+      if (isInt(limit)) {
+        query += ` limit ${limit}`;
+        if (offset) query += ` offset ${offset}`;
+      } else if (limit) {
+        throw new Error(`Invalid limit:${limit}`);
+      }
+      return query;
     },
 
     supportedFunctions() {

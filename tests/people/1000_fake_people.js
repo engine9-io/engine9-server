@@ -2,24 +2,30 @@ const {
   describe, it, before, after,
 } = require('node:test');
 
-process.env.DEBUG = 'test-framework,Performance,BaseWorker';
+process.env.DEBUG = '*';
 const debug = require('debug')('test-framework');
 const assert = require('node:assert');
+const WorkerRunner = require('../../worker-manager/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
 const { rebuildDB, truncateDB } = require('./test_db_modifications');
 
 describe('Insert File of people with options', async () => {
-  const accountId = 'test';
-  const sqlWorker = new SQLWorker({ accountId });
+  const accountId = 'engine9';
+  const runner = new WorkerRunner();
+  const env = runner.getWorkerEnvironment({ accountId });
+  debug('Using env:', env);
+  const sqlWorker = new SQLWorker(env);
+
   const knex = await sqlWorker.connect();
+  debug('Completed connecting to database');
   const personWorker = new PersonWorker({ accountId, knex });
 
   before(async () => {
     if (process.argv.indexOf('rebuild') >= 0) {
-      await rebuildDB({ accountId });
+      await rebuildDB(env);
     } else if (process.argv.indexOf('truncate') >= 0) {
-      await truncateDB({ accountId });
+      await truncateDB(env);
     }
   });
 
@@ -29,7 +35,7 @@ describe('Insert File of people with options', async () => {
   });
 
   it('Should be able to upsert and deduplicate people and email addresses from a file', async () => {
-    await truncateDB({ accountId });
+    await truncateDB(env);
     debug('Argv=', process.argv);
     let filename = process.argv.pop();
     if (filename.indexOf('.csv') >= 0) {

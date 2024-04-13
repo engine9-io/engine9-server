@@ -1,4 +1,0 @@
-nearleyc ./e9ql.ne -o e9ql-parse.tmp.js
-echo "/* eslint-disable */" > e9ql-parse.js
-cat e9ql-parse.tmp.js >>  e9ql-parse.js
-rm e9ql-parse.tmp.js

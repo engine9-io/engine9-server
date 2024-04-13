@@ -148,7 +148,7 @@ Worker.prototype.diff = async function (opts) {
         if (!dbColumn) return { differences: 'new', ...c };
         const differenceKeys = Object.keys(c).reduce((out, k) => {
           // Ignore these attributes
-          if (['type', 'description', 'knex_args'].indexOf(k) >= 0) return out;
+          if (['type', 'description', 'knex_args', 'values'].indexOf(k) >= 0) return out;
           if (c[k] !== dbColumn[k]) {
             // debug(c.name, k, c[k], '!=', dbColumn[k]);
             out[k] = { schema: c[k], db: dbColumn[k] };

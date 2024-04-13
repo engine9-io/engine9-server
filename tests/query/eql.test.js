@@ -6,7 +6,7 @@ const assert = require('node:assert');
 const dayjs = require('dayjs');
 const {
   parse, toSql, withAnalysis, getEvalFn,
-} = require('../../workers/e9ql');
+} = require('../../utilities/eql');
 
 const date_expr = (node, internal) => {
   const { operator, left_side, interval } = node;
@@ -34,9 +34,9 @@ function assertParse(x, expected) {
   });
 }
 
-function evaluationTests(e9ql, lists) {
-  describe(`evaluating ${e9ql}`, () => {
-    const evalFn = getEvalFn({ e9ql });
+function evaluationTests(eql, lists) {
+  describe(`evaluating ${eql}`, () => {
+    const evalFn = getEvalFn({ eql });
     lists.forEach(([v, ex]) => {
       it(`should evaluate ${JSON.stringify(v)} to ${ex}`, () => {
         const result = evalFn(v);
@@ -84,7 +84,7 @@ function roundTrip(x, expected, evalTests) {
     describe(`evaluation tests for \`${x}\``, () => {
       evalTests.forEach(([v, ex]) => {
         it(`should evaluate ${JSON.stringify(v)} to ${ex}`, () => {
-          const result = getEvalFn({ e9ql: x })(v);
+          const result = getEvalFn({ eql: x })(v);
           assert.deepEqual(ex, result);
         });
       });
@@ -126,11 +126,11 @@ describe('roundTrip toSql(parse(x))', () => {
   ]);
 
   roundTrip('date_add("2019-01-01", interval 1 day)', 'date_add("2019-01-01", interval 1 day)', [
-    [{}, dayjs('2019-01-02T05:00:00.000Z').toDate()],
+    [{}, dayjs('2019-01-02T00:00:00.000Z').toDate()],
   ]);
   roundTrip('date_add(x, interval y day)', 'date_add(x, interval y day)', [
-    [{ x: '2019-01-02', y: 1 }, dayjs('2019-01-03T05:00:00.000Z').toDate()],
-    [{ x: '2019-01-02', y: 2 }, dayjs('2019-01-04T05:00:00.000Z').toDate()],
+    [{ x: '2019-01-02', y: 1 }, dayjs('2019-01-03T00:00:00.000Z').toDate()],
+    [{ x: '2019-01-02', y: 2 }, dayjs('2019-01-04T00:00:00.000Z').toDate()],
   ]);
   roundTrip('1.0 + 0.3', '(1 + 0.3)', [
     [{}, 1.3],
@@ -219,10 +219,10 @@ describe('ifnull', () => {
   );
 });
 
-function testAnalysis(baseTable, e9ql, expected) {
-  it(`should correctly analyze \`${e9ql}\``, () => {
+function testAnalysis(baseTable, eql, expected) {
+  it(`should correctly analyze \`${eql}\``, () => {
     const result = withAnalysis({
-      e9ql,
+      eql,
       baseTable,
 
       columnFn: ((f) => f),

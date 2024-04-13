@@ -13,10 +13,18 @@ require('dotenv').config({ path: '.env' });
 
 function Worker(worker) {
   BaseWorker.call(this, worker);
-  this.auth = {
-    ...worker.auth,
-  };
   this.accountId = worker.accountId;
+  if (!this.accountId) throw new Error('No accountId provided to SQLWorker constructor');
+  if (worker.knex) {
+    this.knex = worker.knex;
+  } else {
+    this.auth = {
+      ...worker.auth,
+    };
+    if (!this.auth.database_connection) {
+      throw new Error('No auth provided to SQLWorker constructor, nor a knex instance');
+    }
+  }
 }
 
 util.inherits(Worker, BaseWorker);
@@ -36,11 +44,11 @@ Worker.defaultStandardColumn = {
 Worker.prototype.connect = async function connect() {
   if (this.knex) return this.knex;
   const { accountId } = this;
-  if (!accountId) throw new Error('accountId is required');
+  if (!accountId) throw new Error('accountId is required for connect method');
 
   let config = null;
   const s = this.auth.database_connection;
-  if (!s) throw new Error('Could not find database_connection settings in auth');
+  if (!s) throw new Error(`SQLWorker Could not find database_connection settings in auth configuration with keys ${Object.keys(this.auth)}`);
 
   config = {
     client: 'mysql2',
@@ -60,6 +68,7 @@ Worker.prototype.ok.metadata = {
 Worker.prototype.query = async function (_sql, bindings = []) {
   let sql = _sql;
   if (typeof _sql !== 'string') sql = _sql.sql;
+  if (!sql) throw new Error('No sql provided');
   const knex = await this.connect();
   const [data, columns] = await knex.raw(sql, bindings);
   return { data, columns };
@@ -127,8 +136,11 @@ Worker.prototype.tables.metadata = {
   options: {},
 };
 
-Worker.prototype.escapeValue = function escapeValue(t) {
+Worker.prototype.escapeValue = function (t) {
   return SQLTypes.mysql.escapeValue(t);
+};
+Worker.prototype.addLimit = function (query, limit, offset) {
+  return SQLTypes.mysql.addLimit(query, limit, offset);
 };
 
 const tableNameMatch = /^[a-zA-Z0-9_]+$/;
@@ -434,8 +446,8 @@ Worker.prototype.alterTable = async function ({ table: name, columns = [], index
       }
       if (defaultRaw !== undefined) {
         const allowedRaw = ['current_timestamp()',
-          'current_timestamp() ON UPDATE current_timestamp()'];
-        if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`alterTable: Invalid knex raw value:'${defaultRaw}'`);
+          'current_timestamp() on update current_timestamp()'];
+        if (allowedRaw.indexOf(defaultRaw.toLowerCase()) < 0) throw new Error(`alterTable: Invalid knex raw value:'${defaultRaw}'`);
         column.defaultTo(knex.raw(defaultRaw));
       } else if (defaultValue !== undefined) {
         column.defaultTo(defaultValue);

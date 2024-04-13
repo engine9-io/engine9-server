@@ -1,0 +1,4 @@
+nearleyc ./eql.ne -o eql-parse.tmp.js
+echo "/* eslint-disable */" > eql-parse.js
+cat eql-parse.tmp.js >>  eql-parse.js
+rm eql-parse.tmp.js

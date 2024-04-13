@@ -1,7 +1,7 @@
 /* eslint-disable camelcase */
 const util = require('node:util');
 const debug = require('debug')('QueryWorker');
-const { withAnalysis } = require('./e9ql');
+const { withAnalysis } = require('../utilities/eql');
 
 const SQLWorker = require('./SQLWorker');
 
@@ -14,10 +14,10 @@ util.inherits(Worker, SQLWorker);
 Worker.prototype.withAnalysis = function (options) {
   const worker = this;
   const {
-    e9ql, table, baseTable, table_alias, defaultTable,
+    eql, table, baseTable, table_alias, defaultTable,
   } = options;
   return withAnalysis({
-    e9ql,
+    eql,
     baseTable: table || baseTable,
     defaultTable: defaultTable || table_alias || table,
     columnFn: (f) => worker.escapeColumn(f),
@@ -36,10 +36,10 @@ Worker.prototype.withAnalysis = function (options) {
   });
 };
 
-Worker.prototype.transformE9ql = function (options) {
-  const { e9ql, table, table_alias } = options;
+Worker.prototype.transformEql = function (options) {
+  const { eql, table, table_alias } = options;
   const result = this.withAnalysis({
-    e9ql,
+    eql,
     baseTable: table,
     defaultTable: table_alias || table,
   });
@@ -49,15 +49,15 @@ Worker.prototype.transformE9ql = function (options) {
   return { sql: cleaned, refsByTable };
 };
 
-Worker.prototype.transformE9ql.metadata = {
+Worker.prototype.transformEql.metadata = {
   options: {
-    e9ql: { required: true },
+    eql: { required: true },
     table: { required: true },
     table_alias: {},
   },
 };
 
-Worker.prototype.buildSqlFromQuery = async function (options) {
+Worker.prototype.buildSqlFromQueryObject = async function (options) {
   const worker = this;
   const baseTable = options.table;
   const {
@@ -74,7 +74,6 @@ Worker.prototype.buildSqlFromQuery = async function (options) {
   const dbWorker = this;
 
   async function toSql() {
-    debug('Starting toSql');
     if (!baseTable) throw new Error('table required');
     let baseTableSql = null;
     const tableDefs = {};
@@ -85,7 +84,7 @@ Worker.prototype.buildSqlFromQuery = async function (options) {
       if (alias.indexOf('${') >= 0) throw new Error('When using subqueries, the non-subquery table act as an alias, and cannot have a merge column');
       // prefill so we don't check for the existence of this non-existing table
       tableDefs[alias] = { columns: [] };
-      baseTableSql = await dbWorker.buildSqlFromQuery(subquery);
+      baseTableSql = await dbWorker.buildSqlFromQueryObject(subquery);
       baseTableSql = `(${baseTableSql}) as ${dbWorker.escapeColumn(alias)}`;
     } else {
       baseTableSql = dbWorker.escapeTable(baseTable);
@@ -102,9 +101,8 @@ Worker.prototype.buildSqlFromQuery = async function (options) {
     columns.forEach((f) => {
       tablesToCache[f.table || baseTable] = true;
     });
-    debug('Getting table defs for ', tablesToCache);
+
     await Promise.all(Object.keys(tablesToCache).map((table) => getTableDef({ table })));
-    debug('Cached all tables');
 
     const aggregateFns = {
       NONE: async (x) => x,
@@ -120,30 +118,30 @@ Worker.prototype.buildSqlFromQuery = async function (options) {
 
     async function fromColumn(input, opts) {
       const {
-        table = baseTable, column, aggregate = 'NONE', function: func = 'NONE', alias, e9ql,
+        table = baseTable, column, aggregate = 'NONE', function: func = 'NONE', alias, eql,
       } = input;
       // eslint-disable-next-line no-shadow
       const { ignore_alias = false, order_by = false } = opts || {};
       if (!table) throw new Error(`Invalid column, no table:${JSON.stringify(input)}`);
 
       let result;
-      debug('Checking e9ql', e9ql);
-      if (e9ql) {
-        if (!alias && !ignore_alias) throw new Error('alias is required if using e9ql');
-        debug('Transforming e9ql', e9ql);
+      debug('Checking eql', eql);
+      if (eql) {
+        if (!alias && !ignore_alias) throw new Error('alias is required if using eql');
+        debug('Transforming eql', eql);
         // eslint-disable-next-line no-shadow
-        result = await dbWorker.transformE9ql({ e9ql, table });
+        result = await dbWorker.transformEql({ eql, table });
         // eslint-disable-next-line no-console
         if (ignore_alias) result = result.sql;
         else result = `${result.sql} as ${dbWorker.escapeColumn(alias)}`;
-        debug('Finished e9ql');
+        debug('Finished eql');
       } else {
         const def = await getTableDef({ table });
         const columnDef = def.columns.find((x) => x.name === column);
         if (!columnDef) {
           // New behavior -- allow for extraneous columns
           // and ignore them if they're not in the table
-          // But NOT if you use e9ql, that will error
+          // But NOT if you use eql, that will error
           if (opts && opts.ignore_missing) return null;
           throw new Error(`no such column: ${column} for ${table} with input:${JSON.stringify(input)} and opts:${JSON.stringify(opts)}`);
         }
@@ -186,12 +184,16 @@ Worker.prototype.buildSqlFromQuery = async function (options) {
       IS_NOT_NULL: async ([v1]) => `${v1} is not null`,
     };
 
-    async function fromCondition({ values: raw = [], type, e9ql }) {
-      if (e9ql) {
-        return dbWorker.transformE9ql({ e9ql, table: baseTable }).sql;
+    async function fromCondition({ values: raw = [], type, eql }) {
+      if (eql) {
+        return dbWorker.transformEql({ eql, table: baseTable }).sql;
       }
+      if (!type) throw new Error(`Could not find a condition type for values:${JSON.stringify(raw)}`);
 
       const values = await Promise.all(raw.map(fromConditionValue));
+      if (typeof conditionFns[type] !== 'function') {
+        throw new Error(`Could not find function for type:${type}`);
+      }
       return conditionFns[type](values);
     }
     debug('Checking columns');
@@ -227,10 +229,10 @@ Worker.prototype.buildSqlFromQuery = async function (options) {
     if (!joins) joins = [];
     if (joins.length) {
       joinClause = (await Promise.all(joins.map(async (j) => {
-        const { alias, target: _target, match_e9ql } = j;
+        const { alias, target: _target, match_eql } = j;
         const target = _target || alias;
-        // console.log("match_e9ql=",match_e9ql);
-        const match = dbWorker.transformE9ql({ e9ql: match_e9ql, table: baseTable });
+        // console.log("match_eql=",match_eql);
+        const match = dbWorker.transformEql({ eql: match_eql, table: baseTable });
 
         return `left join ${dbWorker.escapeTable(target)} as ${dbWorker.escapeTable(alias)} on ${match.sql}`;
       }))).join('\n').trim();
@@ -253,7 +255,7 @@ Worker.prototype.buildSqlFromQuery = async function (options) {
 
   return toSql();
 };
-Worker.prototype.buildSqlFromQuery.metadata = {
+Worker.prototype.buildSqlFromQueryObject.metadata = {
   bot: true,
   options: {},
 };

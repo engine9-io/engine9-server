@@ -339,7 +339,8 @@ WorkerRunner.prototype.getWorkerEnvironment = function getWorkerEnvironment(opti
   const accountEnvironment = config.accounts?.[options.accountId] || {};
   // don't print the environment, could have credentials
   debug('Using environment with keys:', Object.keys(accountEnvironment));
-  return callback(null, accountEnvironment);
+  accountEnvironment.accountId = options.accountId;
+  return (typeof callback === 'function') ? callback(null, accountEnvironment) : accountEnvironment;
 };
 
 WorkerRunner.prototype.run = function run() {
@@ -431,7 +432,7 @@ WorkerRunner.prototype.run = function run() {
     accountId: (cb) => getAccountId(cb),
     WorkerConstructor: (accountId, cb) => runner.getWorkerConstructor({ accountId }, cb),
     environment: (accountId, WorkerConstructor, cb) => {
-      runner.getWorkerEnvironment({ accountId, argv, WorkerConstructor }, cb);
+      runner.getWorkerEnvironment({ accountId }, cb);
     },
     method: (environment, WorkerConstructor, cb) => runner.getMethod(WorkerConstructor, cb),
     _options: (method, cb) => runner.getOptionValues(method, cb),
@@ -659,7 +660,8 @@ if (require.main === module) {
     r.run();
   }
 } else {
-  throw new Error('Not the root');
+  // may want to use the configuration loader, so this can be included
+  // throw new Error('WorkerRunner should not be executed');
 }
 
 module.exports = WorkerRunner;

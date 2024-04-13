@@ -1,8 +1,8 @@
 /* eslint-disable camelcase */
 const nearley = require('nearley');
 const dayjs = require('dayjs');
-const debug = require('debug')('e9ql');
-const grammar = require('./e9ql-parse');
+const debug = require('debug')('eql');
+const grammar = require('./eql-parse');
 
 function parse(_sql) {
   const sql = _sql.trim();
@@ -361,8 +361,8 @@ const evalFnHandlers = {
 };
 
 function getEvalFn(options) {
-  const { e9ql } = options;
-  const parsed = parse(e9ql);
+  const { eql } = options;
+  const parsed = parse(eql);
 
   return walkNodes({
     handlers: evalFnHandlers,
@@ -370,12 +370,12 @@ function getEvalFn(options) {
 }
 
 function withAnalysis(options) {
-  const { e9ql, baseTable } = options;
+  const { eql, baseTable } = options;
 
   if (!baseTable) throw new Error('baseTable required');
 
-  const parsed = parse(e9ql);
-  if (!parsed) throw new Error('parsed is null from: ', e9ql);
+  const parsed = parse(eql);
+  if (!parsed) throw new Error('parsed is null from: ', eql);
 
   const cleaned = toSql(options, parsed);
 
