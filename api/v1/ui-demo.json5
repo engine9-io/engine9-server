@@ -1,0 +1,98 @@
+{
+  menu:[
+    {
+    id: "home",
+    title: "Modules",
+    type: "group",
+    children: [
+      {
+        id: "home-dashboard",
+        title: "Dashboard",
+        icon:"home",
+        url: "/dynamic",
+      },
+      {
+        id: "people",
+        title: "People",
+        type: "collapse",
+        children: [
+          {
+            id: "person-list",
+            title: "All",
+            icon:"person",
+            url: "/dynamic/person",
+          },
+          {
+            id: "person-segments",
+            title: "Segments",
+            icon:"segment",
+            url: "/dynamic/segment",
+          }
+        ]},
+        {
+        id: "messages",
+        title: "Messages",
+        type: "collapse",
+        children: [
+          {
+            id: "message-campaign",
+            title: "Campaigns",
+            icon:"campaign",
+            url: "/dynamic/campaign",
+          },
+        ]},
+        {
+        id: "transactions",
+        title: "Transactions",
+        type: "collapse",
+        children: [
+          {
+            id: "transactions-list",
+            title: "Transactions",
+            url: "/dynamic/transactions",
+            icon:"transaction"
+          },
+        ]},
+        {
+        id: "data",
+        title: "Data",
+        type: "collapse",
+        children: [
+          {
+            id: "home-reports",
+            title: "Reports",
+            icon:"report",
+            url: "/dynamic/reports",
+          },
+        ]
+        }
+
+    ]},
+  ],
+  routes:[
+    {
+      path: "/person",
+      layout: "full_width",
+      components: {
+        "body": [
+          {
+            "component": "DataTable",
+            "properties": { "table": "person", "fields": ["id", "given_name", "family_name"] },
+          },
+        ],
+      },
+    },
+    {
+      path: "/person/:id",
+      layout: "full_width",
+      components: {
+        "body": [
+          {
+            "component": "Person",
+            "properties": { "table": "person", "fields": ["id", "given_name", "family_name"] },
+          },
+        ],
+      },
+    }
+  ]
+}

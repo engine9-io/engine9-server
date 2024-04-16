@@ -81,6 +81,15 @@ router.get('/ok', (req, res) => {
   res.json({ ok: true });
 });
 
+router.get('/tables/describe/:table', async (req, res) => {
+  try {
+    const desc = await req.queryWorker.describe({ table: req.params.table });
+    return res.json(desc);
+  } catch (e) {
+    return res.status(422).json({ error: 'Invalid table' });
+  }
+});
+
 router.get('/tables/:table/:id', async (req, res) => {
   const { table, id } = req.params;
   const columns = req.query.columns || undefined;
