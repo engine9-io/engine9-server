@@ -5,10 +5,7 @@ process.env.DEBUG = '*';
 const debug = require('debug')('api');
 
 const express = require('express');
-const cors = require('cors');
 const JSON5 = require('json5');// Useful for parsing extended JSON
-const compression = require('compression');
-const bodyParser = require('body-parser');
 
 // knex starts up it's own debugger,
 const Knex = require('knex');
@@ -23,7 +20,7 @@ let connectionConfig = null;
 
 try {
   // eslint-disable-next-line global-require
-  connectionConfig = require('../../config.json');
+  connectionConfig = require('../../account-config.json');
 } catch (e) {
   debug(e);
   throw new Error('Error loading config.json file -- make sure to create one from config.template.json before running');
@@ -67,10 +64,6 @@ function getQueryWorkerForRequest(req) {
 
   return queryWorker;
 }
-
-router.use(cors());
-router.use(compression());
-router.use(bodyParser.json());
 
 router.use((req, res, next) => {
   req.queryWorker = getQueryWorkerForRequest(req);

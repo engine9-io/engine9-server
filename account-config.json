@@ -1,0 +1,21 @@
+{
+    "accounts":{
+        "dev":{
+            "packet_repository":"s3://engine9-accounts/dev"
+        },
+        "engine9":{
+            "packet_repository":"s3://engine9-accounts/engine9",
+            "auth":{
+                "database_connection":"mysql://engine9:engine9@localhost/engine9"
+            }
+        },
+        "test":{
+            "packet_repository":"s3://engine9-accounts/test",
+            "auth":{
+                "database_connection":"mysql://test:test@localhost/test"
+            }
+        }
+    }
+}
+
+

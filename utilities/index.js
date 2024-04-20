@@ -1,4 +1,5 @@
 const dayjs = require('dayjs');
+const crypto = require('node:crypto');
 
 function relativeDate(s, _initialDate) {
   let initialDate = _initialDate;
@@ -123,6 +124,17 @@ function getStringArray(s, nonZeroLength) {
   return a;
 }
 
+/*
+        generate a unique hexadecimal key
+*/
+function generateUniqueKey(opts) {
+  opts = opts || {};
+  const method = opts.method || 'sha1';
+  const encoding = opts.encoding || 'hex';
+  const bytes = opts.bytes || 2048;
+  return crypto.createHash(method).update(crypto.randomBytes(bytes)).digest(encoding);
+}
+
 module.exports = {
-  bool, parseRegExp, relativeDate, toCharCodes, getIntArray, getStringArray,
+  bool, parseRegExp, relativeDate, toCharCodes, getIntArray, getStringArray, generateUniqueKey,
 };

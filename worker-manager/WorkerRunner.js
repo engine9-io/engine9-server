@@ -11,7 +11,7 @@ const { relativeDate } = require('../utilities');
 let config = null;
 try {
   // eslint-disable-next-line global-require
-  config = require('../config.json');
+  config = require('../account-config.json');
 } catch (e) {
   debug(e);
   throw new Error('Error loading config.json file -- make sure to create one from config.template.json before running');
