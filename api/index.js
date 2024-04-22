@@ -31,12 +31,22 @@ app.use(cors());
 app.use(compression());
 app.use(bodyParser.json());
 
-app.get('/ok', (req, res) => {
-  res.json({ ok: true });
-});
+app.get('/ok', (req, res) => { res.json({ ok: true }); });
 app.use('/data', data);
 app.use('/ui-config', ui);
 app.use('/packet', packetServer);
+
+/*
+error handling -- default is a bit better
+than this, handles NODE_ENV, etc
+app.use((err, req, res, next) => {
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500);
+  return res.send({ error: err });
+});
+*/
 
 const port = 8080;
 

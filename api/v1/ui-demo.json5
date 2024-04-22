@@ -23,6 +23,12 @@
             url: "/dynamic/person",
           },
           {
+            id: "person-list",
+            title: "Sample",
+            icon:"person",
+            url: "/dynamic/person/1",
+          },
+          {
             id: "person-segments",
             title: "Segments",
             icon:"segment",
@@ -77,7 +83,30 @@
         "body": [
           {
             "component": "DataTable",
-            "properties": { "table": "person", "fields": ["id", "given_name", "family_name"] },
+            "properties": {
+              "table": "person",
+              "columns": [
+                {
+                  title: 'Id',
+                  dataIndex: 'id',
+                  sorter: true,
+                  width: '20%',
+                },
+                {
+                  title: 'Name',
+                  dataIndex: 'name',
+                  sorter: true,
+                  render: "{{given_name}} {{family_name}}",
+                  width: '40%',
+                }
+              ],
+              onRow:{
+                onClick:{
+                  action:'navigate',
+                  url:"/dynamic/person/{{record.id}}"
+                }
+              }
+             },
           },
         ],
       },
@@ -88,9 +117,16 @@
       components: {
         "body": [
           {
-            "component": "Person",
-            "properties": { "table": "person", "fields": ["id", "given_name", "family_name"] },
+            "component": "DataForm",
+            "properties": {
+              "table": "person",
+              "inputs": [
+                {type:"hidden", name:"id"},
+                {type:"string", name:"given_name"},
+                {type:"string", name:"family_name"},
+              ],
           },
+          }
         ],
       },
     }

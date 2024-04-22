@@ -83,13 +83,6 @@ router.get('/tables/describe/:table', async (req, res) => {
   }
 });
 
-router.get('/tables/:table/:id', async (req, res) => {
-  const { table, id } = req.params;
-  const columns = req.query.columns || undefined;
-  const object = await req.knex.select(columns).table(table).where({ id });
-  return res.json(object);
-});
-
 function makeArray(s) {
   if (!s) return [];
 
@@ -98,7 +91,9 @@ function makeArray(s) {
   return [obj];
 }
 
-router.get('/tables/:table', async (req, res) => {
+router.get([
+  '/tables/:table/:id',
+  '/tables/:table'], async (req, res) => {
   const { table } = req.params;
   if (!table) throw new Error('No table provided');
   const { limit = 100, offset = 0 } = req.query;
@@ -120,12 +115,19 @@ router.get('/tables/:table', async (req, res) => {
   if (invalid.length > 0) {
     return res.status(422).json({ error: `Unparseable query values:${invalid.join()}` });
   }
+  if (req.params.id) {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) throw new Error('Invalid id');
+    query.conditions = (query.conditions || []).concat({ eql: `id=${id}` });
+    query.limit = 0;
+    delete query.offset;
+  }
 
   let sql;
   try {
     sql = await req.queryWorker.buildSqlFromQueryObject(query);
   } catch (e) {
-    debug('Error generating query with fields:', query);
+    debug('Error generating query with columns:', query);
     debug(e);
     return res.status(422).json({ error: 'Invalid query values' });
   }
