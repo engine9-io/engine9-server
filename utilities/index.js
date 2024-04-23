@@ -127,14 +127,38 @@ function getStringArray(s, nonZeroLength) {
 /*
         generate a unique hexadecimal key
 */
-function generateUniqueKey(opts) {
-  opts = opts || {};
+function generateUniqueKey(_opts) {
+  const opts = _opts || {};
   const method = opts.method || 'sha1';
   const encoding = opts.encoding || 'hex';
   const bytes = opts.bytes || 2048;
   return crypto.createHash(method).update(crypto.randomBytes(bytes)).digest(encoding);
 }
 
+class ErrorObject extends Error {
+  constructor(data) {
+    if (typeof data === 'string') {
+      // normal behavior
+      super(data);
+    } else if (typeof data === 'object') {
+      super(data.message);
+      Object.keys(data).forEach((k) => {
+        this[k] = data[k];
+      });
+      this.status = data.status;
+    } else {
+      super('(No error message)');
+    }
+  }
+}
+
 module.exports = {
-  bool, parseRegExp, relativeDate, toCharCodes, getIntArray, getStringArray, generateUniqueKey,
+  bool,
+  parseRegExp,
+  relativeDate,
+  toCharCodes,
+  getIntArray,
+  getStringArray,
+  generateUniqueKey,
+  ErrorObject,
 };

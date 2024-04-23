@@ -11,6 +11,7 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 const Knex = require('knex');
 
 const QueryWorker = require('../../workers/QueryWorker');
+const { ErrorObject } = require('../../utilities');
 
 const router = express.Router({ mergeParams: true });
 
@@ -85,18 +86,20 @@ router.get('/tables/describe/:table', async (req, res) => {
 
 function makeArray(s) {
   if (!s) return [];
+  if (typeof s === 'object') {
+    if (Array.isArray(s)) return s;
+    return [s];
+  }
 
   const obj = JSON5.parse(s);
   if (Array.isArray(obj)) return obj;
   return [obj];
 }
 
-router.get([
-  '/tables/:table/:id',
-  '/tables/:table'], async (req, res) => {
-  const { table } = req.params;
-  if (!table) throw new Error('No table provided');
-  const { limit = 100, offset = 0 } = req.query;
+async function getData(options, queryWorker) {
+  const { table, limit = 100, offset = 0 } = options;
+  if (!table) throw new ErrorObject({ code: 422, message: 'No table provided' });
+  if (options.extensions && !options.id) throw new ErrorObject({ code: 422, message: 'No table provided' });
   const query = {
     table,
     limit,
@@ -105,18 +108,25 @@ router.get([
 
   const invalid = ['conditions', 'group_by', 'columns'].filter((k) => {
     try {
-      query[k] = makeArray(req.query[k]);
+      query[k] = makeArray(options[k]);
       return false;
     } catch (e) {
-      debug(e);
-      return true;
+      debug(`Error with ${k}`, typeof options[k], options[k], e);
+      return e;
     }
   });
+
   if (invalid.length > 0) {
-    return res.status(422).json({ error: `Unparseable query values:${invalid.join()}` });
+    throw new ErrorObject({
+      status: 422,
+      message: `Unparseable query values:${invalid.join()}`,
+    });
   }
-  if (req.params.id) {
-    const id = parseInt(req.params.id, 10);
+  // Not positive default to all is a great idea
+  if (query.columns.length === 0)query.columns = ['*'];
+
+  if (options.id) {
+    const id = parseInt(options.id, 10);
     if (Number.isNaN(id)) throw new Error('Invalid id');
     query.conditions = (query.conditions || []).concat({ eql: `id=${id}` });
     query.limit = 0;
@@ -125,18 +135,104 @@ router.get([
 
   let sql;
   try {
-    sql = await req.queryWorker.buildSqlFromQueryObject(query);
+    sql = await queryWorker.buildSqlFromQueryObject(query);
+    debug('Retrieved sql', JSON.stringify({ query, sql }, null, 4));
   } catch (e) {
     debug('Error generating query with columns:', query);
     debug(e);
-    return res.status(422).json({ error: 'Invalid query values' });
+    throw new ErrorObject({ status: 422, message: 'Error generating query' });
   }
+  let data = null;
   try {
-    const { data } = await req.queryWorker.query(sql);
+    const r = await queryWorker.query(sql);
+    data = r.data;
+  } catch (e) {
+    debug(e);
+    throw new ErrorObject({ status: 422, message: 'Invalid SQL was generated.' });
+  }
+  // If there's no extensions, just return the data
+  if (!options.extensions) return data;
+
+  let extOption = null;
+  try {
+    extOption = JSON5.parse(options.extensions);
+  } catch (e) {
+    debug(e);
+    throw new ErrorObject({ status: 422, message: 'Invalid JSON5 for extensions' });
+  }
+  if (Array.isArray(extOption)) {
+    // we're fine, it's an array not an object
+  } else {
+    // Turn it into an array if it's not
+    extOption = Object.keys(extOption).map((property) => {
+      if (!extOption[property]) return false;
+      if (extOption[property].property) throw new ErrorObject({ status: 422, message: `Invalid extension property ${property}.property, do not include 'property' in a non-array extensions object` });
+      extOption[property] = property;
+      return extOption[property];
+    }).filter(Boolean);
+  }
+  const dataLookup = {};
+  data.forEach((d) => { dataLookup[parseInt(d.id, 10)] = d; });
+  const allIds = data.map((d) => {
+    if (Number.isNaN(d.id)) {
+      throw new ErrorObject({
+        code: 422,
+        message: `An id that was not a number was returned:${d.id}`,
+      });
+    }
+    return d.id;
+  });
+  debug('Retrieved Ids:', allIds);
+  // Still parse the extensions, we still want to throw an invalid extensions
+  // even if there's no data
+  const cleanedExtensions = extOption.map((ext) => {
+    if (ext.extensions) throw new ErrorObject({ status: 422, message: `Invalid extension property ${ext.property}. Extensions cannot have sub-extensions.` });
+    // Add in the primary key filter
+    ext.conditions = makeArray(ext.conditions);
+    ext.foreign_id_field = ext.foreign_id_field || `${table}_id`;
+    ext.conditions.push({
+      eql: `${ext.foreign_id_field} in (${allIds.map((id) => `${id}`).join(',')})`,
+    });
+    ext.limit = allIds.length * 25; // limit to 25x the number of records
+
+    // prefill empty data
+    data.forEach((d) => { d[ext.property] = []; });
+    return ext;
+  });
+  /*
+    Here we've validated the extensions, but don't bother running them
+  as there's no primary data */
+  if (allIds.length === 0) {
+    return data;
+  }
+
+  const extensionData = await Promise.all(
+    cleanedExtensions.map((ext) => {
+      debug('Running extension for ids:', allIds, ext);
+      return getData(ext, queryWorker);
+    }),
+  );
+  extensionData.forEach((extensionResults, i) => {
+    const ext = cleanedExtensions[i];
+    extensionResults.forEach((r) => {
+      const id = r[ext.foreign_id_field];
+      dataLookup[id]?.[ext.foreign_id_field]?.push(r);
+    });
+  });
+  return data;
+}
+
+router.get([
+  '/tables/:table/:id',
+  '/tables/:table'], async (req, res) => {
+  try {
+    const data = await getData({
+      table: req.params?.table, id: req.params?.id, ...req.query,
+    }, req.queryWorker);
     return res.json({ data });
   } catch (e) {
-    debug('Error running SQL:', { query, sql });
-    return res.status(422).json({ error: 'SQL Error' });
+    debug('Error handling request:', e, e.code, e.message);
+    return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
   }
 });
 

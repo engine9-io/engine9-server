@@ -201,12 +201,22 @@ var grammar = {
     {"name": "predicate", "symbols": ["bit_expr_predicate"], "postprocess": d => d[0]},
     {"name": "in_predicate$subexpression$1", "symbols": ["NOT", "__"]},
     {"name": "in_predicate$subexpression$1", "symbols": []},
-    {"name": "in_predicate", "symbols": ["pre_bit_expr", "in_predicate$subexpression$1", "IN", "_", {"literal":"("}, "_", "expr_comma_list", "_", {"literal":")"}], "postprocess":  d => ({
+    {"name": "in_predicate", "symbols": ["pre_bit_expr", "in_predicate$subexpression$1", "IN", "_", {"literal":"("}, "_", "expr_comma_list", "_", {"literal":")"}], "postprocess":  d => {
+      let exprs=[];
+      switch(d[6].type){
+        case 'string':exprs=[d[6]]; break;
+        case 'expr_comma_list':exprs=d[6].exprs; break;
+        case 'decimal':exprs=[d[6]]; break;
+        default: exprs=[];//unhandled
+      };
+      return {
           type: 'in',
           value: d[0],
           not: (d[1] || []).length > 0,
-          exprs: (d[6].exprs || [])
-        }) },
+          exprs
+        };
+      }
+    },
     {"name": "between_predicate$subexpression$1", "symbols": ["NOT", "__"]},
     {"name": "between_predicate$subexpression$1", "symbols": []},
     {"name": "between_predicate", "symbols": ["pre_bit_expr", "between_predicate$subexpression$1", "BETWEEN", "mid_bit_expr", "AND", "post_bit_expr"], "postprocess": 

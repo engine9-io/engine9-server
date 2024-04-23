@@ -1,6 +1,7 @@
 /* eslint-disable camelcase */
 const util = require('node:util');
-const debug = require('debug')('QueryWorker');
+// const debug = require('debug')('QueryWorker');
+const debugMore = require('debug')('QueryWorker');
 const { withAnalysis } = require('../utilities/eql');
 
 const SQLWorker = require('./SQLWorker');
@@ -71,6 +72,7 @@ Worker.prototype.buildSqlFromQueryObject = async function (options) {
   } = options;
   let { columns, joins = [] } = options;
   if (!columns && fields) columns = fields;// Some legacy formats still use 'fields'
+  if (!columns || columns.length === 0) throw new Error("No columns or fields specified, at least specify columns=['*']");
   const dbWorker = this;
 
   async function toSql() {
@@ -125,16 +127,21 @@ Worker.prototype.buildSqlFromQueryObject = async function (options) {
       if (!table) throw new Error(`Invalid column, no table:${JSON.stringify(input)}`);
 
       let result;
-      debug('Checking eql', eql);
+
+      debugMore('fromColumn', input, opts);
       if (eql) {
+        debugMore('Checking eql', eql);
         if (!alias && !ignore_alias) throw new Error('alias is required if using eql');
-        debug('Transforming eql', eql);
+        debugMore('Transforming eql', eql);
         // eslint-disable-next-line no-shadow
         result = await dbWorker.transformEql({ eql, table });
         // eslint-disable-next-line no-console
         if (ignore_alias) result = result.sql;
         else result = `${result.sql} as ${dbWorker.escapeColumn(alias)}`;
-        debug('Finished eql');
+        debugMore('Finished eql');
+      } else if (input === '*' || column === '*') {
+        debugMore('Using a * column');
+        result = `${dbWorker.escapeTable(table)}.*`;
       } else {
         const def = await getTableDef({ table });
         const columnDef = def.columns.find((x) => x.name === column);
@@ -186,7 +193,9 @@ Worker.prototype.buildSqlFromQueryObject = async function (options) {
 
     async function fromCondition({ values: raw = [], type, eql }) {
       if (eql) {
-        return dbWorker.transformEql({ eql, table: baseTable }).sql;
+        const s = dbWorker.transformEql({ eql, table: baseTable }).sql;
+        debugMore('Parsed eql:', { baseTable, eql }, s);
+        return s;
       }
       if (!type) throw new Error(`Could not find a condition type for values:${JSON.stringify(raw)}`);
 
@@ -196,28 +205,28 @@ Worker.prototype.buildSqlFromQueryObject = async function (options) {
       }
       return conditionFns[type](values);
     }
-    debug('Checking columns');
+    debugMore('Checking columns');
     if (!columns || !columns.length) {
       columns = (await getTableDef({ table: baseTable }))
         .columns.map(({ name }) => ({ column: name }));
     }
-    debug('Checking selections');
+    debugMore('Checking selections');
     const selections = (await Promise.all(
       columns.map((f) => fromColumn(f, { ignore_missing: true })),
     )).filter(Boolean);
-    debug('Checking where clause');
+    debugMore('Checking where clause');
 
     const whereClauseParts = await Promise.all((conditions || []).map(fromCondition));
     let whereClause = '';
     if (whereClauseParts.length) {
       whereClause = `where\n${whereClauseParts.join(' and\n')}`;
     }
-    debug('Checking groupBy');
+    debugMore('Checking groupBy');
     const groupBy = await Promise.all(group_by.map((f) => fromColumn(f, { ignore_alias: true })));
     let groupByClause = '';
     if (groupBy.length) groupByClause = `group by ${groupBy.join(',').trim()}`;
 
-    debug('Checking orderBy');
+    debugMore('Checking orderBy');
     const orderBy = await Promise.all(
       (order_by || []).map((f) => fromColumn(f, { order_by: true, ignore_alias: true })),
     );
@@ -237,7 +246,7 @@ Worker.prototype.buildSqlFromQueryObject = async function (options) {
         return `left join ${dbWorker.escapeTable(target)} as ${dbWorker.escapeTable(alias)} on ${match.sql}`;
       }))).join('\n').trim();
     }
-    debug('Constructing parts');
+    debugMore('Constructing parts');
 
     let sql = [
       'select',

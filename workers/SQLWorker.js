@@ -21,9 +21,6 @@ function Worker(worker) {
     this.auth = {
       ...worker.auth,
     };
-    if (!this.auth.database_connection) {
-      throw new Error('No auth provided to SQLWorker constructor, nor a knex instance');
-    }
   }
 }
 

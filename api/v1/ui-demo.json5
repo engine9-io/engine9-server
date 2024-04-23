@@ -9,7 +9,7 @@
         id: "home-dashboard",
         title: "Dashboard",
         icon:"home",
-        url: "/dynamic",
+        url: "",
       },
       {
         id: "people",
@@ -20,19 +20,19 @@
             id: "person-list",
             title: "All",
             icon:"person",
-            url: "/dynamic/person",
+            url: "/person",
           },
           {
-            id: "person-list",
+            id: "person-list-sample",
             title: "Sample",
             icon:"person",
-            url: "/dynamic/person/1",
+            url: "/person/1",
           },
           {
             id: "person-segments",
             title: "Segments",
             icon:"segment",
-            url: "/dynamic/segment",
+            url: "/segment",
           }
         ]},
         {
@@ -44,7 +44,7 @@
             id: "message-campaign",
             title: "Campaigns",
             icon:"campaign",
-            url: "/dynamic/campaign",
+            url: "/campaign",
           },
         ]},
         {
@@ -55,7 +55,7 @@
           {
             id: "transactions-list",
             title: "Transactions",
-            url: "/dynamic/transactions",
+            url: "/transactions",
             icon:"transaction"
           },
         ]},
@@ -68,7 +68,7 @@
             id: "home-reports",
             title: "Reports",
             icon:"report",
-            url: "/dynamic/reports",
+            url: "/reports",
           },
         ]
         }
@@ -96,14 +96,14 @@
                   title: 'Name',
                   dataIndex: 'name',
                   sorter: true,
-                  render: "{{given_name}} {{family_name}}",
+                  render: "{{record.given_name}} {{record.family_name}}",
                   width: '40%',
                 }
               ],
               onRow:{
                 onClick:{
                   action:'navigate',
-                  url:"/dynamic/person/{{record.id}}"
+                  url:"/person/{{record.id}}"
                 }
               }
              },
@@ -112,20 +112,60 @@
       },
     },
     {
-      path: "/person/:id",
-      layout: "full_width",
+      path: "/person/:id/*",
+      layout: "sidebar",
       components: {
-        "body": [
+        "sidebar":[
           {
-            "component": "DataForm",
+            "component": "DataDisplay",
             "properties": {
               "table": "person",
-              "inputs": [
-                {type:"hidden", name:"id"},
-                {type:"string", name:"given_name"},
-                {type:"string", name:"family_name"},
+              "id":"{{parameters.id}}",
+              "extensions":[
+                {alias:"emails", table:"person_email"}
               ],
+              "components": [
+                "{{record.given_name}} {{record.family_name}}",
+              ],
+             },
           },
+          {
+            "component": "Link",
+            "properties": {
+              label:"Overview",
+              "to": "",
+             },
+          },
+          {
+            "component": "Link",
+            "properties": {
+              label:"Addresses",
+              "to": "address",
+             },
+          },
+        ],
+        "main":[
+          {
+            // "path":"overview", //no path is the default
+            "component": "DataDisplay",
+            "properties": {
+              "table": "person",
+              "components": [
+                "{{record.given_name}} {{family_name}}"
+              ],
+             },
+          },
+          {
+            "path":"address",
+            "label":"Addresses",
+            "component": "DataDisplay",
+            "properties": {
+              "table": "person_address",
+              "conditions":[{eql:"person_id={{person_id}}"}],
+              "rows": [
+                "{{street}}"
+              ],
+             },
           }
         ],
       },
