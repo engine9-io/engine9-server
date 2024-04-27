@@ -11,7 +11,7 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 const Knex = require('knex');
 
 const QueryWorker = require('../../workers/QueryWorker');
-const { ErrorObject } = require('../../utilities');
+const { ObjectError } = require('../../utilities');
 
 const router = express.Router({ mergeParams: true });
 
@@ -98,8 +98,8 @@ function makeArray(s) {
 
 async function getData(options, queryWorker) {
   const { table, limit = 100, offset = 0 } = options;
-  if (!table) throw new ErrorObject({ code: 422, message: 'No table provided' });
-  if (options.extensions && !options.id) throw new ErrorObject({ code: 422, message: 'No table provided' });
+  if (!table) throw new ObjectError({ code: 422, message: 'No table provided' });
+  if (options.extensions && !options.id) throw new ObjectError({ code: 422, message: 'No table provided' });
   const query = {
     table,
     limit,
@@ -117,7 +117,7 @@ async function getData(options, queryWorker) {
   });
 
   if (invalid.length > 0) {
-    throw new ErrorObject({
+    throw new ObjectError({
       status: 422,
       message: `Unparseable query values:${invalid.join()}`,
     });
@@ -140,7 +140,7 @@ async function getData(options, queryWorker) {
   } catch (e) {
     debug('Error generating query with columns:', query);
     debug(e);
-    throw new ErrorObject({ status: 422, message: 'Error generating query' });
+    throw new ObjectError({ status: 422, message: 'Error generating query' });
   }
   let data = null;
   try {
@@ -148,7 +148,7 @@ async function getData(options, queryWorker) {
     data = r.data;
   } catch (e) {
     debug(e);
-    throw new ErrorObject({ status: 422, message: 'Invalid SQL was generated.' });
+    throw new ObjectError({ status: 422, message: 'Invalid SQL was generated.' });
   }
   // If there's no extensions, just return the data
   if (!options.extensions) return data;
@@ -158,16 +158,19 @@ async function getData(options, queryWorker) {
     extOption = JSON5.parse(options.extensions);
   } catch (e) {
     debug(e);
-    throw new ErrorObject({ status: 422, message: 'Invalid JSON5 for extensions' });
+    throw new ObjectError({ status: 422, message: 'Invalid JSON5 for extensions' });
   }
   if (Array.isArray(extOption)) {
-    // we're fine, it's an array not an object
+    throw new ObjectError({
+      code: 422,
+      message: 'Invalid extensions, use an object not an array',
+    });
   } else {
     // Turn it into an array if it's not
     extOption = Object.keys(extOption).map((property) => {
       if (!extOption[property]) return false;
-      if (extOption[property].property) throw new ErrorObject({ status: 422, message: `Invalid extension property ${property}.property, do not include 'property' in a non-array extensions object` });
-      extOption[property] = property;
+      if (extOption[property].property) throw new ObjectError({ status: 422, message: `Invalid extension property ${property}.property, do not include 'property' in a non-array extensions object` });
+      extOption[property].property = property;
       return extOption[property];
     }).filter(Boolean);
   }
@@ -175,7 +178,7 @@ async function getData(options, queryWorker) {
   data.forEach((d) => { dataLookup[parseInt(d.id, 10)] = d; });
   const allIds = data.map((d) => {
     if (Number.isNaN(d.id)) {
-      throw new ErrorObject({
+      throw new ObjectError({
         code: 422,
         message: `An id that was not a number was returned:${d.id}`,
       });
@@ -186,7 +189,7 @@ async function getData(options, queryWorker) {
   // Still parse the extensions, we still want to throw an invalid extensions
   // even if there's no data
   const cleanedExtensions = extOption.map((ext) => {
-    if (ext.extensions) throw new ErrorObject({ status: 422, message: `Invalid extension property ${ext.property}. Extensions cannot have sub-extensions.` });
+    if (ext.extensions) throw new ObjectError({ status: 422, message: `Invalid extension property ${ext.property}. Extensions cannot have sub-extensions.` });
     // Add in the primary key filter
     ext.conditions = makeArray(ext.conditions);
     ext.foreign_id_field = ext.foreign_id_field || `${table}_id`;
@@ -215,8 +218,11 @@ async function getData(options, queryWorker) {
   extensionData.forEach((extensionResults, i) => {
     const ext = cleanedExtensions[i];
     extensionResults.forEach((r) => {
+      if (!ext.foreign_id_field) {
+        throw new ObjectError('no foreign_id_field');
+      }
       const id = r[ext.foreign_id_field];
-      dataLookup[id]?.[ext.foreign_id_field]?.push(r);
+      dataLookup[id]?.[ext.property]?.push(r);
     });
   });
   return data;

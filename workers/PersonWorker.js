@@ -93,16 +93,16 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   */
   await knex.raw('lock tables person write,person_identifier write');
   /* First check to see if any new IDS have slotted in here */
-  const existingIds = await knex.select(['value', 'person_id'])
+  const existingIds = await knex.select(['id_value', 'person_id'])
     .from('person_identifier')
-    .where('value', 'in', Object.keys(identifierMap));
+    .where('id_value', 'in', Object.keys(identifierMap));
   // debug('Found ', existingIds, '.... sleeping');
   /* If we want to test the logic here, we can sleep after the query to wait
   for the conflicting thread to catch up to the problem zone
   */
   // await sleep(5000);
   existingIds.forEach((row) => {
-    (identifierMap[row.value] || []).forEach((item) => {
+    (identifierMap[row.id_value] || []).forEach((item) => {
       item.person_id = row.person_id;
       delete item.temp_id;
     });
@@ -134,10 +134,10 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
         if (!item.person_id) throw new Error(`Unusual error, could not find temp_id:${item.temp_id}`);
         delete item.temp_id;
         (item.identifiers || []).forEach((id) => {
-          personIdentifersToInsert[id.value] = {
+          personIdentifersToInsert[id.id_value] = {
             person_id: item.person_id,
-            type: id.type,
-            value: id.value,
+            id_type: id.id_type,
+            id_value: id.id_value,
           };
         });
       }
@@ -165,9 +165,9 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
     knex = this.knex;
   }
   performance.mark('start-existing-id-query');
-  const existingIds = await knex.select(['value', 'person_id'])
+  const existingIds = await knex.select(['id_value', 'person_id'])
     .from('person_identifier')
-    .where('value', 'in', allIdentifiers.map((d) => d.value));
+    .where('id_value', 'in', allIdentifiers.map((d) => d.value));
   performance.mark('end-existing-id-query');
   const lookup = existingIds.reduce(
     (a, b) => {

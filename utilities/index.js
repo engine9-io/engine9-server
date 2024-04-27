@@ -135,7 +135,11 @@ function generateUniqueKey(_opts) {
   return crypto.createHash(method).update(crypto.randomBytes(bytes)).digest(encoding);
 }
 
-class ErrorObject extends Error {
+/*
+An error that can take an object as a constructor, that can be dereferenced later.
+The object should have a 'message' property for the parent error.
+*/
+class ObjectError extends Error {
   constructor(data) {
     if (typeof data === 'string') {
       // normal behavior
@@ -160,5 +164,5 @@ module.exports = {
   getIntArray,
   getStringArray,
   generateUniqueKey,
-  ErrorObject,
+  ObjectError,
 };

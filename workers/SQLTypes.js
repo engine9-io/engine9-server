@@ -16,6 +16,15 @@ const mysqlTypes = [
     // foreign ids can be nullable
     type: 'foreign_id', column_type: 'bigint', unsigned: true, nullable: true, knex_method: 'bigint',
   },
+  { // A string identifier, similar to a string, but can't be null, defaults to ''
+    type: 'id_string',
+    column_type: 'varchar',
+    length: 255,
+    nullable: false,
+    default_value: '',
+    knex_method: 'string',
+    knex_args: ((o) => ([o.length || 255])),
+  },
   {
     type: 'string', column_type: 'varchar', length: 255, knex_method: 'string', knex_args: ((o) => ([o.length || 255])),
   },

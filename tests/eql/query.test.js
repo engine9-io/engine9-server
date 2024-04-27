@@ -31,7 +31,7 @@ describe('Test Query builder', async () => {
       conditions: [
         { eql: "YEAR(modified_at)>'2020-01-01'" },
         { eql: 'id in (1,2,3)' },
-        { eql: 'id in ( 3 )' },
+        { eql: 'id in (3)' },
       ],
       group_by: [{ eql: "YEAR(modified_at)>'2020-01-01'" }],
     };
