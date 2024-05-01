@@ -9,7 +9,7 @@ const debug = require('debug')('PersonWorker');
 const debugPerformance = require('debug')('Performance');
 const SQLWorker = require('./SQLWorker');
 const FileWorker = require('./FileWorker');
-const PluginBaseWorker = require('./PluginBaseWorker');
+const ExtensionBaseWorker = require('./ExtensionBaseWorker');
 
 const perfObserver = new PerformanceObserver((items) => {
   items.getEntries().forEach((entry) => {
@@ -20,10 +20,10 @@ const perfObserver = new PerformanceObserver((items) => {
 perfObserver.observe({ entryTypes: ['measure'], buffer: true });
 
 function Worker(worker) {
-  PluginBaseWorker.call(this, worker);
+  ExtensionBaseWorker.call(this, worker);
 }
 
-util.inherits(Worker, PluginBaseWorker);
+util.inherits(Worker, ExtensionBaseWorker);
 
 Worker.prototype.getOutboundStream = async function () {
   const sqlWorker = new SQLWorker(this);
@@ -164,11 +164,11 @@ Worker.prototype.appendPersonIds = async function ({ batch }) {
     this.knex = await sqlWorker.connect();
     knex = this.knex;
   }
-  performance.mark('start-existing-id-query');
+  performance.mark('start-existing-id-sql');
   const existingIds = await knex.select(['id_value', 'person_id'])
     .from('person_identifier')
     .where('id_value', 'in', allIdentifiers.map((d) => d.value));
-  performance.mark('end-existing-id-query');
+  performance.mark('end-existing-id-sql');
   const lookup = existingIds.reduce(
     (a, b) => {
       a[b.value] = b.person_id;
@@ -247,7 +247,7 @@ Worker.prototype.upsert = async function ({ stream, filename, batch_size: batchS
       },
     }),
   );
-  performance.measure('existing-ids', 'start-existing-id-query', 'end-existing-id-query');
+  performance.measure('existing-ids', 'start-existing-id-sql', 'end-existing-id-sql');
   performance.measure('assign-ids', 'start-assign-ids-blocking', 'end-assign-ids-blocking');
 
   return summary;

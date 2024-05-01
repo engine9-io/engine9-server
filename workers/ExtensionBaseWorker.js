@@ -1,7 +1,7 @@
 const util = require('node:util');
 const fs = require('node:fs');
 
-const debug = require('debug')('PluginBaseWorker');
+const debug = require('debug')('ExtensionBaseWorker');
 
 const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
@@ -16,15 +16,15 @@ function Worker(worker) {
 util.inherits(Worker, BaseWorker);
 
 /*
-  Core method that takes an plugin configuration,
+  Core method that takes an extension configuration,
   creates all the environment variables, including SQL, etc
 */
 
 const validPaths = /^[a-zA-Z-_]+$/; // Don't allow dots or anything crazy in path names - simple simple
-Worker.prototype.compilePlugin = async function ({ pluginPath }) {
-  if (!pluginPath?.match(validPaths)) throw new Error(`Invalid plugin path: ${pluginPath}`);
+Worker.prototype.compileExtension = async function ({ extensionPath }) {
+  if (!extensionPath?.match(validPaths)) throw new Error(`Invalid extension path: ${extensionPath}`);
   // eslint-disable-next-line import/no-dynamic-require,global-require
-  const config = require(`./${pluginPath}/engine9_plugin.js`);
+  const config = require(`./${extensionPath}/engine9_extension.js`);
 
   let sqlConnection = null;
 

@@ -1,74 +1,74 @@
 {
   menu:[
     {
-    id: "home",
-    title: "Modules",
-    type: "group",
+    id: 'home',
+    title: 'Modules',
+    type: 'group',
     children: [
       {
-        id: "home-dashboard",
-        title: "Dashboard",
-        icon:"home",
-        url: "",
+        id: 'home-dashboard',
+        title: 'Dashboard',
+        icon:'home',
+        url: '',
       },
       {
-        id: "people",
-        title: "People",
-        type: "collapse",
+        id: 'people',
+        title: 'People',
+        type: 'collapse',
         children: [
           {
-            id: "person-list",
-            title: "All",
-            icon:"person",
-            url: "/person",
+            id: 'person-list',
+            title: 'All',
+            icon:'person',
+            url: '/person',
           },
           {
-            id: "person-list-sample",
-            title: "Sample",
-            icon:"person",
-            url: "/person/1",
+            id: 'person-list-sample',
+            title: 'Sample',
+            icon:'person',
+            url: '/person/1',
           },
           {
-            id: "person-segments",
-            title: "Segments",
-            icon:"segment",
-            url: "/segment",
+            id: 'person-segments',
+            title: 'Segments',
+            icon:'segment',
+            url: '/segment',
           }
         ]},
         {
-        id: "messages",
-        title: "Messages",
-        type: "collapse",
+        id: 'messages',
+        title: 'Messages',
+        type: 'collapse',
         children: [
           {
-            id: "message-campaign",
-            title: "Campaigns",
-            icon:"campaign",
-            url: "/campaign",
+            id: 'message-campaign',
+            title: 'Campaigns',
+            icon:'campaign',
+            url: '/campaign',
           },
         ]},
         {
-        id: "transactions",
-        title: "Transactions",
-        type: "collapse",
+        id: 'transactions',
+        title: 'Transactions',
+        type: 'collapse',
         children: [
           {
-            id: "transactions-list",
-            title: "Transactions",
-            url: "/transactions",
-            icon:"transaction"
+            id: 'transactions-list',
+            title: 'Transactions',
+            url: '/transactions',
+            icon:'transaction'
           },
         ]},
         {
-        id: "data",
-        title: "Data",
-        type: "collapse",
+        id: 'data',
+        title: 'Data',
+        type: 'collapse',
         children: [
           {
-            id: "home-reports",
-            title: "Reports",
-            icon:"report",
-            url: "/reports",
+            id: 'home-reports',
+            title: 'Reports',
+            icon:'report',
+            url: '/reports',
           },
         ]
         }
@@ -77,15 +77,35 @@
   ],
   routes:[
     {
-      path: "/person",
-      layout: "full_width",
+      path: '/',
+      layout: 'grid',
       components: {
-        "body": [
+        'main': [
+          {component:'StatCard'},
+          {component:'StatCard'},
+          {component:'StatCard'},
+          {component:'StatCard'},
+          {component:'StatCard'},
+          {component:'StatCard'},
+          {component:'StatCard'},
+        ]
+      }
+    },
+    {
+      path: '/person',
+      layout: 'full_width',
+      components: {
+        'main': [
           {
-            "component": "DataTable",
-            "properties": {
-              "table": "person",
-              "columns": [
+            'component': 'DataTable',
+            'properties': {
+              'table': 'person',
+              extensions:{
+                emails:{
+                  table:'person_email'
+                }
+              },
+              'columns': [
                 {
                   title: 'Id',
                   dataIndex: 'id',
@@ -96,14 +116,14 @@
                   title: 'Name',
                   dataIndex: 'name',
                   sorter: true,
-                  render: "{{record.given_name}} {{record.family_name}}",
+                  render: '{{given_name}} {{family_name}} {{emails.0.email}}',
                   width: '40%',
                 }
               ],
               onRow:{
                 onClick:{
                   action:'navigate',
-                  url:"/person/{{record.id}}"
+                  url:'/person/{{record.id}}'
                 }
               }
              },
@@ -112,58 +132,58 @@
       },
     },
     {
-      path: "/person/:id/*",
-      layout: "sidebar",
+      path: '/person/:id/*',
+      layout: 'sidebar',
       components: {
-        "sidebar":[
+        'sidebar':[
           {
-            "component": "DataDisplay",
-            "properties": {
-              "table": "person",
-              "id":"{{parameters.id}}",
-              "extensions":[
-                {alias:"emails", table:"person_email"}
+            'component': 'DataDisplay',
+            'properties': {
+              'table': 'person',
+              'id':'{{parameters.id}}',
+              'extensions':[
+                {alias:'emails', table:'person_email'}
               ],
-              "components": [
-                "{{record.given_name}} {{record.family_name}}",
+              'components': [
+                '{{record.given_name}} {{record.family_name}}',
               ],
              },
           },
           {
-            "component": "Link",
-            "properties": {
-              label:"Overview",
-              "to": "",
+            'component': 'Link',
+            'properties': {
+              label:'Overview',
+              'to': '',
              },
           },
           {
-            "component": "Link",
-            "properties": {
-              label:"Addresses",
-              "to": "address",
+            'component': 'Link',
+            'properties': {
+              label:'Addresses',
+              'to': 'address',
              },
           },
         ],
-        "main":[
+        'main':[
           {
-            // "path":"overview", //no path is the default
-            "component": "DataDisplay",
-            "properties": {
-              "table": "person",
-              "components": [
-                "{{record.given_name}} {{family_name}}"
+            // 'path':'overview', //no path is the default
+            'component': 'DataDisplay',
+            'properties': {
+              'table': 'person',
+              'components': [
+                '{{record.given_name}} {{family_name}}'
               ],
              },
           },
           {
-            "path":"address",
-            "label":"Addresses",
-            "component": "DataDisplay",
-            "properties": {
-              "table": "person_address",
-              "conditions":[{eql:"person_id={{person_id}}"}],
-              "rows": [
-                "{{street}}"
+            'path':'address',
+            'label':'Addresses',
+            'component': 'DataDisplay',
+            'properties': {
+              'table': 'person_address',
+              'conditions':[{eql:'person_id={{person_id}}'}],
+              'rows': [
+                '{{street}}'
               ],
              },
           }

@@ -48,7 +48,7 @@ describe('Insert File of people with options', async () => {
 
     const { data } = await sqlWorker.query('select count(*) as records from person_email');
     debug('Retrieved ', data, ' from database');
-    assert.deepEqual(data[0].records, 990, 'Does not match');
+    assert.deepEqual(data[0].records, 1000, 'Does not match');
     debug('Finished up');
   });
 });

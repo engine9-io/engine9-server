@@ -10,12 +10,12 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 // knex starts up it's own debugger,
 const Knex = require('knex');
 
-const QueryWorker = require('../../workers/QueryWorker');
+const SQLWorker = require('../../workers/SQLWorker');
 const { ObjectError } = require('../../utilities');
 
 const router = express.Router({ mergeParams: true });
 
-const queryWorkerCache = new Map();
+const databaseWorkerCache = new Map();
 
 let connectionConfig = null;
 
@@ -41,15 +41,15 @@ function knexConfigForTenant(accountId) {
   }
 }
 
-function getQueryWorkerForRequest(req) {
+function getSQLWorkerForRequest(req) {
   // the account_id comes from authentication step, or in the headers,
   // NOT the url parameters, engine9 is the default
   const headerAccountId = req.get('ENGINE9_ACCOUNT_ID');
   const accountId = headerAccountId || 'engine9';
 
-  let queryWorker = queryWorkerCache.get(accountId);
+  let databaseWorker = databaseWorkerCache.get(accountId);
 
-  if (!queryWorker) {
+  if (!databaseWorker) {
     let config = null;
     try {
       config = knexConfigForTenant(accountId);
@@ -59,15 +59,15 @@ function getQueryWorkerForRequest(req) {
     }
 
     const knex = Knex(config);
-    queryWorker = new QueryWorker({ accountId, knex });
-    queryWorkerCache.set(accountId, queryWorker);
+    databaseWorker = new SQLWorker({ accountId, knex });
+    databaseWorkerCache.set(accountId, databaseWorker);
   }
 
-  return queryWorker;
+  return databaseWorker;
 }
 
 router.use((req, res, next) => {
-  req.queryWorker = getQueryWorkerForRequest(req);
+  req.databaseWorker = getSQLWorkerForRequest(req);
   next();
 });
 
@@ -77,7 +77,7 @@ router.get('/ok', (req, res) => {
 
 router.get('/tables/describe/:table', async (req, res) => {
   try {
-    const desc = await req.queryWorker.describe({ table: req.params.table });
+    const desc = await req.databaseWorker.describe({ table: req.params.table });
     return res.json(desc);
   } catch (e) {
     return res.status(422).json({ error: 'Invalid table' });
@@ -96,11 +96,15 @@ function makeArray(s) {
   return [obj];
 }
 
-async function getData(options, queryWorker) {
+async function getData(options, databaseWorker) {
   const { table, limit = 100, offset = 0 } = options;
   if (!table) throw new ObjectError({ code: 422, message: 'No table provided' });
-  if (options.extensions && !options.id) throw new ObjectError({ code: 422, message: 'No table provided' });
-  const query = {
+  // Limit extension calls to not beat up the DB
+  if (options.extensions && !options.id && parseInt(limit, 10) > 100) {
+    throw new ObjectError({ code: 422, message: 'No extensions allowed with limits>100.  Please adjust the limit' });
+  }
+
+  const eqlObject = {
     table,
     limit,
     offset,
@@ -108,7 +112,7 @@ async function getData(options, queryWorker) {
 
   const invalid = ['conditions', 'group_by', 'columns'].filter((k) => {
     try {
-      query[k] = makeArray(options[k]);
+      eqlObject[k] = makeArray(options[k]);
       return false;
     } catch (e) {
       debug(`Error with ${k}`, typeof options[k], options[k], e);
@@ -119,32 +123,32 @@ async function getData(options, queryWorker) {
   if (invalid.length > 0) {
     throw new ObjectError({
       status: 422,
-      message: `Unparseable query values:${invalid.join()}`,
+      message: `Unparseable values:${invalid.join()}`,
     });
   }
   // Not positive default to all is a great idea
-  if (query.columns.length === 0)query.columns = ['*'];
+  if (eqlObject.columns.length === 0)eqlObject.columns = ['*'];
 
   if (options.id) {
     const id = parseInt(options.id, 10);
     if (Number.isNaN(id)) throw new Error('Invalid id');
-    query.conditions = (query.conditions || []).concat({ eql: `id=${id}` });
-    query.limit = 0;
-    delete query.offset;
+    eqlObject.conditions = (eqlObject.conditions || []).concat({ eql: `id=${id}` });
+    eqlObject.limit = 0;
+    delete eqlObject.offset;
   }
 
   let sql;
   try {
-    sql = await queryWorker.buildSqlFromQueryObject(query);
-    debug('Retrieved sql', JSON.stringify({ query, sql }, null, 4));
+    sql = await databaseWorker.buildSqlFromEQLObject(eqlObject);
+    debug('Retrieved sql', JSON.stringify({ eqlObject, sql }, null, 4));
   } catch (e) {
-    debug('Error generating query with columns:', query);
+    debug('Error generating sql with object:', eqlObject);
     debug(e);
-    throw new ObjectError({ status: 422, message: 'Error generating query' });
+    throw new ObjectError({ status: 422, message: 'Error generating sql' });
   }
   let data = null;
   try {
-    const r = await queryWorker.query(sql);
+    const r = await databaseWorker.query(sql);
     data = r.data;
   } catch (e) {
     debug(e);
@@ -212,7 +216,7 @@ async function getData(options, queryWorker) {
   const extensionData = await Promise.all(
     cleanedExtensions.map((ext) => {
       debug('Running extension for ids:', allIds, ext);
-      return getData(ext, queryWorker);
+      return getData(ext, databaseWorker);
     }),
   );
   extensionData.forEach((extensionResults, i) => {
@@ -232,9 +236,11 @@ router.get([
   '/tables/:table/:id',
   '/tables/:table'], async (req, res) => {
   try {
+    const table = req.params?.table;
+    if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
     const data = await getData({
-      table: req.params?.table, id: req.params?.id, ...req.query,
-    }, req.queryWorker);
+      table, id: req.params?.id, ...req.query,
+    }, req.databaseWorker);
     return res.json({ data });
   } catch (e) {
     debug('Error handling request:', e, e.code, e.message);

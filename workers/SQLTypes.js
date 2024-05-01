@@ -178,17 +178,17 @@ module.exports = {
     escapeValue(value) {
       return mysql.escape(value);
     },
-    addLimit(_query, limit, offset) {
-      if (!limit) return _query;
-      let query = _query;
+    addLimit(_sql, limit, offset) {
+      if (!limit) return _sql;
+      let sql = _sql;
       // make sure it's an integer, and defined
       if (isInt(limit)) {
-        query += ` limit ${limit}`;
-        if (offset) query += ` offset ${offset}`;
+        sql += ` limit ${limit}`;
+        if (offset) sql += ` offset ${offset}`;
       } else if (limit) {
         throw new Error(`Invalid limit:${limit}`);
       }
-      return query;
+      return sql;
     },
 
     supportedFunctions() {

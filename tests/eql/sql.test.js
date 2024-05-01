@@ -3,21 +3,21 @@ const {
   describe, it, after,
 } = require('node:test');
 
-process.env.DEBUG = 'query.test.js,QueryWorker';
-const debug = require('debug')('query.test.js');
+process.env.DEBUG = 'sql.test.js,SQLWorker';
+const debug = require('debug')('sql.test.js');
 // const assert = require('node:assert');
 
 // This will configure the .env file when constructing
 const WorkerRunner = require('../../worker-manager/WorkerRunner');
-const QueryWorker = require('../../workers/QueryWorker');
+const SQLWorker = require('../../workers/SQLWorker');
 
-describe('Test Query builder', async () => {
+describe('Test SQL builder', async () => {
   const accountId = 'test';
   const runner = new WorkerRunner();
   const env = runner.getWorkerEnvironment({ accountId });
-  const queryWorker = new QueryWorker(env);
+  const sqlWorker = new SQLWorker(env);
   after(async () => {
-    queryWorker.destroy();
+    sqlWorker.destroy();
   });
 
   it('should build a query from an object with eql', async () => {
@@ -36,13 +36,13 @@ describe('Test Query builder', async () => {
       group_by: [{ eql: "YEAR(modified_at)>'2020-01-01'" }],
     };
     debug('Building sql:');
-    const sql = await queryWorker.buildSqlFromQueryObject(query);
-    const { data } = await queryWorker.query(sql);
+    const sql = await sqlWorker.buildSqlFromEQLObject(query);
+    const { data } = await sqlWorker.query(sql);
     debug('Results of ', sql, data);
   });
 
-  it('should build a valid query with a valid in', async () => {
-    const query = {
+  it('should build valid sql with a valid in', async () => {
+    const obj = {
       table: 'person_email',
       columns: ['*'],
       limit: 25,
@@ -51,14 +51,14 @@ describe('Test Query builder', async () => {
       group_by: [],
     };
     debug('Building sql:');
-    const sql = await queryWorker.buildSqlFromQueryObject(query);
-    const { data } = await queryWorker.query(sql);
+    const sql = await sqlWorker.buildSqlFromEQLObject(obj);
+    const { data } = await sqlWorker.query(sql);
     debug('Results of ', sql, data);
   });
 
   // subqueries not working with aliases right now
-  it('should build a query with a valid subquery', async () => {
-    const sql = await queryWorker.buildSqlFromQueryObject({
+  it('should build sql with a valid subquery', async () => {
+    const sql = await sqlWorker.buildSqlFromEQLObject({
       table: 'subquery_1',
       subquery: {
         table: 'person_email',
