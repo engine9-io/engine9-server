@@ -4,15 +4,17 @@ require('dotenv').config({ path: '../.env' });
 process.env.DEBUG = '*';
 // const debug = require('debug')('api/ui');
 const express = require('express');
-const JSON5 = require('json5');// Useful for parsing extended JSON
-const fs = require('node:fs');
 
-const fsp = fs.promises;
+const UIWorker = require('../../workers/UIWorker');
+
 const router = express.Router({ mergeParams: true });
 
-router.get('/demo', async (req, res) => {
-  const content = JSON5.parse(await fsp.readFile('v1/ui-demo.json5'));
-  return res.json(content);
+const uiWorker = new UIWorker();
+router.get('/console', async (req, res) => {
+  const config = await uiWorker.getConsoleConfig(
+    { account_id: req.accountId, user_id: req.userId },
+  );
+  return res.json(config);
 });
 
 module.exports = router;

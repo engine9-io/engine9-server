@@ -1,10 +1,9 @@
 const util = require('node:util');
 const fs = require('node:fs');
 
-const debug = require('debug')('ExtensionBaseWorker');
-
 const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
+const debug = require('debug')('ExtensionBaseWorker');
 
 const BaseWorker = require('./BaseWorker');
 const SQLWorker = require('./SQLWorker');
