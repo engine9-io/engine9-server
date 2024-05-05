@@ -9,7 +9,7 @@ const debug = require('debug')('PersonWorker');
 const debugPerformance = require('debug')('Performance');
 const SQLWorker = require('./SQLWorker');
 const FileWorker = require('./FileWorker');
-const ExtensionBaseWorker = require('./ExtensionBaseWorker');
+const PluginBaseWorker = require('./PluginBaseWorker');
 
 const perfObserver = new PerformanceObserver((items) => {
   items.getEntries().forEach((entry) => {
@@ -20,28 +20,10 @@ const perfObserver = new PerformanceObserver((items) => {
 perfObserver.observe({ entryTypes: ['measure'], buffer: true });
 
 function Worker(worker) {
-  ExtensionBaseWorker.call(this, worker);
+  PluginBaseWorker.call(this, worker);
 }
 
-util.inherits(Worker, ExtensionBaseWorker);
-
-Worker.prototype.getOutboundStream = async function () {
-  const sqlWorker = new SQLWorker(this);
-  const emailExtension = this.compileExtension({ extension_path: 'core_extensions/person_email' });
-  const stream = await sqlWorker.stream({ sql: 'select * from person' });
-
-  const { filename, stream: fileStream } = this.getFileWriterStream();
-  await pipeline(
-    stream,
-    emailExtension,
-    this.getJSONStringifyTransform().transform,
-    fileStream,
-  );
-
-  return { filename };
-};
-
-Worker.prototype.getOutboundStream.metadata = {};
+util.inherits(Worker, PluginBaseWorker);
 
 /*
   Okay, assigning ids is the one thing that we need to parallelize.
@@ -202,7 +184,7 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
       { path: 'person.appendPersonIds' },
       { path: 'engine9-interfaces/person_email/transforms/inbound/extract_tables.js', options: {} },
       { path: 'engine9-interfaces/person_address/transforms/inbound/extract_tables.js' },
-      { path: 'engine9-interfaces/person_segment/transforms/inbound/extract_tables.js' },
+      { path: 'engine9-interfaces/segment/transforms/inbound/extract_tables.js' },
       { path: 'sql.upsertTables' },
     ],
   };

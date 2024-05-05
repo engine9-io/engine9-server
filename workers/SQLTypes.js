@@ -60,6 +60,9 @@ const mysqlTypes = [
     type: 'text', column_type: 'text', length: 65535, knex_method: 'text',
   },
   {
+    type: 'json', column_type: 'longtext', length: 4294967295, knex_method: 'json',
+  },
+  {
     type: 'created_at',
     column_type: 'timestamp',
     default_value: 'current_timestamp()',

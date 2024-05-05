@@ -248,4 +248,18 @@ router.get([
   }
 });
 
+router.post(['/tables/:table/:id'], async (req, res) => {
+  try {
+    const table = req.params?.table;
+    if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
+    const data = await saveData({
+      table, id: req.params?.id, ...req.query,
+    }, req.databaseWorker);
+    return res.json({ data });
+  } catch (e) {
+    debug('Error handling request:', e, e.code, e.message);
+    return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
+  }
+});
+
 module.exports = router;

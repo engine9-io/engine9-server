@@ -3,7 +3,7 @@ const fs = require('node:fs');
 
 const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
-const debug = require('debug')('ExtensionBaseWorker');
+const debug = require('debug')('PluginBaseWorker');
 
 const BaseWorker = require('./BaseWorker');
 const SQLWorker = require('./SQLWorker');
@@ -20,7 +20,7 @@ util.inherits(Worker, BaseWorker);
 */
 
 const validPaths = /^[a-zA-Z-_]+$/; // Don't allow dots or anything crazy in path names - simple simple
-Worker.prototype.compileExtension = async function ({ extensionPath }) {
+Worker.prototype.compilePlugin = async function ({ extensionPath }) {
   if (!extensionPath?.match(validPaths)) throw new Error(`Invalid extension path: ${extensionPath}`);
   // eslint-disable-next-line import/no-dynamic-require,global-require
   const config = require(`./${extensionPath}/engine9_extension.js`);

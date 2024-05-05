@@ -16,35 +16,25 @@ function Worker(worker) {
 util.inherits(Worker, BaseWorker);
 
 const DEFAULT_UI = {
-  menu: [
-    {
-      id: 'home',
-      title: 'Modules',
-      type: 'group',
+  menu: {
+    home: {
+      title: 'Dashboard',
+      icon: 'dashboard',
+      url: '/',
+    },
+    data: {
+      title: 'Data',
+      type: 'collapse',
       children: [
         {
-          id: 'home-dashboard',
-          title: 'Dashboard',
-          icon: 'home',
-          url: '',
+          id: 'home-reports',
+          title: 'Reports',
+          icon: 'report',
+          url: '/report',
         },
-        {
-          id: 'data',
-          title: 'Data',
-          type: 'collapse',
-          children: [
-            {
-              id: 'home-reports',
-              title: 'Reports',
-              icon: 'report',
-              url: '/report',
-            },
-          ],
-        },
-
       ],
     },
-  ],
+  },
   routes: {
     '/': {
       layout: 'grid',
@@ -77,17 +67,21 @@ Worker.prototype.getConsoleConfig = async function ({ accountId, userId }) {
   // this will be dynamic at some point
   const paths = [
     'engine9-interfaces/person',
-    'engine9-interfaces/person_address',
     'engine9-interfaces/person_email',
+    'engine9-interfaces/person_address',
     'engine9-interfaces/person_phone',
-    'engine9-interfaces/person_segment',
+    'engine9-interfaces/segment',
     'engine9-interfaces/message',
   ];
 
   const configurations = await Promise.all(paths.map((path) => this.compileConsoleConfig(path)));
   let config = JSON.parse(JSON.stringify(DEFAULT_UI));
-  configurations.forEach((c) => {
-    config = deepMerge(config, c);
+  configurations.forEach((c, i) => {
+    try {
+      config = deepMerge(config, c);
+    } catch (e) {
+      throw new Error(`Error with ui configuration for ${paths[i]}: ${e.message}`);
+    }
   });
 
   return config;

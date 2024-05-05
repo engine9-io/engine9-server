@@ -159,10 +159,15 @@ class ObjectError extends Error {
 /**
 * Deep merge two or more objects or arrays.
 * (c) Chris Ferdinandi, MIT License, https://gomakethings.com
- * @param   {*} ...objs  The arrays or objects to merge
+* Updated to keep a stack, which also limits it to only merging 2 objects
+* This sacrifices multi-merge for ease of debugging complex hierarchies
+ * @param   {*} a  The core object
+ * @param   {*} b  The object to merge in
  * @returns {*}          The merged arrays or objects
  */
-function deepMerge(...objs) {
+function deepMerge(a, b, _stack) {
+  const objs = [a, b];
+  const stack = _stack || [];
   /**
    * Get the object type
    * @param  {*}       obj The object
@@ -179,9 +184,16 @@ function deepMerge(...objs) {
   function mergeObj(clone, obj) {
     // eslint-disable-next-line no-restricted-syntax
     for (const [key, value] of Object.entries(obj)) {
+      stack.push(key);
       const type = getType(value);
-      if (clone[key] !== undefined && getType(clone[key]) === type && ['array', 'object'].includes(type)) {
-        clone[key] = deepMerge(clone[key], value);
+      if (clone[key] !== undefined && ['array', 'object'].includes(type)) {
+        const cloneType = getType(clone[key]);
+        if (cloneType === type) {
+          clone[key] = deepMerge(clone[key], value, stack);
+        } else {
+          console.error(clone, obj);
+          throw new Error(`Deep Merge cowardly not merging key ${stack.join('.')}, which has unmatching types: ${cloneType}!=${type}`);
+        }
       } else {
         clone[key] = structuredClone(value);
       }
