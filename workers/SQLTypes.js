@@ -87,6 +87,19 @@ const mysqlTypes = [
   { type: 'date', column_type: 'date', knex_method: 'date' },
   { type: 'datetime', column_type: 'datetime', knex_method: 'datetime' },
   { type: 'time', column_type: 'time', knex_method: 'time' },
+  {
+    type: 'enum',
+    column_type: 'enum',
+    length: 16,
+    knex_method: 'enu',
+    knex_args: ((o) => {
+      if (!o.values || o.values.length === 0) throw new Error(`No values provided for enum type:${JSON.stringify(o)}`);
+
+      return [o.values];
+    }
+    ),
+
+  },
 ];
 function isInt(s) { return Number.isInteger(typeof s === 'number' ? s : parseFloat(s)); }
 
@@ -112,7 +125,7 @@ module.exports = {
       // The name of the knex methods is ... inconsistent
       const { type } = col;
       const typeDef = mysqlTypes.find((t) => t.type === type);
-      if (!typeDef) throw new Error(`Could not find type ${type}`);
+      if (!typeDef) throw new Error(`Could not find mysql type ${type}`);
       let { nullable } = col;
       if (nullable === undefined) {
         nullable = typeDef.nullable;
@@ -143,6 +156,17 @@ module.exports = {
           input.default_value = input.default_value.slice(1, -1);
         }
         return { ...mysqlTypes.find((t) => t.type === 'string'), ...input };
+      }
+
+      if (input.column_type.indexOf('enum') === 0) {
+        // example enum('','remote_person_id','email_hash_v1','phone_hash_v1')
+        input.values = input.column_type.slice(5, -1).split(',').map((d) => d.slice(1, -1));
+        input.column_type = 'enum';
+        if (input.default_value
+          && typeof input.default_value === 'string'
+          && input.default_value.match(/^'.*'$/)) {
+          input.default_value = input.default_value.slice(1, -1);
+        }
       }
 
       if (input.column_type.slice(-9).toLowerCase() === ' unsigned') {

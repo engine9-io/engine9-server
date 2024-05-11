@@ -248,6 +248,7 @@ router.get([
   }
 });
 
+/*
 router.post(['/tables/:table/:id'], async (req, res) => {
   try {
     const table = req.params?.table;
@@ -261,5 +262,6 @@ router.post(['/tables/:table/:id'], async (req, res) => {
     return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
   }
 });
+*/
 
 module.exports = router;
