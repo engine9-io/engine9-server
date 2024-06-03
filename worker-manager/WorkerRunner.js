@@ -515,7 +515,7 @@ WorkerRunner.prototype.run = function run() {
             const l = workerInstance[method.name].length;
             if (l > 1) throw new Error(`async functions must take zero or one parameter, ${method.name} has ${l}`);
             const response = await (workerInstance[method.name](options));
-            if (response === undefined) throw new Error('No return value from method -- be sure to return something');
+            if (response === undefined || response === null) throw new Error('No return value from method -- be sure to return something');
             if (response.modify) return cb(null, null, response.modify);
             return cb(null, response);
           } catch (e) {

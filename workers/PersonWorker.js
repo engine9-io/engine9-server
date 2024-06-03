@@ -201,7 +201,7 @@ Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
   return summary;
 };
 
-Worker.prototype.upsert = async function ({ stream, filename, batch_size: batchSize = 500 }) {
+Worker.prototype.upsert = async function ({ stream, filename, batchSize = 500 }) {
   const worker = this;
   const fileWorker = new FileWorker(this);
   const inStream = await fileWorker.getStream({ stream, filename });
@@ -239,7 +239,7 @@ Worker.prototype.upsert.metadata = {
   options: {
     stream: {},
     filename: {},
-    batch_size: {},
+    batchSize: {},
   },
 };
 

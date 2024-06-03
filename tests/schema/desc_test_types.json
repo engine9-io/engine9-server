@@ -136,6 +136,14 @@
             "nullable": true,
             "default_value": null,
             "auto_increment": false
+        },
+        {
+            "name": "type_uuid",
+            "column_type": "uuid",
+            "length": null,
+            "nullable": false,
+            "default_value": null,
+            "auto_increment": true
         }
     ]
 }

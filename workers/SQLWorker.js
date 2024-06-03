@@ -65,27 +65,27 @@ Worker.prototype.ok = async function f() {
 Worker.prototype.ok.metadata = {
   options: {},
 };
-Worker.prototype.query = async function (_sql, bindings = []) {
+Worker.prototype.query = async function (_sql, values = []) {
   let sql = _sql;
   if (typeof _sql !== 'string') sql = _sql.sql;
   if (!sql) throw new Error('No sql provided');
   const knex = await this.connect();
-  const [data, columns] = await knex.raw(sql, bindings);
+  const [data, columns] = await knex.raw(sql, values);
   return { data, columns };
 };
 Worker.prototype.query.metadata = {
   options: {
     sql: {},
-    bindings: { description: 'Array of escapable values' },
+    values: { description: 'Array of escapable values' },
   },
 };
 
 Worker.prototype.tables = async function f(options = {}) {
   let sql = 'select TABLE_NAME from information_schema.tables where table_schema=';
-  const bindings = [];
+  const values = [];
   if (options.database) {
     sql += '?';
-    bindings.push(options.database);
+    values.push(options.database);
   } else {
     sql += 'database()';
   }
@@ -95,7 +95,7 @@ Worker.prototype.tables = async function f(options = {}) {
     sql += " and table_type='BASE TABLE'";
   }
 
-  let d = await this.query(sql, bindings);
+  let d = await this.query(sql, values);
   d = d.data.map((t) => t.TABLE_NAME || t.table_name);
   d.sort((a, b) => (a < b ? -1 : 1));
 

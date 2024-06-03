@@ -31,7 +31,7 @@ Worker.prototype.compilePlugin = async function ({ extensionPath }) {
   Object.entries(config.streams || {}).forEach(([name, streamConfig]) => {
     const output = {};
     streams[name] = output;
-    output.batch_size = streamConfig.batch_size || 100;
+    output.batchSize = streamConfig.batchSize || 100;
 
     output.env = {};
     Object.entries(streamConfig.env).forEach(([k, v]) => {

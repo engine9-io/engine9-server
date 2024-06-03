@@ -98,7 +98,11 @@ const mysqlTypes = [
       return [o.values];
     }
     ),
-
+  },
+  {
+    type: 'uuid',
+    column_type: 'uuid',
+    knex_method: 'uuid',
   },
 ];
 function isInt(s) { return Number.isInteger(typeof s === 'number' ? s : parseFloat(s)); }
