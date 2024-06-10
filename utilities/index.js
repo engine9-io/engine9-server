@@ -191,7 +191,6 @@ function deepMerge(a, b, _stack) {
         if (cloneType === type) {
           clone[key] = deepMerge(clone[key], value, stack);
         } else {
-          console.error(clone, obj);
           throw new Error(`Deep Merge cowardly not merging key ${stack.join('.')}, which has unmatching types: ${cloneType}!=${type}`);
         }
       } else {
