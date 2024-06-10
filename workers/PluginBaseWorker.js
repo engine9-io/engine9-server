@@ -123,6 +123,9 @@ Worker.prototype.compilePipeline = async function (_pipeline) {
 Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) {
   // pipeline level bindings
   pipeline.bindings = pipeline.bindings || {};
+  // New streams that are started during a pipeline,
+  // that must be completed afterwards with a push(null)
+  pipeline.newStreams = pipeline.newStreams || [];
   // promises to wait after completion.  Good for finishing files, etc
   pipeline.promises = pipeline.promises || [];
   // output files
@@ -161,16 +164,17 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
             files,
           } = await PacketTools.getTimelineOutputStream({});
           pipeline.bindings[name] = timelineStream;
+          pipeline.newStreams = pipeline.newStreams.concat(timelineStream);
           pipeline.promises = pipeline.promises.concat(promises || []);
           pipeline.files = pipeline.files.concat(files);
           transformArguments[name] = timelineStream;
         } else if (binding.type === 'sql.query') {
           if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
-          if (!binding.columns) throw new Error(`columns are required for binding ${name}`);
-          if (binding.columns.length !== 1) throw new Error(`Currently only one column is allowed for sql.query bindings, found ${binding.columns.length} for ${name}`);
+          if (!binding.lookup) throw new Error(`lookup as an array is required for binding ${name}`);
+          if (binding.lookup.length !== 1) throw new Error(`Currently only one lookup column is allowed for sql.query bindings, found ${binding.lookup.length} for ${name}`);
           const values = new Set();
           batch.forEach((b) => {
-            const v = b[binding.columns[0]];
+            const v = b[binding.lookup[0]];
             if (v) values.add(v);
           });
           if (values.length === 0) {
@@ -178,7 +182,7 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
             return;
           }
           const sql = `/* ${cleanPath} */ select * from ${this.sqlWorker.escapeTable(binding.table)}`
-          + ` where ${this.sqlWorker.escapeColumn(binding.columns[0])} in (${[...values].map(() => '?').join(',')})`;
+          + ` where ${this.sqlWorker.escapeColumn(binding.lookup[0])} in (${[...values].map(() => '?').join(',')})`;
           const { data } = await this.sqlWorker.query(sql, [...values]);
           transformArguments[name] = data;
         } else if (binding.type === 'sql.tables.upsert') {

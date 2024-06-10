@@ -1,6 +1,7 @@
 const {
   describe, it, before, after,
 } = require('node:test');
+const fs = require('node:fs');
 
 process.env.DEBUG = '*';
 const debug = require('debug')('test-framework');
@@ -35,14 +36,19 @@ describe('Insert File of people with options', async () => {
   });
 
   it('Should be able to upsert and deduplicate people and email status, and produce an audit output', async () => {
-    await truncateDB(env);
+    // await truncateDB(env);
     debug('Argv=', process.argv);
     const stream = [
       { email: 'x@y.com' },
-      { email: 'y@z.com' },
+      { email: 'z@z.com' },
     ];
 
-    await personWorker.upsert({ stream });
+    const { files } = await personWorker.upsert({ stream });
+    const content = fs.readFileSync(files[0]).toString().split('\n').map((d) => d.trim())
+      .filter(Boolean);
+    assert.equal(content[0], 'uuid,entry_type,person_id,reference_id', "First line doesn't match expected timeline csv header");
+    assert.equal(content.length, 3, `There are ${content.length}, not 3 lines in the CSV file ${files[0]}`);
+    debug('Output timeline file:', files[0]);
 
     const { data } = await sqlWorker.query('select count(*) as records from person_email');
     debug('Retrieved ', data, ' from database');

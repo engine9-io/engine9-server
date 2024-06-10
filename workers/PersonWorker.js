@@ -116,10 +116,13 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
         if (!item.person_id) throw new Error(`Unusual error, could not find temp_id:${item.temp_id}`);
         delete item.temp_id;
         (item.identifiers || []).forEach((id) => {
-          personIdentifersToInsert[id.id_value] = {
+          personIdentifersToInsert[id.value] = {
             person_id: item.person_id,
-            id_type: id.id_type,
-            id_value: id.id_value,
+            // source_plugin_id is the connection this record first came from.  It
+            // should be provided by the source stream, or null
+            source_plugin_id: id.source_plugin_id || null,
+            id_type: id.type,
+            id_value: id.value,
           };
         });
       }
@@ -182,9 +185,9 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
       { path: 'engine9-interfaces/person_email/transforms/inbound/extract_identifiers.js', options: { dedupe_with_email: true } },
       { path: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js', options: { dedupe_with_phone: true } },
       { path: 'person.appendPersonIds' },
-      { path: 'engine9-interfaces/person_email/transforms/inbound/extract_tables.js', options: {} },
-      { path: 'engine9-interfaces/person_address/transforms/inbound/extract_tables.js' },
-      { path: 'engine9-interfaces/segment/transforms/inbound/extract_tables.js' },
+      { path: 'engine9-interfaces/person_email/transforms/inbound/upsert_tables.js', options: {} },
+      { path: 'engine9-interfaces/person_address/transforms/inbound/upsert_tables.js' },
+      { path: 'engine9-interfaces/segment/transforms/inbound/upsert_tables.js' },
       { path: 'sql.upsertTables' },
     ],
   };
@@ -232,10 +235,12 @@ Worker.prototype.upsert = async function ({ stream, filename, batchSize = 500 })
   performance.measure('existing-ids', 'start-existing-id-sql', 'end-existing-id-sql');
   performance.measure('assign-ids', 'start-assign-ids-blocking', 'end-assign-ids-blocking');
 
-  // There are some pipeline-wide promises, like outputs to a packet or timeline file
-  // await compiledPipeline.promises[0];
-
-  // await Promise.all(compiledPipeline.promises || []);
+  // There are some pipeline-wide streams and promises
+  // like new timeline streams, or outputs to a packet or timeline file
+  // terminate the inputs for these streams
+  (compiledPipeline.newStreams || []).forEach((s) => s.push(null));
+  // Await any file completions
+  await Promise.all(compiledPipeline.promises || []);
   summary.files = compiledPipeline.files || [];
 
   return summary;
