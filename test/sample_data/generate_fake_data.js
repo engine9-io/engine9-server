@@ -1,12 +1,15 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
 const { fakerEN_US: faker } = require('@faker-js/faker');
 const fs = require('node:fs');
 const { stringify } = require('csv');
 const { Readable } = require('node:stream');
 
+let personId = 100000000;
 function createRandomUser() {
   const region = faker.location.state({ abbreviated: true });
+  personId += Math.floor(Math.random() * 5);
   return {
-    // userId: faker.string.uuid(),
+    person_id: personId, // userId: faker.string.uuid(),
     // username: faker.internet.userName(),
     given_name: faker.person.firstName(),
     family_name: faker.person.lastName(),
@@ -24,7 +27,7 @@ function createRandomUser() {
   };
 }
 
-const count = 100000;
+const count = 1000000;
 const userArray = faker.helpers.multiple(createRandomUser, {
   count,
 });
@@ -45,11 +48,11 @@ userArray.forEach((user) => {
   }
   return null;
 });
-
+console.log(`Creating ${count} fake people`);
 Readable.from(userArray)
   .pipe(stringify({ header: true }))
   .pipe(fs.createWriteStream(`${__dirname}/${count}_fake_people.csv`));
-
+console.log(`Creating ${count} fake transactions`);
 Readable.from(transactionArray)
   .pipe(stringify({ header: true }))
   .pipe(fs.createWriteStream(`${__dirname}/${count}_fake_transactions.csv`));
