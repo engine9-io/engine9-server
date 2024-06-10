@@ -322,10 +322,10 @@ Worker.prototype.testTransform.metadata = {
 Worker.prototype.getStream = async function ({ stream, filename } = {}) {
   if (stream) {
     if (Array.isArray(stream)) {
-      return Readable.from(stream);
+      return { stream: Readable.from(stream) };
     }
     // probably already a stream
-    if (typeof stream === 'object') return stream;
+    if (typeof stream === 'object') return { stream };
     throw new Error(`Invalid stream type:${typeof stream}`);
   }
 

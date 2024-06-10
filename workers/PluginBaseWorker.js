@@ -5,6 +5,7 @@ const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
 
+const PacketTools = require('engine9-packet-tools');
 const BaseWorker = require('./BaseWorker');
 const SQLWorker = require('./SQLWorker');
 
@@ -81,7 +82,7 @@ Worker.prototype.compileTransform = async function ({ transform, path }) {
     return {
       path,
       bindings: {
-        tablesToUpsert: { type: 'sql.tablesToUpsert' },
+        tablesToUpsert: { type: 'sql.tables.upsert' },
       },
       transform: (opts) => this.sqlWorker.upsertTables(opts),
     };
@@ -120,8 +121,16 @@ Worker.prototype.compilePipeline = async function (_pipeline) {
 };
 
 Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) {
+  // pipeline level bindings
+  pipeline.bindings = pipeline.bindings || {};
+  // promises to wait after completion.  Good for finishing files, etc
+  pipeline.promises = pipeline.promises || [];
+  // output files
+  pipeline.files = pipeline.files || [];
+
   const tablesToUpsert = {};
   const summary = { records: batch.length, executionTime: {} };
+
   // eslint-disable-next-line no-restricted-syntax
   for (const {
     transform, bindings, options, path,
@@ -133,13 +142,29 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
         })}`);
       }
       const cleanPath = path.replace(/^[a-zA-Z/_-]*/, '_');
-      const transformParams = { batch, options };
+      const transformArguments = { batch, options };
       const bindingNames = Object.keys(bindings);
+      /*
+      Bindings are the heart of getting data into and out of a transform.  Bindings allow for
+      including and comparing existing data, allowing setups for upserting data,
+      as well as outputs of timeline entries, etc.
+      */
       // eslint-disable-next-line no-await-in-loop
       await Promise.all(bindingNames.map(async (name) => {
         const binding = bindings[name];
         if (!binding.type) throw new Error(`type is required for binding ${name}`);
-        if (binding.type === 'sql.query') {
+        if (pipeline.bindings[name]) {
+          transformArguments[name] = pipeline.bindings[name];
+        } else if (binding.type === 'packet.output.timeline') {
+          const {
+            stream: timelineStream, promises,
+            files,
+          } = await PacketTools.getTimelineOutputStream({});
+          pipeline.bindings[name] = timelineStream;
+          pipeline.promises = pipeline.promises.concat(promises || []);
+          pipeline.files = pipeline.files.concat(files);
+          transformArguments[name] = timelineStream;
+        } else if (binding.type === 'sql.query') {
           if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
           if (!binding.columns) throw new Error(`columns are required for binding ${name}`);
           if (binding.columns.length !== 1) throw new Error(`Currently only one column is allowed for sql.query bindings, found ${binding.columns.length} for ${name}`);
@@ -149,20 +174,20 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
             if (v) values.add(v);
           });
           if (values.length === 0) {
-            transformParams[name] = [];
+            transformArguments[name] = [];
             return;
           }
           const sql = `/* ${cleanPath} */ select * from ${this.sqlWorker.escapeTable(binding.table)}`
           + ` where ${this.sqlWorker.escapeColumn(binding.columns[0])} in (${[...values].map(() => '?').join(',')})`;
           const { data } = await this.sqlWorker.query(sql, [...values]);
-          transformParams[name] = data;
-        } else if (binding.type === 'sql.tablesToUpsert') {
-          transformParams[name] = tablesToUpsert;
+          transformArguments[name] = data;
+        } else if (binding.type === 'sql.tables.upsert') {
+          transformArguments[name] = tablesToUpsert;
         }
       }));
       const start = new Date().getTime();
       // eslint-disable-next-line no-await-in-loop
-      await transform(transformParams);
+      await transform(transformArguments);
       const ms = new Date().getTime() - start;
       summary.executionTime[path] = (summary.executionTime[path] || 0) + ms;
     } catch (e) {

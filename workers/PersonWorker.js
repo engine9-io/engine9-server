@@ -232,6 +232,12 @@ Worker.prototype.upsert = async function ({ stream, filename, batchSize = 500 })
   performance.measure('existing-ids', 'start-existing-id-sql', 'end-existing-id-sql');
   performance.measure('assign-ids', 'start-assign-ids-blocking', 'end-assign-ids-blocking');
 
+  // There are some pipeline-wide promises, like outputs to a packet or timeline file
+  // await compiledPipeline.promises[0];
+
+  // await Promise.all(compiledPipeline.promises || []);
+  summary.files = compiledPipeline.files || [];
+
   return summary;
 };
 
