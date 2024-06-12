@@ -2,7 +2,7 @@ const { performance, PerformanceObserver } = require('node:perf_hooks');
 
 const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
-const crypto = require('node:crypto');
+const { uuidv7 } = require('uuidv7');
 const { Transform } = require('node:stream');
 
 const debug = require('debug')('PersonWorker');
@@ -46,7 +46,7 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
       return false;
     });
     if (!item.temp_id) {
-      item.temp_id = crypto.randomUUID();
+      item.temp_id = uuidv7();
       (item.identifiers || []).forEach((id) => {
         tempIdLookup[id.value] = item.temp_id;
       });
