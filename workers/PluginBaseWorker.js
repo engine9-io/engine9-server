@@ -5,7 +5,7 @@ const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
 
-const PacketTools = require('engine9-packet-tools');
+const PacketTools = require('@engine9/packet-tools');
 const BaseWorker = require('./BaseWorker');
 const SQLWorker = require('./SQLWorker');
 
