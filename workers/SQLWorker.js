@@ -72,9 +72,14 @@ Worker.prototype.query = async function (_sql, values) {
   let sql = _sql;
   if (typeof _sql !== 'string') sql = _sql.sql;
   if (!sql) throw new Error('No sql provided');
-  const knex = await this.connect();
-  const [data, columns] = await knex.raw(sql, values);
-  return { data, columns };
+  try {
+    const knex = await this.connect();
+    const [data, columns] = await knex.raw(sql, values);
+    return { data, columns };
+  } catch (e) {
+    info('Error running query:', { _sql, values });
+    throw e;
+  }
 };
 Worker.prototype.query.metadata = {
   options: {
@@ -717,6 +722,7 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
       let v = null;
       try {
         v = this.stringToType(val, def.column_type, def.length, def.nullable);
+        if (v === undefined) throw new Error('undefined returned');
       } catch (e) {
         info(e);
         throw new Error(`Error mapping string to value:  Column '${def.name}', type='${def.column_type}': ${e}, attempted val=${val}, object=${JSON.stringify(o)}`);
