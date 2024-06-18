@@ -95,7 +95,13 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   const tempIds = Object.keys(lookupByTempId);
 
   // Insert the right number of records
-  const toInsert = tempIds.map((id) => ({ id: null, given_name: lookupByTempId[id]?.given_name || '', family_name: lookupByTempId[id]?.family_name || '' }));
+
+  // eslint-disable-next-line no-unused-vars
+  const toInsert = tempIds.map((id) => ({
+    id: null,
+  //  given_name: lookupByTempId[id]?.given_name || '',
+    // family_name: lookupByTempId[id]?.family_name || ''
+  }));
 
   if (toInsert.length > 0) {
     const response = await knex.table('person')
