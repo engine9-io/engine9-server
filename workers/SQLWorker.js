@@ -712,6 +712,7 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
   // run should pre-populate the correct values
   const ignore = ['created_at', 'modified_at'];// these are handled by the database, should not be upserted
   const includedColumns = desc.columns
+    .filter((f) => f.name.indexOf('_hidden_') !== 0)
     .filter((f) => ignore.indexOf(f.name) < 0)
     .filter((f) => array[0][f.name] !== undefined);
 
