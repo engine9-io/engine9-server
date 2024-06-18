@@ -1,5 +1,6 @@
 /* eslint-disable camelcase */
 const util = require('util');
+const info = require('debug')('info:SQLWorker');
 const debug = require('debug')('SQLWorker');
 const debugMore = require('debug')('debug:SQLWorker');
 
@@ -709,7 +710,8 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
       try {
         v = this.stringToType(val, def.column_type, def.length, def.nullable);
       } catch (e) {
-        throw new Error(`Error with column '${def.name}': ${e}, object=${JSON.stringify(o)}`);
+        info(e);
+        throw new Error(`Error parsing column '${def.name}', type='${def.column_type}': ${e}, attempted val=${val}, object=${JSON.stringify(o)}`);
       }
 
       return knex.raw('?', [v]);
@@ -720,12 +722,19 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
   const sql = this.buildInsertSql({
     knex, table, columns: includedColumns, rows, upsert: true, returning: ['id'],
   });
-  const { data } = await this.query(sql);
-  data.forEach((d, i) => {
-    if (array[i].id && d.id !== array[i].id) throw new Error(`There was a problem upserting object with id ${array[i].id},invalid id returned`);
-    array[i].id = d.id;
-  });
-  return array;
+  try {
+    const { data } = await this.query(sql);
+    data.forEach((d, i) => {
+      if (array[i].id && d.id !== array[i].id) throw new Error(`There was a problem upserting object with id ${array[i].id},invalid id returned`);
+      array[i].id = d.id;
+    });
+    return array;
+  } catch (e) {
+    info({
+      table, includedColumns, rows, sql,
+    });
+    throw e;
+  }
 };
 
 Worker.prototype.upsertTables = async function ({ tablesToUpsert }) {
