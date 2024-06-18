@@ -725,6 +725,7 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
         if (v === undefined) throw new Error('undefined returned');
       } catch (e) {
         info(e);
+        info('First record used for included columns:', array[0]);
         throw new Error(`Error mapping string to value:  Column '${def.name}', type='${def.column_type}': ${e}, attempted val=${val}, object=${JSON.stringify(o)}`);
       }
 
