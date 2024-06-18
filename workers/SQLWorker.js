@@ -279,6 +279,8 @@ Worker.prototype.stringToType = function (_v, _t, length, nullable, nullAsString
     case 'timestamp_ntz':
     case 'timestamp without time zone':
       if (v === null && nullable) return null;
+      // this is commented because an undefined date or time is usually a bug on the input
+      // if (v === undefined && nullable) return null;
       dt = new Date(v);
       if (dt === 'Invalid Date') return null;
       return dt.toISOString().slice(0, -1);
@@ -701,7 +703,11 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
   // Otherwise we have to do much less efficient per-item updates.
   // If you need to only specify some values, a previous deduplication
   // run should pre-populate the correct values
-  const includedColumns = desc.columns.filter((f) => array[0][f.name] !== undefined);
+  const ignore = ['created_at', 'modified_at'];// these are handled by the database, should not be upserted
+  const includedColumns = desc.columns
+    .filter((f) => ignore.indexOf(f.name) < 0)
+    .filter((f) => array[0][f.name] !== undefined);
+
   const rows = array.map((o) => {
     const values = includedColumns.map((def) => {
       const val = o[def.name];
@@ -711,7 +717,7 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
         v = this.stringToType(val, def.column_type, def.length, def.nullable);
       } catch (e) {
         info(e);
-        throw new Error(`Error parsing column '${def.name}', type='${def.column_type}': ${e}, attempted val=${val}, object=${JSON.stringify(o)}`);
+        throw new Error(`Error mapping string to value:  Column '${def.name}', type='${def.column_type}': ${e}, attempted val=${val}, object=${JSON.stringify(o)}`);
       }
 
       return knex.raw('?', [v]);
