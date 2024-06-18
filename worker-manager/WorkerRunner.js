@@ -320,6 +320,8 @@ function getAccountId(cb) {
   let accountId = null;
   if (argv.accountId) {
     accountId = String(argv.accountId);
+  } else if (argv.account_id) {
+    accountId = String(argv.account_id);
   } else if (argv.a) {
     accountId = String(argv.a);
   } else if (process.env.ENGINE9_ACCOUNT_ID) {
