@@ -5,7 +5,7 @@
 */
 
 const util = require('node:util');
-const PacketTools = require('engine9-packet-tools');
+const PacketTools = require('@engine9/packet-tools');
 const BaseWorker = require('./BaseWorker');
 
 function Worker(worker) {

@@ -204,10 +204,14 @@ Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
   return summary;
 };
 
-Worker.prototype.upsert = async function ({ stream, filename, batchSize = 500 }) {
+Worker.prototype.upsert = async function ({
+  stream, filename, packet, batchSize = 500,
+}) {
   const worker = this;
   const fileWorker = new FileWorker(this);
-  const inStream = await fileWorker.getStream({ stream, filename });
+  const inStream = await fileWorker.getStream({
+    stream, filename, packet, type: 'person',
+  });
   const pipelineConfig = await this.getDefaultPipelineConfig();
   const compiledPipeline = await this.compilePipeline(pipelineConfig);
   let records = 0;

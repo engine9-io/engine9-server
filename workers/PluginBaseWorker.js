@@ -163,6 +163,7 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
             stream: timelineStream, promises,
             files,
           } = await PacketTools.getTimelineOutputStream({});
+          debug(`Creating a new output timeline for binding ${name}`);
           pipeline.bindings[name] = timelineStream;
           pipeline.newStreams = pipeline.newStreams.concat(timelineStream);
           pipeline.promises = pipeline.promises.concat(promises || []);

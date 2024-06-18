@@ -6,6 +6,7 @@ const util = require('util');
 const { Readable, Transform } = require('node:stream');
 
 const { pipeline } = require('node:stream/promises');
+const PacketTools = require('@engine9/packet-tools');
 const debug = require('debug')('FileWorker');
 // const through2 = require('through2');
 const csv = require('csv');
@@ -318,8 +319,10 @@ Worker.prototype.testTransform.metadata = {
   },
 };
 
-/* Get a stream from an actual stream, or an array, or a file */
-Worker.prototype.getStream = async function ({ stream, filename } = {}) {
+/* Get a stream from an actual stream, or an array, or a file, or a packet */
+Worker.prototype.getStream = async function ({
+  stream, filename, packet, type,
+} = {}) {
   if (stream) {
     if (Array.isArray(stream)) {
       return { stream: Readable.from(stream) };
@@ -327,9 +330,16 @@ Worker.prototype.getStream = async function ({ stream, filename } = {}) {
     // probably already a stream
     if (typeof stream === 'object') return { stream };
     throw new Error(`Invalid stream type:${typeof stream}`);
+  } else if (filename) {
+    return this.fileToObjectStream({ filename });
+  } else {
+    let { stream: packetStream } = await PacketTools.getStream({ packet, type });
+    const { transforms } = this.csvToObjectTransforms({});
+    transforms.forEach((t) => {
+      packetStream = packetStream.pipe(t);
+    });
+    return { stream: packetStream };
   }
-
-  return this.fileToObjectStream({ filename });
 };
 
 module.exports = Worker;
