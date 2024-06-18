@@ -1,4 +1,5 @@
 const debug = require('debug')('BaseWorker');
+const info = require('debug')('info:log');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -40,17 +41,17 @@ Worker.prototype.logSome = function (prefix, records, start, ...rest) {
   }
 
   if (records <= 5) {
-    debug(prefix, records, getRate(), ...rest);
+    info(prefix, records, getRate(), ...rest);
   } else if (records <= 100 && records % 10 === 0) {
-    debug(prefix, records, getRate(), ...rest);
+    info(prefix, records, getRate(), ...rest);
   } else if (records <= 1000 && records % 100 === 0) {
-    debug(prefix, records, getRate(), ...rest);
+    info(prefix, records, getRate(), ...rest);
   } else if (records <= 10000 && records % 1000 === 0) {
-    debug(prefix, records, getRate(), ...rest);
+    info(prefix, records, getRate(), ...rest);
   } else if (records <= 100000 && records % 5000 === 0) {
-    debug(prefix, records, getRate(), ...rest);
+    info(prefix, records, getRate(), ...rest);
   } else if (records % 20000 === 0) {
-    debug(prefix, records, getRate(), ...rest);
+    info(prefix, records, getRate(), ...rest);
   }
 };
 

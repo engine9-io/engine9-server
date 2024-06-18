@@ -6,6 +6,7 @@ const { uuidv7 } = require('uuidv7');
 const { Transform } = require('node:stream');
 
 const debug = require('debug')('PersonWorker');
+const info = require('debug')('info:PersonWorker');
 const debugPerformance = require('debug')('Performance');
 const SQLWorker = require('./SQLWorker');
 const FileWorker = require('./FileWorker');
@@ -205,7 +206,7 @@ Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
   if (!batch) throw new Error('upsert requires a batch');
   const pipelineConfig = await this.getDefaultPipelineConfig();
   const compiledPipeline = await this.compilePipeline(pipelineConfig);
-
+  info(`Executing pipeline with batch of size ${batch.length}`);
   const summary = await this.executeCompiledPipeline({ pipeline: compiledPipeline, batch });
 
   return summary;
