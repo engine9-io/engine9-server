@@ -1,0 +1,4 @@
+email,email_hash_v1,subscription_status,deliverability_score,created_at,confirmation_status,subscription_confirmation_send_date,confirmation_date,resubscribe_date,unsubscribe_method,unsubscribe_date,frakture_last_modified
+asdf_wilho_@yahoo.com,,Subscribed,1,2020-02-25 00:00:00,Confirmation Unknown,NULL,NULL,NULL,NULL,NULL,2020-02-25 00:00:00
+munoz????23@yahoo.com,,Unsubscribed,2,2023-05-22 00:00:00,--,NULL,NULL,NULL,Hard Bounce,2023-05-25 00:00:00,2023-05-25 00:00:00
+munoz23@yahoo.com,,Not Subscribed,3,2023-06-27 00:00:00,--,NULL,NULL,NULL,NULL,NULL,2023-06-27 00:00:00
