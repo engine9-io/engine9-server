@@ -66,7 +66,9 @@ Worker.prototype.ok = async function f() {
 Worker.prototype.ok.metadata = {
   options: {},
 };
-Worker.prototype.query = async function (_sql, values = []) {
+// values can be undefined or null,
+// implying we don't want to use any bindings -- may have already been bound
+Worker.prototype.query = async function (_sql, values) {
   let sql = _sql;
   if (typeof _sql !== 'string') sql = _sql.sql;
   if (!sql) throw new Error('No sql provided');
