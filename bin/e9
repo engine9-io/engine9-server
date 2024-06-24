@@ -1,7 +1,7 @@
 #!/bin/bash
 #This lets us know the current process to check for configurations
 export ENGINE9_PARENT_PID=$PPID
-RUNNER_PATH=$ENGINE9_SERVER_DIR/worker-manager/WorkerRunner.js
+RUNNER_PATH=$ENGINE9_SERVER_DIR/scheduler/WorkerRunner.js
 >&2 echo Engine9 Worker CLI - PID $ENGINE9_PARENT_PID running $RUNNER_PATH
 export DEBUG=info:*,WorkerRunner,SchemaWorker,-knex:query,-knex:client,-knex:bindings
 

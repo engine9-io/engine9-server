@@ -59,11 +59,13 @@ WorkerRunner.prototype.getWorkerConstructor = function getWorkerConstructor(opti
   return async.autoInject({
     workerPath: (cb) => runner.getWorkerPath(options, cb),
     WorkerConstructor: (workerPath, cb) => {
+      debug(`Getting constructor by requiring ${workerPath}`);
       let WorkerConstructor = null;
       try {
         // eslint-disable-next-line
         WorkerConstructor = require(workerPath);
       } catch (e) {
+        debug(e);
         const msg = (e.message || e.toString());
         if (msg.indexOf('Cannot find module') >= 0) {
           debug(e.stack);
@@ -101,11 +103,11 @@ WorkerRunner.prototype.getWorkerConstructor = function getWorkerConstructor(opti
 const loggers = {};
 
 WorkerRunner.prototype.getLogPath = function getLogPath(job) {
-  if (!job.job_id) throw new Error(`Could not find job_id in ${JSON.stringify(job)}`);
+  if (!job.jobId) throw new Error(`Could not find jobId in ${JSON.stringify(job)}`);
   if (!job.job_list_id) throw new Error(`Could not find job_list_id in ${JSON.stringify(job)}`);
 
   const logDir = process.env.JOB_LOG_DIR || '/var/log/frakture';
-  return `${logDir + path.sep}joblists${path.sep}${job.accountId}_${job.job_list_id}_${job.job_id}.txt`;
+  return `${logDir + path.sep}joblists${path.sep}${job.accountId}_${job.job_list_id}_${job.jobId}.txt`;
 };
 
 WorkerRunner.prototype.getLogger = function getLogger(job) {
@@ -436,7 +438,10 @@ WorkerRunner.prototype.run = function run() {
     environment: (accountId, WorkerConstructor, cb) => {
       runner.getWorkerEnvironment({ accountId }, cb);
     },
-    method: (environment, WorkerConstructor, cb) => runner.getMethod(WorkerConstructor, cb),
+    method: (environment, WorkerConstructor, cb) => {
+      if (!WorkerConstructor) return cb(new Error('Did not get valid constructor'));
+      return runner.getMethod(WorkerConstructor, cb);
+    },
     _options: (method, cb) => runner.getOptionValues(method, cb),
     _workerInstance: (_options, WorkerConstructor, environment, instanceCallback) => {
       try {
@@ -489,8 +494,8 @@ WorkerRunner.prototype.run = function run() {
 
       workerInstance.log = debug;
 
-      workerInstance.job_id = argv._.find((d) => d.indexOf('_job_id') === 0);
-      if (workerInstance.job_id)workerInstance.job_id = workerInstance.job_id.slice(workerInstance.job_id.indexOf('=') + 1);
+      workerInstance.jobId = argv._.find((d) => d.indexOf('_jobId') === 0);
+      if (workerInstance.jobId)workerInstance.jobId = workerInstance.jobId.slice(workerInstance.jobId.indexOf('=') + 1);
       cb();
     },
   }, (configError, {
@@ -563,7 +568,7 @@ WorkerRunner.prototype.run = function run() {
 
           // eslint-disable-next-line no-shadow
           const output = {
-            frakture_response_type: 'modify',
+            job_response_type: 'modify',
             modify,
           };
           modify.options = modify.options || {};

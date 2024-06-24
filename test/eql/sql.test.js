@@ -8,7 +8,7 @@ const debug = require('debug')('sql.test.js');
 // const assert = require('node:assert');
 
 // This will configure the .env file when constructing
-const WorkerRunner = require('../../worker-manager/WorkerRunner');
+const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 
 describe('Test SQL builder', async () => {

@@ -91,7 +91,6 @@ const mysqlTypes = [
   {
     type: 'enum',
     column_type: 'enum',
-    length: 16,
     knex_method: 'enu',
     knex_args: ((o) => {
       if (!o.values || o.values.length === 0) throw new Error(`No values provided for enum type:${JSON.stringify(o)}`);
@@ -202,7 +201,7 @@ module.exports = {
         },
       );
       if (!typeDef) {
-        throw new Error(`Could not find type that matches ${JSON.stringify(input)} \n${log.map((s) => JSON.stringify(s)).join('\n')}`);
+        throw new Error(`Could not find column type that matches ${JSON.stringify(input)} \n${log.map((s) => JSON.stringify(s)).join('\n')}`);
       }
 
       return Object.assign(input, typeDef);

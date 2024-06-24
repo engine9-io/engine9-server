@@ -49,7 +49,7 @@ Worker.prototype.connect = async function connect() {
 
   let config = null;
   const s = this.auth.database_connection;
-  if (!s) throw new Error(`SQLWorker Could not find database_connection settings in auth configuration with keys ${Object.keys(this.auth)}`);
+  if (!s) throw new Error(`SQLWorker Could not find database_connection settings in auth configuration for account ${accountId} with keys ${Object.keys(this.auth)}`);
 
   config = {
     client: 'mysql2',
@@ -77,7 +77,7 @@ Worker.prototype.query = async function (_sql, values) {
     const [data, columns] = await knex.raw(sql, values);
     return { data, columns };
   } catch (e) {
-    info('Error running query:', { _sql, values });
+    info('Error running query:', { _sql, values }, e);
     throw e;
   }
 };
@@ -566,7 +566,7 @@ Worker.prototype.insertFromStream = async function (options) {
       if (Array.isArray(o)) {
         throw new Error('You should not pass an array into insertFromStream');
       }
-      o.account_id = o.account_id || worker.account_id || 'n/a';
+      o.account_id = o.account_id || worker.account_id;
 
       // Support default values
       Object.keys(defaults).forEach((i) => {
@@ -618,7 +618,7 @@ Worker.prototype.insertFromStream = async function (options) {
         }
         if (rows.length > 0) {
           try {
-            const sql = worker.createInsertSql({
+            const sql = worker.buildInsertSql({
               knex, table, columns, rows,
             });
             if ((counter % 50000 === 0) || (counter < 1000 && counter % 200 === 0)) debug(`Inserting ${rows.length} rows, Total:${counter}`);
@@ -652,7 +652,7 @@ Worker.prototype.insertFromStream = async function (options) {
     }, function (cb) {
       if (rows.length > 0) {
         try {
-          const complete = worker.createInsertSql({
+          const complete = worker.buildInsertSql({
             knex, table, columns, rows,
           });
           this.push(complete);
