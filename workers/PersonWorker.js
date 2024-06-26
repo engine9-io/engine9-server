@@ -239,7 +239,7 @@ Worker.prototype.upsert = async function ({
           summary.executionTime[path] = (summary.executionTime[path] || 0) + val;
         });
         records += batch.length;
-        worker.logSome('PersonWorker upsert processed ', records, start, JSON.stringify(summary));
+        worker.logSome('PersonWorker upsert processed ', records, start, JSON.stringify({ filename, packet, ...summary }));
         cb();
       },
     }),
@@ -254,6 +254,7 @@ Worker.prototype.upsert = async function ({
   // Await any file completions
   await Promise.all(compiledPipeline.promises || []);
   summary.files = compiledPipeline.files || [];
+  summary.records = records;
 
   return summary;
 };
