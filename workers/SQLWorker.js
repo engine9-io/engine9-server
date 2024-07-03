@@ -833,8 +833,8 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
   const {
     subquery,
     conditions = [],
-    group_by = [],
-    order_by = [],
+    groupBy: _groupBy = [],
+    orderBy: _orderBy = [],
     fields,
     limit,
     offset,
@@ -892,7 +892,7 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
         table = baseTable, column, aggregate = 'NONE', function: func = 'NONE', alias, eql,
       } = input;
       // eslint-disable-next-line no-shadow
-      const { ignore_alias = false, order_by = false } = opts || {};
+      const { ignore_alias = false, orderBy = false } = opts || {};
       if (!table) throw new Error(`Invalid column, no table:${JSON.stringify(input)}`);
 
       let result;
@@ -927,8 +927,8 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
         if (alias && !ignore_alias) result = `${result} as ${dbWorker.escapeColumn(alias)}`;
       }
 
-      if (order_by && input.order_by_direction) {
-        const o = input.order_by_direction.toLowerCase();
+      if (orderBy && input.orderByDirection) {
+        const o = input.orderByDirection.toLowerCase();
         if (o !== 'asc' && o !== 'desc') throw new Error(`Invalid - must be asc or desc, not: ${o}`);
         result = `${result} ${o}`;
       }
@@ -991,13 +991,13 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
       whereClause = `where\n${whereClauseParts.join(' and\n')}`;
     }
     debugMore('Checking groupBy');
-    const groupBy = await Promise.all(group_by.map((f) => fromColumn(f, { ignore_alias: true })));
+    const groupBy = await Promise.all(_groupBy.map((f) => fromColumn(f, { ignore_alias: true })));
     let groupByClause = '';
     if (groupBy.length) groupByClause = `group by ${groupBy.join(',').trim()}`;
 
     debugMore('Checking orderBy');
     const orderBy = await Promise.all(
-      (order_by || []).map((f) => fromColumn(f, { order_by: true, ignore_alias: true })),
+      (_orderBy || []).map((f) => fromColumn(f, { orderBy: true, ignore_alias: true })),
     );
 
     let orderByClause = '';

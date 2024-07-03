@@ -110,7 +110,7 @@ async function getData(options, databaseWorker) {
     offset,
   };
 
-  const invalid = ['conditions', 'group_by', 'columns'].filter((k) => {
+  const invalid = ['conditions', 'groupBy', 'columns'].filter((k) => {
     try {
       eqlObject[k] = makeArray(options[k]);
       return false;
@@ -241,6 +241,41 @@ router.get([
     const data = await getData({
       table, id: req.params?.id, ...req.query,
     }, req.databaseWorker);
+    return res.json({ data });
+  } catch (e) {
+    debug('Error handling request:', e, e.code, e.message);
+    return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
+  }
+});
+
+router.post([
+  '/tables/:table/:id',
+  '/tables/:table'], async (req, res) => {
+  try {
+    const table = req.params?.table;
+    if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
+    let id = req.params?.id;
+    const { body } = req;
+    if (id) {
+      await req.databaseWorker.knex.table(table).insert(body);
+    } else {
+      const response = await req.databaseWorker.knex.table(table).insert(body);
+
+      [id] = response;
+    }
+
+    return res.json({ id });
+  } catch (e) {
+    debug('Error handling request:', e, e.code, e.message);
+    return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
+  }
+});
+
+router.post(['/eql'], async (req, res) => {
+  try {
+    const { body } = req;
+    debug('Body=', body);
+    const data = await getData(body, req.databaseWorker);
     return res.json({ data });
   } catch (e) {
     debug('Error handling request:', e, e.code, e.message);

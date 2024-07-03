@@ -1,0 +1,8 @@
+{
+ "uid": "engine9-api",
+ "append": true,
+ "watch": true,
+ "script": "./index.js",
+ "sourceDir": ".",
+ "logFile":"/var/log/engine9/engine9-api.txt"
+}

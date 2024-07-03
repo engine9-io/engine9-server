@@ -33,7 +33,7 @@ describe('Test SQL builder', async () => {
         { eql: 'id in (1,2,3)' },
         { eql: 'id in (3)' },
       ],
-      group_by: [{ eql: "YEAR(modified_at)>'2020-01-01'" }],
+      groupBy: [{ eql: "YEAR(modified_at)>'2020-01-01'" }],
     };
     debug('Building sql:');
     const sql = await sqlWorker.buildSqlFromEQLObject(query);
@@ -48,7 +48,7 @@ describe('Test SQL builder', async () => {
       limit: 25,
       offset: 0,
       conditions: [{ eql: 'id in (1,2,3)' }],
-      group_by: [],
+      groupBy: [],
     };
     debug('Building sql:');
     const sql = await sqlWorker.buildSqlFromEQLObject(obj);
@@ -66,7 +66,7 @@ describe('Test SQL builder', async () => {
           { eql: 'person_id', alias: 'person_id' },
           { eql: 'count(*)', alias: 'emails' },
         ],
-        group_by: [{ eql: 'person_id' }],
+        groupBy: [{ eql: 'person_id' }],
         alias: 'subquery_1',
       },
       columns: [
@@ -77,7 +77,7 @@ describe('Test SQL builder', async () => {
         },
         { eql: 'count(person_id)', alias: 'people' },
       ],
-      group_by: [{
+      groupBy: [{
         eql: `case when subquery_1.emails>1
         then 'multi-email' else 'one-email' end`,
       }],
