@@ -22,18 +22,6 @@ const DEFAULT_UI = {
       icon: 'dashboard',
       url: '/',
     },
-    data: {
-      title: 'Data',
-      type: 'collapse',
-      children: [
-        {
-          id: 'home-reports',
-          title: 'Reports',
-          icon: 'report',
-          url: '/report',
-        },
-      ],
-    },
   },
   routes: {
     '/': {
@@ -83,6 +71,9 @@ Worker.prototype.getConsoleConfig = async function ({ accountId, userId }) {
     'engine9-interfaces/person_phone',
     'engine9-interfaces/segment',
     'engine9-interfaces/message',
+    'engine9-interfaces/job',
+    'engine9-interfaces/query',
+    'engine9-interfaces/report',
   ];
 
   const configurations = await Promise.all(paths.map((path) => this.compileConsoleConfig(path)));

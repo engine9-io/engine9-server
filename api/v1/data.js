@@ -238,10 +238,16 @@ router.get([
   try {
     const table = req.params?.table;
     if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
+
     const data = await getData({
       table, id: req.params?.id, ...req.query,
     }, req.databaseWorker);
-    return res.json({ data });
+    const output = { data };
+    if (req.query.schema === 'true') {
+      output.schema = await req.databaseWorker.describe({ table: req.params.table });
+    }
+
+    return res.json(output);
   } catch (e) {
     debug('Error handling request:', e, e.code, e.message);
     return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
@@ -257,8 +263,10 @@ router.post([
     let id = req.params?.id;
     const { body } = req;
     if (id) {
-      await req.databaseWorker.knex.table(table).insert(body);
+      console.log(`Updating record ${id}`);
+      await req.databaseWorker.knex.table(table).where({ id }).update(body);
     } else {
+      console.log(`Inserting record ${id}`);
       const response = await req.databaseWorker.knex.table(table).insert(body);
 
       [id] = response;
