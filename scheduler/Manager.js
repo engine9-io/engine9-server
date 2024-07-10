@@ -89,8 +89,8 @@ Manager.prototype.handleEvent = async function (event) {
 
 Manager.prototype.getLogPath = function (job) {
   if (!job.jobId) throw new Error(`Could not find jobId in ${JSON.stringify(job)}`);
-  const logDir = process.env.JOB_LOG_DIR || '/var/log/frakture';
-  return `${logDir + path.sep}joblists${path.sep}${job.accountId}_${job.jobId}.txt`;
+  const logDir = process.env.ENGINE9_LOG_DIR || '/var/log/engine9';
+  return `${logDir + path.sep}jobs${path.sep}${job.accountId}_${job.jobId}.txt`;
 };
 
 Manager.prototype.getColor = function () {
@@ -189,9 +189,9 @@ Manager.prototype.forkJob = function (_job, callback) {
       `_jobId=${job.jobId}`,
       `_jobLog=${manager.getLogPath(job)}`,
     ];
-    const runnerPath = 'scheduler/WorkerRunner.js';
+    const runnerPath = 'WorkerRunner.js';
 
-    debug(`Forking ${job.jobId} ${prefix} ${runnerPath} ${forkParams.join(' ')} ${Object.keys(job.options).map((k) => `--${k}=${JSON.stringify(job.options[k])}`).join(' ')}`);
+    debug(`Forking job ${job.jobId} ${prefix} ${runnerPath} ${forkParams.join(' ')} ${Object.keys(job.options).map((k) => `--${k}=${JSON.stringify(job.options[k])}`).join(' ')}`);
 
     const opts = { silent: true };
     opts.env = { ...process.env };
@@ -203,8 +203,7 @@ Manager.prototype.forkJob = function (_job, callback) {
       forkParams,
       opts,
     );
-
-    let logToClient = false;
+    let logToClient = true;
     if (process.env.NODE_DEBUG && process.env.NODE_DEBUG.indexOf('Manager') >= 0) logToClient = true;
 
     fork.color = color;
@@ -259,6 +258,7 @@ Manager.prototype.forkJob = function (_job, callback) {
         });
       } else {
         if (logToClient) debug(new Date().toString(), 'Progress:'[fork.color], m.data);
+        debug('Unknown message received from child:', m);
         manager.toSchedulerQueue.add({
           eventType: 'job_modify',
           job: {

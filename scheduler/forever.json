@@ -4,5 +4,5 @@
  "watch": true,
  "script": "./index.js",
  "sourceDir": ".",
- "logFile":"/var/log/engine9/api.log"
+ "logFile":"/var/log/engine9/scheduler.log"
 }

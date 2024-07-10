@@ -1,10 +1,14 @@
 const util = require('node:util');
 const { createQueue, QueueOrder } = require('simple-in-memory-queue');
 const debug = require('debug')('SQLJobScheduler');
+const debugJob = require('debug')('job:SQLJobScheduler');
+const debugPoll = require('debug')('poll:SQLJobScheduler');
+const dayjs = require('dayjs');
 const Manager = require('./Manager');
 const WorkerRunner = require('./WorkerRunner');// just to get the environment
 const SQLWorker = require('../workers/SQLWorker');// just to get the environment
 const EchoWorker = require('../workers/EchoWorker');// just to get the environment
+const { relativeDate } = require('../utilities');
 
 /*
 
@@ -50,9 +54,14 @@ Scheduler.prototype.init = async function () {
     },
   });
 
-  const runner = new WorkerRunner();
-  const env = runner.getWorkerEnvironment(this.opts);
-  this.sqlWorker = new SQLWorker(env);
+  try {
+    const runner = new WorkerRunner();
+    const env = runner.getWorkerEnvironment({ accountId: process.env.SCHEDULER_JOB_ACCOUNT_ID || 'engine9' });
+    this.sqlWorker = new SQLWorker(env);
+  } catch (e) {
+    console.error(e);
+    throw new Error('Could not set up the Scheduler environment and database connection');
+  }
 
   this.toSchedulerQueue.on.push.subscribe({
     consumer: ({ items }) => {
@@ -63,15 +72,21 @@ Scheduler.prototype.init = async function () {
   });
 };
 
-Scheduler.prototype.poll = async function ({ repeatMilliseconds = 500 }) {
-  if (this.is_polling) return;
+Scheduler.prototype.poll = async function ({ repeatMilliseconds = 2000 } = {}) {
+  if (this.is_polling) {
+    debugPoll('Already polling, returning..');
+    return;
+  }
   this.is_polling = true;
-  const { data: jobs } = await this.sqlWorker
-    .query(`select id as jobId from job where status='pending' 
-        and (start_after is null or start_after<now())
-      `);
+  const sql = 'select id as jobId,start_after,status from job where status=\'pending\' and (start_after is null or start_after<now())';
+  debugPoll(sql);
+  const { data: jobs } = await this.sqlWorker.query(sql);
   if (jobs.length > 0) {
-    await Promise.all(jobs.map((job) => this.handleEvent({ eventType: 'job_go', job })));
+    debugPoll(`Found ${jobs.length} jobs, including ${jobs.slice(0, 5).map((d) => d.jobId)}`);
+    await Promise.all(jobs.map((job) => {
+      debugJob(`Found job ${job.jobId} with status ${job.status} starting after ${job.start_after}`);
+      return this.handleEvent({ eventType: 'job_go', job });
+    }));
   }
   this.is_polling = false;
   if (repeatMilliseconds) setTimeout(() => this.poll(), repeatMilliseconds);
@@ -100,6 +115,7 @@ Scheduler.prototype.handleEvent = async function (event) {
     /* these go to the manager */
     case 'job_kill': {
       this.toManagerQueue.push(event);
+      debugJob(`Updating job ${jobId} with status kill_sent`);
       await this.sqlWorker.query('update job set status=? where id=?', ['kill_sent', jobId]);
 
       break;
@@ -115,6 +131,7 @@ Scheduler.prototype.handleEvent = async function (event) {
       }).forEach(([k, v]) => { job[k] = job[v]; delete job[v]; });
       job.options = job.options || {};
       if (typeof job.options === 'string')job.options = JSON.parse(job.options);
+      debugJob(`Updating job ${jobId} set status=sent_to_queue`);
       await this.sqlWorker.query('update job set status=? where id=?', ['sent_to_queue', jobId]);
       this.toManagerQueue.push({ eventType: 'job_start', job });
 
@@ -152,23 +169,29 @@ Scheduler.prototype.handleEvent = async function (event) {
       }
 
       values.push(jobId);
-
+      debugJob(`job_modify: Updating job ${jobId} with ${fields.map((f, i) => f.slice(0, -1) + values[i])}`);
       await this.sqlWorker.query(`update job set ${fields.join(',')} where id=?`, values);
       break;
     }
     case 'job_error':
     {
       const job = (await this.sqlWorker.query('select * from job where id=?', [jobId]))?.data?.[0];
-      let { error } = event;
+
+      const newJob = event.job || event;
+      let { error } = newJob;
+      if (!error) {
+        debugJob({ event });
+        throw new Error('No error property in job_error event');
+      }
       let err = {};
       if (error instanceof Error) {
         err.stack = error.stack;
-        err.message = error.toString();
+        [err.message] = error.toString().split('\n');
       } else if (typeof error === 'string') {
         // Only allow the first 500 chars of an error
         error = error.slice(0, 500);
-        err.stack = new Error(error).stack;
-        err.message = error;
+        err.stack = error;
+        [err.message] = String(error).split('\n');
       } else if (typeof error === 'object') {
         err = error;
         if (!err.message && err.error) {
@@ -178,7 +201,7 @@ Scheduler.prototype.handleEvent = async function (event) {
         }
         if (!err.message && err.sqlMessage) err.message = err.sqlMessage;
         if (!err.message) err.message = 'Error (see details below)';
-        if (!err.stack) err.stack = new Error(util.inspect(error)).stack;
+        // if (!err.stack) err.stack = new Error(util.inspect(error)).stack;
 
         debug(util.inspect(error, { depth: 5 }));
       } else {
@@ -189,11 +212,32 @@ Scheduler.prototype.handleEvent = async function (event) {
       if (error.type) err.type = error.type;
       if (error.level) err.level = error.level;
 
-      const errors = (job.errors || []).push(err);
-      let status = 'errored'; // this allows us to retry a few times
-      if (errors.length < 4) status = 'pending';
+      let errors = (job.errors || []);
+      if (typeof errors === 'string') {
+        try {
+          errors = JSON.parse(errors);
+        } catch (e) {
+          errors = [errors];
+        }
+      }
+      if (!Array.isArray(errors)) errors = [errors];
+      errors.push(err);
 
-      await this.sqlWorker.query('update job set status=?,errors=? where id=?', [status, errors, jobId]);
+      let startAfter = null;
+
+      let status = 'error'; // this allows us to retry a few times, if it's not a critical or authentication error
+      if (errors.length < 4) {
+        if (err.level && ['critical', 'authentication'].find((d) => d === err.level.toLowerCase())) {
+          // critical or auth errors should not be retried
+        } else {
+          // This calculates how long to wait before another trial
+          // Start with immediate, then fall off 20 second per error
+          startAfter = relativeDate(`+${(errors.length - 1) * 20}s`);
+          status = 'pending';
+        }
+      }
+      debugJob(`After error #${errors.length}, updating job ${jobId} to status ${status}, starting after ${startAfter ? dayjs(startAfter).format('HH:mm:ss') : 'now'},error=`, String(err.message || err).split('\n')[0]);
+      await this.sqlWorker.query('update job set status=?,errors=?,progress=?,start_after=? where id=?', [status, JSON.stringify(errors, null, 4), null, startAfter, jobId]);
       break;
     }
     case 'job_complete': {
@@ -222,6 +266,7 @@ Scheduler.prototype.handleEvent = async function (event) {
       values.push(JSON.stringify(output));
 
       values.push(jobId);
+      debugJob(`job_complete: Updating job ${jobId} with ${fields.map((f, i) => f.slice(0, -1) + values[i])}`);
       await this.sqlWorker.query(`update job set ${fields.join(',')} where id=?`, values);
 
       break;
@@ -232,14 +277,4 @@ Scheduler.prototype.handleEvent = async function (event) {
   return null;
 };
 
-async function start() {
-  const scheduler = new Scheduler();
-  await scheduler.init();
-  scheduler.toManagerQueue.push({ eventType: 'ping' });
-  scheduler.poll();
-}
-
-if (require.main === module) {
-  start();
-}
 module.exports = Scheduler;

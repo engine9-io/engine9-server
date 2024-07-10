@@ -6,6 +6,7 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 const { RateLimiter } = require('limiter');
 const minimist = require('minimist');
 const debug = require('debug')('WorkerRunner');
+const debugError = require('debug')('error:WorkerRunner');
 const { relativeDate } = require('../utilities');
 
 let config = null;
@@ -39,6 +40,7 @@ function getFiles(dir, files = []) {
 }
 
 WorkerRunner.prototype.getWorkerPath = function getWorkerPath(options, callback) {
+  debug('Getting worker path with ', argv);
   let pathLookup = argv._[0];
   if (!pathLookup) return callback('No path specified in command line');
   pathLookup = pathLookup.toLowerCase();
@@ -47,7 +49,11 @@ WorkerRunner.prototype.getWorkerPath = function getWorkerPath(options, callback)
   debug('Looking for workers in path:', d);
   const availableWorkerPaths = getFiles(d);
   const paths = availableWorkerPaths.filter((p) => p.toLowerCase().indexOf(pathLookup) >= 0);
-  if (paths.length === 0) return callback(`Could not find a worker that matches ${pathLookup}`);
+  if (paths.length === 0) {
+    debug(`No worker path found that matches ${pathLookup}`);
+    return callback(`Could not find a worker that matches ${pathLookup}`);
+  }
+  debug('Found worker paths:', paths);
   const p = paths[0];
   if (paths.length > 1) debug(`Multiple paths found, using ${p}`); // notify, but don't error, for convenience
   debug('Returning path ', p);
@@ -65,7 +71,7 @@ WorkerRunner.prototype.getWorkerConstructor = function getWorkerConstructor(opti
         // eslint-disable-next-line
         WorkerConstructor = require(workerPath);
       } catch (e) {
-        debug(e);
+        debugError(e);
         const msg = (e.message || e.toString());
         if (msg.indexOf('Cannot find module') >= 0) {
           debug(e.stack);
@@ -97,7 +103,7 @@ WorkerRunner.prototype.getWorkerConstructor = function getWorkerConstructor(opti
       WorkerConstructor.path = fullName;
       return cb(null, WorkerConstructor);
     },
-  }, (e, { WorkerConstructor } = {}) => callback(null, WorkerConstructor));
+  }, (e, { WorkerConstructor } = {}) => callback(e, WorkerConstructor));
 };
 
 const loggers = {};
@@ -106,8 +112,8 @@ WorkerRunner.prototype.getLogPath = function getLogPath(job) {
   if (!job.jobId) throw new Error(`Could not find jobId in ${JSON.stringify(job)}`);
   if (!job.job_list_id) throw new Error(`Could not find job_list_id in ${JSON.stringify(job)}`);
 
-  const logDir = process.env.JOB_LOG_DIR || '/var/log/frakture';
-  return `${logDir + path.sep}joblists${path.sep}${job.accountId}_${job.job_list_id}_${job.jobId}.txt`;
+  const logDir = process.env.ENGINE9_LOG_DIR || '/var/log/engine9';
+  return `${logDir + path.sep}jobs${path.sep}${job.accountId}_${job.job_list_id}_${job.jobId}.txt`;
 };
 
 WorkerRunner.prototype.getLogger = function getLogger(job) {
@@ -340,6 +346,7 @@ function getAccountId(cb) {
 }
 
 WorkerRunner.prototype.getWorkerEnvironment = function getWorkerEnvironment(options, callback) {
+  if (!options) throw new Error('getWorkerEnvironment requires options');
   const accountEnvironment = config.accounts?.[options.accountId] || {};
   // don't print the environment, could have credentials
   debug('Using environment with keys:', Object.keys(accountEnvironment));
@@ -361,7 +368,7 @@ WorkerRunner.prototype.run = function run() {
       // eslint-disable-next-line no-console
       console.error(s);
       if (process.send) {
-        process.send({ frakture_type: 'error', data: e.stack || e }, () => {
+        process.send({ message_type: 'error', data: e.stack || e }, () => {
           process.exit(-1);
         });
       } else {
@@ -375,7 +382,7 @@ WorkerRunner.prototype.run = function run() {
   process.on('SIGHUP', () => {
     debug(`${new Date().toString()}SIGHUP received`);
     if (process.send) {
-      process.send({ frakture_type: 'error', data: { message: 'Stopped by system' } }, () => {
+      process.send({ message_type: 'error', data: { message: 'Stopped by system' } }, () => {
         process.exit(-3);
       });
     } else {
@@ -386,7 +393,7 @@ WorkerRunner.prototype.run = function run() {
   process.on('SIGTERM', () => {
     debug(`${new Date().toString()}SIGTERM received`);
     if (process.send) {
-      process.send({ frakture_type: 'error', data: { level: 'CRITICAL', message: 'Killed by system' } }, () => {
+      process.send({ message_type: 'error', data: { level: 'CRITICAL', message: 'Killed by system' } }, () => {
         process.exit(-2);
       });
     } else {
@@ -397,7 +404,7 @@ WorkerRunner.prototype.run = function run() {
   process.on('SIGTSTP', () => {
     debug(`${new Date().toString()}SIGTSTP received`);
     if (process.send) {
-      process.send({ frakture_type: 'error', data: { level: 'CRITICAL', message: 'Killed by user - TStop signal' } }, () => {
+      process.send({ message_type: 'error', data: { level: 'CRITICAL', message: 'Killed by user - TStop signal' } }, () => {
         process.exit(-2);
       });
     } else {
@@ -412,7 +419,7 @@ WorkerRunner.prototype.run = function run() {
   process.on('SIGQUIT', () => {
     debug(`${new Date().toString()}SIGQUIT received at ${new Date()}`);
     if (process.send) {
-      process.send({ frakture_type: 'error', data: { message: 'Killed by system - Quit signal' } }, () => {
+      process.send({ message_type: 'error', data: { message: 'Killed by system - Quit signal' } }, () => {
         debug(`SIGQUIT exiting job at ${new Date()}`);
         process.exit(-2);
       });
@@ -425,7 +432,7 @@ WorkerRunner.prototype.run = function run() {
   process.on('SIGINT', () => {
     debug(`${new Date().toString()}: SIGINT received`);
     if (process.send) {
-      process.send({ frakture_type: 'error', data: { message: 'Killed because of a timeout' } }, () => {
+      process.send({ message_type: 'error', data: { message: 'Killed because of a timeout' } }, () => {
         process.exit(-2);
       });
     } else {
@@ -439,7 +446,12 @@ WorkerRunner.prototype.run = function run() {
       runner.getWorkerEnvironment({ accountId }, cb);
     },
     method: (environment, WorkerConstructor, cb) => {
-      if (!WorkerConstructor) return cb(new Error('Did not get valid constructor'));
+      if (!WorkerConstructor) {
+        return cb({
+          level: 'CRITICAL',
+          error: 'Did not get valid constructor',
+        });
+      }
       return runner.getMethod(WorkerConstructor, cb);
     },
     _options: (method, cb) => runner.getOptionValues(method, cb),
@@ -485,7 +497,7 @@ WorkerRunner.prototype.run = function run() {
         // Don't overwhelm our progress tracker -- 1 per 3 seconds
         if (progressLimiter.tryRemoveTokens(1)) {
           if (process.send) {
-            process.send({ frakture_type: 'progress', data: o });
+            process.send({ message_type: 'progress', data: o });
           }
         } else {
           // do nothing
@@ -505,8 +517,15 @@ WorkerRunner.prototype.run = function run() {
     let options = _options;
 
     if (configError) {
-      debug('There was a configuration error, returning callback');
-      return callback(configError);
+      debug('There was a configuration error, returning critical error');
+      let error = configError;
+      if (typeof error === 'string') {
+        error = {
+          level: 'CRITICAL',
+          error,
+        };
+      }
+      return callback(error);
     }
     function runOnce() {
       let hasError = false;

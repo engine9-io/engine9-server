@@ -89,8 +89,8 @@ Manager.prototype.handleEvent = async function (event) {
 
 Manager.prototype.getLogPath = function (job) {
   if (!job.jobId) throw new Error(`Could not find jobId in ${JSON.stringify(job)}`);
-  const logDir = process.env.JOB_LOG_DIR || '/var/log/frakture';
-  return `${logDir + path.sep}joblists${path.sep}${job.accountId}_${job.jobId}.txt`;
+  const logDir = process.env.ENGINE9_LOG_DIR || '/var/log/engine9';
+  return `${logDir + path.sep}jobs${path.sep}${job.accountId}_${job.jobId}.txt`;
 };
 
 Manager.prototype.getColor = function () {
