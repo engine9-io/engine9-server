@@ -449,7 +449,7 @@ WorkerRunner.prototype.run = function run() {
       if (!WorkerConstructor) {
         return cb({
           level: 'CRITICAL',
-          error: 'Did not get valid constructor',
+          message: 'Did not get valid constructor',
         });
       }
       return runner.getMethod(WorkerConstructor, cb);
@@ -522,7 +522,7 @@ WorkerRunner.prototype.run = function run() {
       if (typeof error === 'string') {
         error = {
           level: 'CRITICAL',
-          error,
+          message: error,
         };
       }
       return callback(error);

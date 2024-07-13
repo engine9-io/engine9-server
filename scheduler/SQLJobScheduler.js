@@ -3,7 +3,9 @@ const { createQueue, QueueOrder } = require('simple-in-memory-queue');
 const debug = require('debug')('SQLJobScheduler');
 const debugJob = require('debug')('job:SQLJobScheduler');
 const debugPoll = require('debug')('poll:SQLJobScheduler');
+const debugError = require('debug')('error:SQLJobScheduler');
 const dayjs = require('dayjs');
+const { mkdirp } = require('mkdirp');
 const Manager = require('./Manager');
 const WorkerRunner = require('./WorkerRunner');// just to get the environment
 const SQLWorker = require('../workers/SQLWorker');// just to get the environment
@@ -22,9 +24,15 @@ const { relativeDate } = require('../utilities');
 function Scheduler(opts) {
   this.opts = opts;
 }
-
 Scheduler.prototype.init = async function () {
   const scheduler = this;
+
+  try {
+    const logDir = process.env.ENGINE9_LOG_DIR || '/var/log/engine9';
+    await mkdirp(logDir);
+  } catch (err) {
+    if (err && err.code !== 'EEXIST') throw err;
+  }
   // Create and standardize the queue methods with add/list/clear
 
   scheduler.toSchedulerQueue = createQueue({ order: QueueOrder.FIRST_IN_FIRST_OUT });
@@ -59,7 +67,7 @@ Scheduler.prototype.init = async function () {
     const env = runner.getWorkerEnvironment({ accountId: process.env.SCHEDULER_JOB_ACCOUNT_ID || 'engine9' });
     this.sqlWorker = new SQLWorker(env);
   } catch (e) {
-    console.error(e);
+    debugError(e);
     throw new Error('Could not set up the Scheduler environment and database connection');
   }
 

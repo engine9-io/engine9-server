@@ -144,6 +144,9 @@ Worker.prototype.tables.metadata = {
   options: {},
 };
 
+Worker.prototype.escapeField = function (f) {
+  return SQLTypes.mysql.escapeField(f);
+};
 Worker.prototype.escapeValue = function (t) {
   return SQLTypes.mysql.escapeValue(t);
 };
