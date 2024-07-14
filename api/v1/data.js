@@ -290,6 +290,70 @@ router.post(['/eql'], async (req, res) => {
     return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
   }
 });
+router.get('/query/fields', async (req, res) => {
+  res.json({
+    fields: [
+      {
+        name: 'given_name',
+        label: 'First Name',
+        placeholder: 'Enter first name',
+      },
+      {
+        name: 'family_name',
+        label: 'Last Name',
+        placeholder: 'Enter last name',
+        defaultOperator: 'beginsWith',
+      },
+      {
+        name: 'age', label: 'Age', inputType: 'number',
+      },
+      {
+        name: 'segment',
+        label: 'Segment',
+        valueEditorType: 'select',
+        values: [
+          {
+            label: 'Static',
+            options: [
+              { name: 1, label: 'Segment 1' },
+              { name: 2, label: 'Segment 2' },
+            ],
+          },
+          {
+            label: 'Dynamic',
+            options: [
+              { name: 3, label: 'Segment 3' },
+              { name: 4, label: 'Segment 4' },
+            ],
+          },
+        ],
+        operators: [
+          { name: 'in', value: 'in', label: 'Is a member of' },
+          { name: 'notIn', value: 'notIn', label: 'Is not a member of' },
+        ],
+        defaultValue: false,
+      },
+
+      {
+        name: 'gender',
+        label: 'Gender',
+        operators: ['='],
+        valueEditorType: 'radio',
+        values: [
+          { name: 'M', label: 'Male' },
+          { name: 'F', label: 'Female' },
+          { name: 'O', label: 'Other' },
+        ],
+      },
+      { name: 'height', label: 'Height' },
+      { name: 'job', label: 'Job' },
+      { name: 'description', label: 'Description', valueEditorType: 'textarea' },
+      { name: 'birthdate', label: 'Birth Date', inputType: 'date' },
+      { name: 'datetime', label: 'Show Time', inputType: 'datetime-local' },
+      { name: 'alarm', label: 'Daily Alarm', inputType: 'time' },
+    ],
+  });
+});
 
 /*
 router.post(['/tables/:table/:id'], async (req, res) => {

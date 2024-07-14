@@ -6,14 +6,13 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
 
 const PacketTools = require('@engine9/packet-tools');
-const BaseWorker = require('./BaseWorker');
 const SQLWorker = require('./SQLWorker');
 
 function Worker(worker) {
-  BaseWorker.call(this, worker);
+  SQLWorker.call(this, worker);
 }
 
-util.inherits(Worker, BaseWorker);
+util.inherits(Worker, SQLWorker);
 
 /*
   Core method that takes an extension configuration,
@@ -78,13 +77,12 @@ Worker.prototype.compileTransform = async function ({ transform, path }) {
       transform: (opts) => this.appendPersonIds(opts),
     };
   } if (path === 'sql.upsertTables') {
-    if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
     return {
       path,
       bindings: {
         tablesToUpsert: { type: 'sql.tables.upsert' },
       },
-      transform: (opts) => this.sqlWorker.upsertTables(opts),
+      transform: (opts) => this.upsertTables(opts),
     };
   }
   let p = path;
@@ -170,7 +168,6 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
           pipeline.files = pipeline.files.concat(files);
           transformArguments[name] = timelineStream;
         } else if (binding.type === 'sql.query') {
-          if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
           if (!binding.lookup) throw new Error(`lookup as an array is required for binding ${name}`);
           if (binding.lookup.length !== 1) throw new Error(`Currently only one lookup column is allowed for sql.query bindings, found ${binding.lookup.length} for ${name}`);
           const values = new Set();
@@ -182,9 +179,9 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
             transformArguments[name] = [];
             return;
           }
-          const sql = `/* ${cleanPath} */ select * from ${this.sqlWorker.escapeTable(binding.table)}`
-          + ` where ${this.sqlWorker.escapeColumn(binding.lookup[0])} in (${[...values].map(() => '?').join(',')})`;
-          const { data } = await this.sqlWorker.query(sql, [...values]);
+          const sql = `/* ${cleanPath} */ select * from ${this.escapeTable(binding.table)}`
+          + ` where ${this.escapeColumn(binding.lookup[0])} in (${[...values].map(() => '?').join(',')})`;
+          const { data } = await this.query(sql, [...values]);
           transformArguments[name] = data;
         } else if (binding.type === 'sql.tables.upsert') {
           transformArguments[name] = tablesToUpsert;
@@ -201,6 +198,25 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
     }
   }
   return summary;
+};
+
+Worker.prototype.getActivePaths = async function () {
+  // this will be dynamic at some point
+  const paths = [
+    'engine9-interfaces/person',
+    'engine9-interfaces/person_email',
+    'engine9-interfaces/person_address',
+    'engine9-interfaces/person_phone',
+    'engine9-interfaces/segment',
+    'engine9-interfaces/message',
+    'engine9-interfaces/job',
+    'engine9-interfaces/query',
+    'engine9-interfaces/report',
+  ];
+  return { paths };
+};
+Worker.prototype.getActivePaths.metadata = {
+  options: {},
 };
 
 module.exports = Worker;

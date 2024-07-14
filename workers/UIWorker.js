@@ -4,16 +4,19 @@ const fs = require('node:fs');
 const debug = require('debug')('UIWorker');
 
 const JSON5 = require('json5');// Useful for parsing extended JSON
-const BaseWorker = require('./BaseWorker');
+const PluginBaseWorker = require('./PluginBaseWorker');
 const { deepMerge } = require('../utilities');
 
 const fsp = fs.promises;
 
 function Worker(worker) {
-  BaseWorker.call(this, worker);
+  PluginBaseWorker.call(this, worker);
 }
 
-util.inherits(Worker, BaseWorker);
+util.inherits(Worker, PluginBaseWorker);
+Object.keys(PluginBaseWorker.prototype).forEach((k) => {
+  Worker.prototype[k] = PluginBaseWorker.prototype[k];
+});
 
 const DEFAULT_UI = {
   menu: {
@@ -54,7 +57,7 @@ const DEFAULT_UI = {
 
 Worker.prototype.compileConsoleConfig = async function (path) {
   let p = path;
-  if (path.indexOf('engine9-interfaces/') === 0) p = `../../${path}/ui.console.json5`;
+  if (path.indexOf('engine9-interfaces/') === 0) p = `${__dirname}/../../${path}/ui.console.json5`;
   debug(`Compiling ${p} from directory ${process.cwd()}`);
   const string = await fsp.readFile(p);
   const config = JSON5.parse(string);
@@ -63,19 +66,7 @@ Worker.prototype.compileConsoleConfig = async function (path) {
 
 Worker.prototype.getConsoleConfig = async function ({ accountId, userId }) {
   debug('Getting config for ', { accountId, userId });
-  // this will be dynamic at some point
-  const paths = [
-    'engine9-interfaces/person',
-    'engine9-interfaces/person_email',
-    'engine9-interfaces/person_address',
-    'engine9-interfaces/person_phone',
-    'engine9-interfaces/segment',
-    'engine9-interfaces/message',
-    'engine9-interfaces/job',
-    'engine9-interfaces/query',
-    'engine9-interfaces/report',
-  ];
-
+  const { paths } = await this.getActivePaths();
   const configurations = await Promise.all(paths.map((path) => this.compileConsoleConfig(path)));
   let config = JSON.parse(JSON.stringify(DEFAULT_UI));
   configurations.forEach((c, i) => {
