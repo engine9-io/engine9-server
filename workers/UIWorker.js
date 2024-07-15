@@ -66,7 +66,7 @@ Worker.prototype.compileConsoleConfig = async function (path) {
 
 Worker.prototype.getConsoleConfig = async function ({ accountId, userId }) {
   debug('Getting config for ', { accountId, userId });
-  const { paths } = await this.getActivePaths();
+  const { paths } = await this.getActivePluginPaths();
   const configurations = await Promise.all(paths.map((path) => this.compileConsoleConfig(path)));
   let config = JSON.parse(JSON.stringify(DEFAULT_UI));
   configurations.forEach((c, i) => {

@@ -4,7 +4,10 @@
 */
 const util = require('util');
 const debug = require('debug')('SchemaWorker');
-const fs = require('fs');
+const fs = require('node:fs');
+
+const fsp = fs.promises;
+const path = require('node:path');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const SQLWorker = require('./SQLWorker');
 const SQLTypes = require('./SQLTypes');
@@ -20,6 +23,17 @@ Worker.metadata = {
 };
 
 /*
+  Gets the path for a local schema, or returns blank
+  if it does not exist
+*/
+Worker.prototype.resolveLocalSchemaPath = async function (schema) {
+  const localPath = path.resolve(`${__dirname}/../../${schema}${schema.slice(-1) === '/' ? '' : '/'}schema.js`);
+
+  await fsp.access(localPath, fs.constants.R_OK);
+  return localPath;
+};
+
+/*
   Retrieves, validates, and expands a schema to the global standard.
   Will throw an error if there's a problem with it
 */
@@ -30,8 +44,9 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
     schema = _schema;
   } else if (typeof _schema === 'string' && _schema.indexOf('engine9-interfaces/') === 0) {
     // This is a local version, not a github version
+    const p = await this.resolveLocalSchemaPath(schema);
     // eslint-disable-next-line import/no-dynamic-require,global-require
-    schema = require(`${_schema}${_schema.slice(-1) === '/' ? '' : '/'}schema.js`);
+    schema = require(p);
   } else {
     let content = null;
     if (_schema.indexOf('@engine9-interfaces/') === 0) {

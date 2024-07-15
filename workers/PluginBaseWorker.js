@@ -6,13 +6,13 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
 
 const PacketTools = require('@engine9/packet-tools');
-const SQLWorker = require('./SQLWorker');
+const SchemaWorker = require('./SchemaWorker');
 
 function Worker(worker) {
-  SQLWorker.call(this, worker);
+  SchemaWorker.call(this, worker);
 }
 
-util.inherits(Worker, SQLWorker);
+util.inherits(Worker, SchemaWorker);
 
 /*
   Core method that takes an extension configuration,
@@ -39,7 +39,7 @@ Worker.prototype.compilePlugin = async function ({ extensionPath }) {
         const parts = v.split('.');
         if (parts[0] === 'SQL') {
           if (sqlConnection === null) {
-            sqlConnection = new SQLWorker(this).connect();
+            sqlConnection = new SchemaWorker(this).connect();
           }
           if (parts[1] === 'tables') {
             // TODO -- check allowed tables here
@@ -200,7 +200,7 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
   return summary;
 };
 
-Worker.prototype.getActivePaths = async function () {
+Worker.prototype.getActivePluginPaths = async function () {
   // this will be dynamic at some point
   const paths = [
     'engine9-interfaces/person',
@@ -215,7 +215,19 @@ Worker.prototype.getActivePaths = async function () {
   ];
   return { paths };
 };
-Worker.prototype.getActivePaths.metadata = {
+Worker.prototype.getActivePluginPaths.metadata = {
+  options: {},
+};
+
+Worker.prototype.deployAllSchemas = async function () {
+  const { paths } = await this.getActivePluginPaths();
+
+  // eslint-disable-next-line no-restricted-syntax, no-await-in-loop
+  for (const schema of paths) { await this.deploy({ schema }); }
+
+  return paths;
+};
+Worker.prototype.deployAllSchemas.metadata = {
   options: {},
 };
 
