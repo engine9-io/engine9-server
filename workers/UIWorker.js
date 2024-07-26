@@ -52,7 +52,18 @@ const DEFAULT_UI = {
         ],
       },
     },
+    '/profile': {
+      layout: 'grid',
+      components: {
+        main: [
+          {
+            component: 'Profile',
+          },
+        ],
+      },
+    },
   },
+
 };
 
 Worker.prototype.compileConsoleConfig = async function (path) {

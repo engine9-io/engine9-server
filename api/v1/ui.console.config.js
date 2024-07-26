@@ -9,10 +9,11 @@ const UIWorker = require('../../workers/UIWorker');
 
 const router = express.Router({ mergeParams: true });
 
-const uiWorker = new UIWorker();
 router.get('/console', async (req, res) => {
+  const accountId = req.accountId || 'engine9'; // CHANGE ME
+  const uiWorker = new UIWorker({ accountId });
   const config = await uiWorker.getConsoleConfig(
-    { account_id: req.accountId, user_id: req.userId },
+    { accountId, userId: req.userId },
   );
   return res.json(config);
 });

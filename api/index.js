@@ -25,6 +25,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 const data = require('./v1/data');
 const ui = require('./v1/ui.console.config');
+const { addUserToRequest } = require('./v1/permissions');
 const packetServer = require('./packet-server/index');
 
 app.use(cors());
@@ -32,8 +33,15 @@ app.use(compression());
 app.use(bodyParser.json());
 
 app.get('/ok', (req, res) => { res.json({ ok: true }); });
-app.use('/data', data);
+// This should move
+
 app.use('/ui', ui);
+app.use(addUserToRequest);
+
+app.get('/user', (req, res) => { res.json({ user: req.user }); });
+
+app.use('/data', data);
+
 app.use('/packet', packetServer);
 
 /*

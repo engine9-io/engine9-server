@@ -66,6 +66,27 @@ function getSQLWorkerForRequest(req) {
   return databaseWorker;
 }
 
+// Validate permissions
+router.use((req, res, next) => {
+  req.accountId = req.hostname.split('.').pop();
+  const { userId } = req;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const hasUser = connectionConfig.accounts?.[req.accountId]?.userIds?.find((d) => d === userId);
+  if (hasUser) return next();
+
+  const { firebaseUserId } = req;
+  if (firebaseUserId) {
+    const firebaseAuthed = connectionConfig
+      .accounts?.[req.accountId]?.firebaseUserIds?.find((d) => d === firebaseUserId);
+    if (firebaseAuthed) {
+      return next();
+    }
+    return res.status(401).json({ error: 'Firebase user unauthorized' });
+  }
+  return res.status(401).json({ error: 'User unauthorized' });
+});
+
 router.use((req, res, next) => {
   req.databaseWorker = getSQLWorkerForRequest(req);
   next();
@@ -263,10 +284,8 @@ router.post([
     let id = req.params?.id;
     const { body } = req;
     if (id) {
-      console.log(`Updating record ${id}`);
       await req.databaseWorker.knex.table(table).where({ id }).update(body);
     } else {
-      console.log(`Inserting record ${id}`);
       const response = await req.databaseWorker.knex.table(table).insert(body);
 
       [id] = response;

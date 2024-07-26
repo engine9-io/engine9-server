@@ -23,7 +23,7 @@ Worker.metadata = {
 };
 
 /*
-  Gets the path for a local schema, or returns blank
+  Gets the path for a local schema, or throws an error
   if it does not exist
 */
 Worker.prototype.resolveLocalSchemaPath = async function (schema) {

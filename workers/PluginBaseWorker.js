@@ -221,12 +221,29 @@ Worker.prototype.getActivePluginPaths.metadata = {
 
 Worker.prototype.deployAllSchemas = async function () {
   const { paths } = await this.getActivePluginPaths();
+  const availableSchemas = [];
+  // We want to do these in series because they may have an ordering
+  // to deploying the schemas
 
-  // eslint-disable-next-line no-restricted-syntax, no-await-in-loop
-  for (const schema of paths) { await this.deploy({ schema }); }
-
-  return paths;
+  // eslint-disable-next-line no-restricted-syntax
+  for (const schema of paths) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await this.resolveLocalSchemaPath(schema);
+      availableSchemas.push(schema);
+    } catch (e) {
+      debug(e);
+    }
+  }
+  // eslint-disable-next-line no-restricted-syntax
+  for (const schema of availableSchemas) {
+    debug(`deployAllSchemas: Deploying schema:${schema}`);
+    // eslint-disable-next-line no-await-in-loop
+    await this.deploy({ schema });
+  }
+  return availableSchemas;
 };
+
 Worker.prototype.deployAllSchemas.metadata = {
   options: {},
 };
