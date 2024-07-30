@@ -1,3 +1,5 @@
+const https = require('node:https');
+const fs = require('node:fs');
 const express = require('express');
 
 const app = express();
@@ -33,7 +35,6 @@ app.use(compression());
 app.use(bodyParser.json());
 
 app.get('/ok', (req, res) => { res.json({ ok: true }); });
-// This should move
 
 app.use('/ui', ui);
 app.use(addUserToRequest);
@@ -56,10 +57,22 @@ app.use((err, req, res, next) => {
 });
 */
 
-const port = 8080;
+let port = 443; // default to ssl port
 
-app.listen(port, (e) => {
-  if (e) throw e;
-  // eslint-disable-next-line no-console
-  console.log('listening on:', port);
-});
+if (process.env.API_PORT) port = parseInt(process.env.API_PORT, 10);
+if (process.env.SSL_CERT_PATH) {
+  https.createServer({
+    key: fs.readFileSync(`${process.env.SSL_CERT_PATH}/key.pem`),
+    cert: fs.readFileSync(`${process.env.SSL_CERT_PATH}/cert.pem`),
+  }, app).listen(port, (e) => {
+    if (e) throw e;
+    // eslint-disable-next-line no-console
+    console.log('listening on:', port);
+  });
+} else {
+  app.listen(port, (e) => {
+    if (e) throw e;
+    // eslint-disable-next-line no-console
+    console.log('listening on:', port);
+  });
+}
