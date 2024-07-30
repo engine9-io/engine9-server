@@ -76,15 +76,15 @@ router.use((req, res, next) => {
   //Currently only supporter firebase user ids, expand at some point later
   */
 
-  const firebaseUserId = user.uid;
-  if (firebaseUserId) {
+  const userId = user.uid;
+  if (userId) {
     const isAdmin = connectionConfig
-      .adminUserIds?.find((d) => d === firebaseUserId);
+      .adminUserIds?.find((d) => d === userId);
     if (isAdmin) {
       return next();
     }
     const firebaseAuthed = connectionConfig
-      .accounts?.[req.accountId]?.firebaseUserIds?.find((d) => d === firebaseUserId);
+      .accounts?.[req.accountId]?.userIds?.find((d) => d === userId);
     if (firebaseAuthed) {
       return next();
     }

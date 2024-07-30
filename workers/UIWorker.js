@@ -37,16 +37,13 @@ const DEFAULT_UI = {
             {
               table: 'person',
               columns: [
-                // 'id',
                 { eql: 'YEAR(modified_at)', alias: 'year_modified' },
                 { eql: 'count(id)', alias: 'count' },
               ],
               conditions: [
                 { eql: "YEAR(modified_at)>'2020-01-01'" },
-                { eql: 'id in (1,2,3)' },
-                { eql: 'id in (3)' },
               ],
-              groupBy: [{ eql: "YEAR(modified_at)>'2020-01-01'" }],
+              groupBy: [{ eql: 'YEAR(modified_at)' }],
             },
           },
         ],
