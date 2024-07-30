@@ -44,19 +44,12 @@ function knexConfigForTenant(accountId) {
 function getSQLWorkerForRequest(req) {
   // the account_id comes from authentication step, or in the headers,
   // NOT the url parameters, engine9 is the default
-  const headerAccountId = req.get('ENGINE9_ACCOUNT_ID');
-  const accountId = headerAccountId || 'engine9';
+  const { accountId } = req;
 
   let databaseWorker = databaseWorkerCache.get(accountId);
 
   if (!databaseWorker) {
-    let config = null;
-    try {
-      config = knexConfigForTenant(accountId);
-    } catch (e) {
-      if (!headerAccountId) throw new Error('No ENGINE9_ACCOUNT_ID header');
-      throw e;
-    }
+    const config = knexConfigForTenant(accountId);
 
     const knex = Knex(config);
     databaseWorker = new SQLWorker({ accountId, knex });
@@ -68,7 +61,8 @@ function getSQLWorkerForRequest(req) {
 
 // Validate permissions
 router.use((req, res, next) => {
-  req.accountId = req.hostname.split('.').pop();
+  req.accountId = req.get('X-ENGINE9-ACCOUNT-ID');
+  if (!req.accountId) return res.status(401).json({ error: 'No X-ENGINE9-ACCOUNT-ID header' });
   const { userId } = req;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
