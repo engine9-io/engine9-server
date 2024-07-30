@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 // A lot of libraries initialize using the process.env object, so keep this first
 require('dotenv').config({ path: '../.env' });
 
@@ -84,6 +85,7 @@ router.use((req, res, next) => {
     }
     return res.status(401).json({ error: 'Firebase user unauthorized' });
   }
+  console.error('User unauthorized: No firebaseUserId for user:', user);
   return res.status(401).json({ error: 'User unauthorized' });
 });
 
