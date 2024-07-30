@@ -63,13 +63,19 @@ function getSQLWorkerForRequest(req) {
 router.use((req, res, next) => {
   req.accountId = req.get('X-ENGINE9-ACCOUNT-ID');
   if (!req.accountId) return res.status(401).json({ error: 'No X-ENGINE9-ACCOUNT-ID header' });
-  const { userId } = req;
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const { user } = req;
+  if (!user) {
+    return res.status(401).json({ error: 'No valid user' });
+  }
 
+  /*
   const hasUser = connectionConfig.accounts?.[req.accountId]?.userIds?.find((d) => d === userId);
   if (hasUser) return next();
 
-  const { firebaseUserId } = req;
+  //Currently only supporter firebase user ids, expand at some point later
+  */
+
+  const firebaseUserId = user.firebase?.uid;
   if (firebaseUserId) {
     const firebaseAuthed = connectionConfig
       .accounts?.[req.accountId]?.firebaseUserIds?.find((d) => d === firebaseUserId);
