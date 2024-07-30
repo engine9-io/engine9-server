@@ -78,12 +78,18 @@ router.use((req, res, next) => {
 
   const firebaseUserId = user.uid;
   if (firebaseUserId) {
+    const isAdmin = connectionConfig
+      .adminUserIds?.find((d) => d === firebaseUserId);
+    if (isAdmin) {
+      return next();
+    }
     const firebaseAuthed = connectionConfig
       .accounts?.[req.accountId]?.firebaseUserIds?.find((d) => d === firebaseUserId);
     if (firebaseAuthed) {
       return next();
     }
-    return res.status(401).json({ error: 'Firebase user unauthorized' });
+    console.error('User unauthorized: No firebaseUserId found for', user);
+    return res.status(401).json({ error: `User not authorized for account ${req.accountId}` });
   }
   console.error('User unauthorized: No firebaseUserId for user:', user);
   return res.status(401).json({ error: 'User unauthorized' });
