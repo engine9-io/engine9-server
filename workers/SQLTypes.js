@@ -2,7 +2,7 @@ const mysql = require('mysql2');
 
 const mysqlTypes = [
   {
-    type: 'id', column_type: 'bigint', unsigned: true, nullable: false, auto_increment: true, knex_method: 'bigIncrements',
+    type: 'id', column_type: 'bigint', nullable: false, auto_increment: true, knex_method: 'bigIncrements',
   },
   {
     // person id is a very specific foreign id
@@ -10,11 +10,11 @@ const mysqlTypes = [
     // that way we never have to deal with null cases, and different platforms can rely on it having
     // a non-null value
     // Even though there's situations where it's not set, that value is then 0
-    type: 'person_id', column_type: 'bigint', unsigned: true, nullable: false, default_value: 0, knex_method: 'bigint',
+    type: 'person_id', column_type: 'bigint', nullable: false, default_value: 0, knex_method: 'bigint',
   },
   {
     // foreign ids can be nullable
-    type: 'foreign_id', column_type: 'bigint', unsigned: true, nullable: true, knex_method: 'bigint',
+    type: 'foreign_id', column_type: 'bigint', nullable: true, knex_method: 'bigint',
   },
   { // A string identifier, similar to a string,
     // but can't be null, defaults to '', 64 chars to join with hashes
@@ -373,7 +373,7 @@ module.exports = {
       };
 
       this.getCastIntFunction = function (value) {
-        return `CAST(${value} AS UNSIGNED)`;
+        return `CAST(${value} AS SIGNED)`;
       };
 
       this.getTrimFunction = function (value) {
