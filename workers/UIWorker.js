@@ -27,7 +27,7 @@ const DEFAULT_UI = {
     },
   },
   routes: {
-    '/': {
+    '': {
       layout: 'grid',
       components: {
         main: [
@@ -49,7 +49,7 @@ const DEFAULT_UI = {
         ],
       },
     },
-    '/profile': {
+    profile: {
       layout: 'grid',
       components: {
         main: [
