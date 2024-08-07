@@ -27,6 +27,7 @@ Worker.metadata = {
   if it does not exist
 */
 Worker.prototype.resolveLocalSchemaPath = async function (schema) {
+  if (!schema) throw new Error(`Could not resolve local schema path for schema:${schema}`);
   const localPath = path.resolve(`${__dirname}/../../${schema}${schema.slice(-1) === '/' ? '' : '/'}schema.js`);
 
   await fsp.access(localPath, fs.constants.R_OK);
@@ -44,7 +45,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
     schema = _schema;
   } else if (typeof _schema === 'string' && _schema.indexOf('engine9-interfaces/') === 0) {
     // This is a local version, not a github version
-    const p = await this.resolveLocalSchemaPath(schema);
+    const p = await this.resolveLocalSchemaPath(_schema);
     // eslint-disable-next-line import/no-dynamic-require,global-require
     schema = require(p);
   } else {
