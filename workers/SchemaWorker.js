@@ -46,6 +46,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
   } else if (typeof _schema === 'string' && _schema.indexOf('engine9-interfaces/') === 0) {
     // This is a local version, not a github version
     const p = await this.resolveLocalSchemaPath(_schema);
+    debug('Loading local schema:', p);
     // eslint-disable-next-line import/no-dynamic-require,global-require
     schema = require(p);
   } else {
