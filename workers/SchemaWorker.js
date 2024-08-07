@@ -206,7 +206,7 @@ Worker.prototype.deploy = async function (opts) {
   const { tables } = await this.diff(opts);
   if (tables.length === 0) return { no_changes: true };
   const { prefix = '' } = opts;
-  debug(`Creating ${tables.length} tables, including`, JSON.stringify(tables[0], null, 4));
+  debug(`Deploying ${tables.length} tables, including`, JSON.stringify(tables[0], null, 4));
   await Promise.all(
     tables.map(async ({
       table, differences, columns = [], indexes = [],
@@ -219,7 +219,7 @@ Worker.prototype.deploy = async function (opts) {
             return this.createTable({ table: prefix + table, columns, indexes });
           }
           if (columns.length > 0 || indexes.length > 0) {
-            debug(`Altering table ${prefix}${table}`);
+            debug(`Altering table ${prefix}${table} with difference ${difference}`);
             return this.alterTable({ table: prefix + table, columns, indexes });
           }
 
