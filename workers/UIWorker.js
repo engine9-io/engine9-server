@@ -1,22 +1,15 @@
-const util = require('node:util');
 const fs = require('node:fs');
 
 const debug = require('debug')('UIWorker');
 
 const JSON5 = require('json5');// Useful for parsing extended JSON
-const PluginBaseWorker = require('./PluginBaseWorker');
+
 const { deepMerge } = require('../utilities');
 
 const fsp = fs.promises;
 
-function Worker(worker) {
-  PluginBaseWorker.call(this, worker);
+function Worker() {
 }
-
-util.inherits(Worker, PluginBaseWorker);
-Object.keys(PluginBaseWorker.prototype).forEach((k) => {
-  Worker.prototype[k] = PluginBaseWorker.prototype[k];
-});
 
 const DEFAULT_UI = {
   menu: {
@@ -73,8 +66,29 @@ Worker.prototype.compileConsoleConfig = async function (path) {
 };
 
 Worker.prototype.getConsoleConfig = async function ({ accountId, userId }) {
-  debug('Getting config for ', { accountId, userId });
-  const { paths } = await this.getActivePluginPaths();
+  let paths = null;
+  if (accountId === 'dev') {
+    paths = [
+      'engine9-interfaces/person',
+      'engine9-interfaces/person_email',
+      'engine9-interfaces/person_address',
+      'engine9-interfaces/person_phone',
+      'engine9-interfaces/segment',
+      'engine9-interfaces/message',
+      'engine9-interfaces/job',
+      'engine9-interfaces/query',
+      'engine9-interfaces/report',
+    ];
+  } else {
+    // This is here so we don't have to load the whole stack for
+    // development accounts
+    // eslint-disable-next-line global-require
+    const PluginBaseWorker = require('./PluginBaseWorker');
+    const worker = new PluginBaseWorker(this);
+    debug('Getting config for ', { accountId, userId });
+    paths = (await worker.getActivePluginPaths()).paths;
+  }
+
   const configurations = await Promise.all(paths.map((path) => this.compileConsoleConfig(path)));
   let config = JSON.parse(JSON.stringify(DEFAULT_UI));
   configurations.forEach((c, i) => {
@@ -94,5 +108,10 @@ Worker.prototype.getConsoleConfig.metadata = {
     userId: {},
   },
 };
+Worker.prototype.getConsoleConfigString = async function (options) {
+  const config = await this.getConsoleConfig(options);
+  return JSON5.stringify(config, null, 4);
+};
+Worker.prototype.getConsoleConfigString.metadata = Worker.prototype.getConsoleConfig.metadata;
 
 module.exports = Worker;
