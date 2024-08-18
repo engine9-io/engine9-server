@@ -25,9 +25,9 @@ app.use(bodyParser.json());
 if (isDevelopment) app.set('json spaces', 2); // number of spaces for indentation
 app.use(bodyParser.urlencoded({ extended: true }));
 
-const data = require('./v1/data');
-const ui = require('./v1/ui.console.config');
-const { addUserToRequest } = require('./v1/permissions');
+const data = require('./object/data');
+const ui = require('./object/ui.console.config');
+const { addUserToRequest } = require('./object/permissions');
 const packetServer = require('./packet-server/index');
 
 app.use(cors());
