@@ -29,10 +29,11 @@ Worker.prototype.echo = function echo(options, callback) {
   setTimeout(() => { this.progress({ message, percent_complete: 50 }); }, seconds * 500);
   setTimeout(() => { this.progress({ message, percent_complete: 70 }); }, seconds * 700);
   setTimeout(() => { this.progress({ message, percent_complete: 90 }); }, seconds * 900);
-  return setTimeout(() => {
+  setTimeout(() => {
     this.log('Echo completing');
     callback(null, obj);
   }, seconds * 1000);
+  debug('Returning from echo, no callback');
 };
 Worker.prototype.echo.metadata = {
   options: {

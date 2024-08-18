@@ -324,25 +324,27 @@ WorkerRunner.prototype.getOptionValues = function getOptionValues(method, callba
   });
 };
 
-function getAccountId(cb) {
-  let accountId = null;
+function getAccountIds() {
+  if (argv.account_id) throw new Error('account_id is not an allowed option');
+  if (argv.account_ids) throw new Error('account_ids is not an allowed option');
+  let accountIds = null;
   if (argv.accountId) {
-    accountId = String(argv.accountId);
-  } else if (argv.account_id) {
-    accountId = String(argv.account_id);
+    accountIds = String(argv.accountId);
   } else if (argv.a) {
-    accountId = String(argv.a);
+    accountIds = String(argv.a);
   } else if (process.env.ENGINE9_ACCOUNT_ID) {
-    accountId = process.env.ENGINE9_ACCOUNT_ID;
+    accountIds = process.env.ENGINE9_ACCOUNT_ID;
   } else {
-    accountId = 'engine9';
+    accountIds = 'engine9';
   }
-  if (!accountId.match(/^[a-zA-Z0-9_-]+$/)) throw new Error(`invalid accountId=${accountId}`);
-  debug(`Using accountId=${accountId} in environment ${process.env.NODE_ENV} with debug ${process.env.DEBUG}`);
+  accountIds = accountIds.split(',');
+  accountIds.forEach((accountId) => {
+    if (!accountId.match(/^[a-zA-Z0-9_-]+$/)) throw new Error(`invalid accountId=${accountId}`);
+  });
   // don't need this in the options
   delete argv.accountId;
   delete argv.a;
-  return cb(null, accountId);
+  return accountIds;
 }
 
 WorkerRunner.prototype.getWorkerEnvironment = function getWorkerEnvironment(options, callback) {
@@ -354,10 +356,10 @@ WorkerRunner.prototype.getWorkerEnvironment = function getWorkerEnvironment(opti
   return (typeof callback === 'function') ? callback(null, accountEnvironment) : accountEnvironment;
 };
 
-WorkerRunner.prototype.run = function run() {
-  const runner = this;
-  debug('Starting Runner');
-  function callback(_e, uncaught) {
+WorkerRunner.prototype.run = function () {
+  const accountIds = getAccountIds();
+  function processCallback(_e, uncaught) {
+    debug('Processing callback');
     if (_e) {
       let e = _e;
       if (!e.stack && typeof e === 'object')e = JSON.stringify(e, null, 4);
@@ -375,7 +377,42 @@ WorkerRunner.prototype.run = function run() {
         process.exit(-1);
       }
     }
+    // Add a tenth of a second to complete writing to stdout
+    // In MacOS without this the process exits before all content is written to the output
+    setTimeout(() => {
+      process.exit(0);
+    }, 100);
   }
+
+  if (accountIds.length === 1) {
+    debug('Starting Runner with account id ', accountIds[0]);
+    return this.runAccount(accountIds[0], processCallback);
+  }
+  debug(`Starting ${accountIds.length} Runners with account ids ${accountIds.join(',')}`);
+  const status = { output: [], success: [], error: [] };
+  return async.eachSeries(
+    accountIds,
+    (accountId, acb) => this.runAccount(accountId, (e, output) => {
+      if (e) status.error.push(accountId);
+      else {
+        status.success.push(accountId);
+        status.output.push({ accountId, output });
+      }
+      debug(`Finished ${accountId}, calling account callback`);
+      acb();
+    }),
+    (e) => {
+      if (e) throw e;
+      // eslint-disable-next-line no-console
+      console.log(status);
+      processCallback();
+    },
+  );
+};
+
+WorkerRunner.prototype.runAccount = function runAccount(accountId, callback) {
+  const runner = this;
+  debug(`Processing accountId=${accountId} in environment ${process.env.NODE_ENV} with debug ${process.env.DEBUG}`);
 
   process.on('uncaughtException', (e) => callback(e, true));
 
@@ -440,9 +477,8 @@ WorkerRunner.prototype.run = function run() {
     }
   });
   async.autoInject({
-    accountId: (cb) => getAccountId(cb),
-    WorkerConstructor: (accountId, cb) => runner.getWorkerConstructor({ accountId }, cb),
-    environment: (accountId, WorkerConstructor, cb) => {
+    WorkerConstructor: (cb) => runner.getWorkerConstructor({ accountId }, cb),
+    environment: (WorkerConstructor, cb) => {
       runner.getWorkerEnvironment({ accountId }, cb);
     },
     method: (environment, WorkerConstructor, cb) => {
@@ -465,7 +501,7 @@ WorkerRunner.prototype.run = function run() {
         return instanceCallback(e);
       }
     },
-    assignCommonMethods: (_workerInstance, accountId, method, cb) => {
+    assignCommonMethods: (_workerInstance, method, cb) => {
       const progressLimiter = new RateLimiter(1, 3000);
       const workerInstance = _workerInstance;
       workerInstance.accountId = accountId;
@@ -530,7 +566,6 @@ WorkerRunner.prototype.run = function run() {
     function runOnce() {
       let hasError = false;
 
-      debug(`Running ${method.name} with options `, Object.keys(options));
       /*
         If it's async, await the response and check for a modify output
       */
@@ -538,6 +573,7 @@ WorkerRunner.prototype.run = function run() {
       async function checkAsync(cb) {
         if (util.types.isAsyncFunction(workerInstance[method.name])) {
           try {
+            debug(`Running async ${method.name} with options `, Object.keys(options));
             const l = workerInstance[method.name].length;
             if (l > 1) throw new Error(`async functions must take zero or one parameter, ${method.name} has ${l}`);
             const response = await (workerInstance[method.name](options));
@@ -548,6 +584,7 @@ WorkerRunner.prototype.run = function run() {
             return cb(e);
           }
         }
+        debug(`Running non-async ${method.name} with options `, Object.keys(options));
         return workerInstance[method.name](options, cb);
       }
       const start = new Date().getTime();
@@ -567,7 +604,8 @@ WorkerRunner.prototype.run = function run() {
           debug(`Error executing job ${method.name}`, 'Error type:', typeof e);
           hasError = true;
           return callback(e);
-        } if (modify) {
+        }
+        if (modify) {
           debug('A modification was specified:', modify);
           try {
             JSON.stringify(modify);
@@ -646,10 +684,7 @@ WorkerRunner.prototype.run = function run() {
           // eslint-disable-next-line no-console
           console.log(JSON.stringify(response, null, 4));
         }
-        // Add a tenth of a second to complete writing to stdout
-        // In MacOS without this the process exits before all content is written to the output
-        setTimeout(() => { process.exit(0); }, 100);
-        return callback();
+        return callback(null, response);
       });
     }
     try {
@@ -678,7 +713,7 @@ if (require.main === module) {
     // eslint-disable-next-line
     console.error('No DEBUG environment variable set, no likely output');
   }
-  if (argv._.length === 1 && (argv.a || argv.account_id)) {
+  if (argv._.length === 1 && (argv.a || argv.accountId)) {
     // just setting an account id, so return
     end();
   } else {
