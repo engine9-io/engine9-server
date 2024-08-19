@@ -26,6 +26,13 @@ const mysqlTypes = [
     knex_method: 'string',
     knex_args: ((o) => ([o.length || 255])),
   },
+  { // A uuid identifier, similar to a string, but can't be null
+
+    type: 'id_uuid',
+    column_type: 'uuid',
+    knex_method: 'uuid',
+    nullable: false,
+  },
   {
     type: 'string', column_type: 'varchar', length: 255, knex_method: 'string', knex_args: ((o) => ([o.length || 255])),
   },
@@ -98,6 +105,13 @@ const mysqlTypes = [
       return [o.values];
     }
     ),
+  },
+  // foreign ids can be nullable
+  {
+    type: 'foreign_uuid',
+    column_type: 'uuid',
+    knex_method: 'uuid',
+    nullable: true,
   },
   {
     type: 'uuid',
