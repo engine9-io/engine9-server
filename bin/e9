@@ -3,6 +3,6 @@
 export ENGINE9_PARENT_PID=$PPID
 RUNNER_PATH=$ENGINE9_SERVER_DIR/scheduler/WorkerRunner.js
 >&2 echo Engine9 Worker CLI - PID $ENGINE9_PARENT_PID running $RUNNER_PATH
-export DEBUG=info:*,UIWorker,WorkerRunner,SchemaWorker,-knex:query,-knex:client,-knex:bindings
+export DEBUG=info:*,SQLWorker,UIWorker,WorkerRunner,SchemaWorker,-knex:query,-knex:client,-knex:bindings
 
 node --unhandled-rejections=strict $RUNNER_PATH "$@"

@@ -133,6 +133,7 @@ Worker.prototype.diff = async function (opts) {
   if (prefix && prefix.slice(-1) !== '_') throw new Error(`A prefix should end with '_', it is ${prefix}`);
   const diffTables = await Promise.all(
     schema.tables.map(async ({ name: table, columns: schemaColumns, indexes: schemaIndexes }) => {
+      debug(`Checking table ${table}`);
       let desc = null;
       try {
         desc = await this.describe({ table: prefix + table });
@@ -192,8 +193,9 @@ Worker.prototype.diff = async function (opts) {
       return out;
     }),
   );
-
-  return { tables: diffTables.filter(Boolean) };
+  const tables = diffTables.filter(Boolean);
+  debug(`Returning ${tables.length} diff tables`);
+  return { tables };
 };
 
 Worker.prototype.diff.metadata = {

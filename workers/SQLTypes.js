@@ -30,7 +30,8 @@ const mysqlTypes = [
 
     type: 'id_uuid',
     column_type: 'uuid',
-    knex_method: 'uuid',
+    knex_method: 'specificType',
+    knex_args: (() => (['uuid'])),
     nullable: false,
   },
   {
@@ -111,12 +112,14 @@ const mysqlTypes = [
     type: 'foreign_uuid',
     column_type: 'uuid',
     knex_method: 'uuid',
+    knex_args: (() => (['uuid'])),
     nullable: true,
   },
   {
     type: 'uuid',
     column_type: 'uuid',
     knex_method: 'uuid',
+    knex_args: (() => (['uuid'])),
   },
 ];
 function isInt(s) { return Number.isInteger(typeof s === 'number' ? s : parseFloat(s)); }
@@ -215,7 +218,7 @@ module.exports = {
         },
       );
       if (!typeDef) {
-        throw new Error(`Could not find column type that matches ${JSON.stringify(input)} \n${log.map((s) => JSON.stringify(s)).join('\n')}`);
+        throw new Error(`dialectToStandard: Could not find column type that matches ${JSON.stringify(input)} \n${log.map((s) => JSON.stringify(s)).join('\n')}`);
       }
 
       return Object.assign(input, typeDef);
