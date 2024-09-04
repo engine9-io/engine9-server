@@ -1,5 +1,12 @@
 const dayjs = require('dayjs');
 const crypto = require('node:crypto');
+const JSON5 = require('json5');
+
+function parseJSON5(s) {
+  if (s == null || s === undefined) return null;
+  if (typeof s === 'object') return s;
+  return JSON5.parse(s);
+}
 
 function relativeDate(s, _initialDate) {
   let initialDate = _initialDate;
@@ -231,6 +238,7 @@ function deepMerge(a, b, _stack) {
 module.exports = {
   bool,
   parseRegExp,
+  parseJSON5,
   relativeDate,
   toCharCodes,
   getIntArray,

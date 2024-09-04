@@ -18,15 +18,7 @@ const router = express.Router({ mergeParams: true });
 
 const databaseWorkerCache = new Map();
 
-let connectionConfig = null;
-
-try {
-  // eslint-disable-next-line global-require
-  connectionConfig = require('../../account-config.json');
-} catch (e) {
-  debug(e);
-  throw new Error('Error loading config.json file -- make sure to create one from config.template.json before running');
-}
+const connectionConfig = require('../../account-config.json');
 
 function knexConfigForTenant(accountId) {
   if (!accountId) throw new Error('accountId is required');
@@ -124,7 +116,7 @@ function makeArray(s) {
   if (Array.isArray(obj)) return obj;
   return [obj];
 }
-
+const uuidMatch = /^[0-9,a-f]{8}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{12}$/;
 async function getData(options, databaseWorker) {
   const { table, limit = 100, offset = 0 } = options;
   if (!table) throw new ObjectError({ code: 422, message: 'No table provided' });
@@ -157,10 +149,10 @@ async function getData(options, databaseWorker) {
   }
   // Not positive default to all is a great idea
   if (eqlObject.columns.length === 0)eqlObject.columns = ['*'];
-
   if (options.id) {
-    const id = parseInt(options.id, 10);
-    if (Number.isNaN(id)) throw new Error('Invalid id');
+    let id = parseInt(options.id, 10);
+    if (uuidMatch.test(options.id)) id = `'${options.id}'`;
+    else if (Number.isNaN(id)) throw new Error('Invalid id');
     eqlObject.conditions = (eqlObject.conditions || []).concat({ eql: `id=${id}` });
     eqlObject.limit = 0;
     delete eqlObject.offset;
@@ -188,7 +180,7 @@ async function getData(options, databaseWorker) {
     throw new ObjectError({ status: 422, message: 'Invalid SQL was generated.' });
   }
   // If there's no includes, just return the data
-  if (!options.includes) return { data };
+  if (!options.include) return { data };
 
   let includeOption = null;
   try {
@@ -295,6 +287,20 @@ router.get([
 });
 
 router.post([
+  '/message/:message_id',
+  '/message'], async (req, res) => {
+  try {
+    const { body } = req;
+    if (req.params?.message_id) body.id = req.params?.message_id;
+    const r = await req.databaseWorker.upsertMessage(body);
+    return res.json(r);
+  } catch (e) {
+    debug('Error handling request:', e, e.code, e.message);
+    return res.status(e.status || 500).json({ errors: [{ message: e.message || 'Error with request' }] });
+  }
+});
+
+router.post([
   '/tables/:table/:id',
   '/tables/:table'], async (req, res) => {
   try {
@@ -303,9 +309,10 @@ router.post([
     let id = req.params?.id;
     const { body } = req;
     if (id) {
-      await req.databaseWorker.knex.table(table).where({ id }).update(body);
+      body.id = id;
+      await req.databaseWorker.updateOne({ table, data: body });
     } else {
-      const response = await req.databaseWorker.knex.table(table).insert(body);
+      const response = await req.databaseWorker.insertOne({ table, data: body });
 
       [id] = response;
     }

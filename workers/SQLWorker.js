@@ -5,10 +5,13 @@ const debug = require('debug')('SQLWorker');
 const debugMore = require('debug')('debug:SQLWorker');
 
 const Knex = require('knex');
+const { getUUIDv7 } = require('@engine9/packet-tools');
 const { Readable } = require('stream');
 const through2 = require('through2');
-const JSON5 = require('json5');// Useful for parsing extended JSON
-const { bool, toCharCodes, parseRegExp } = require('../utilities');
+const JSON5 = require('json5');
+const {
+  bool, toCharCodes, parseRegExp, parseJSON5,
+} = require('../utilities');
 const SQLTypes = require('./SQLTypes');
 
 const BaseWorker = require('./BaseWorker');
@@ -272,6 +275,70 @@ Worker.prototype.stream.metadata = {
   options: {
     sql: { required: true },
   },
+};
+
+Worker.prototype.insertOne = async function ({ table, data }) {
+  const knex = await this.connect();
+  return knex.table(table).insert(data);
+};
+
+Worker.prototype.upsertMessage = async function (opts) {
+  if (opts.message_id !== undefined) throw new Error('upsert message should have an id, not a message_id');
+  const knexTransaction = await this.connect();
+  return knexTransaction.transaction(async (knex) => {
+    const desc = await this.describe({ table: 'message' });
+    const message = desc.columns.reduce((a, b) => {
+      if (opts[b.name] !== undefined)a[b.name] = opts[b.name];
+      return a;
+    }, {});
+    let message_id = message.id;
+    if (!message_id) {
+      message_id = getUUIDv7(opts.publish_date || undefined);
+      message.id = message_id;
+      await knex.table('message').insert(message);
+    } else {
+      await knex.table('message').where({ id: message_id }).update(message);
+    }
+    debug(`Finished upserting message id ${message_id}`);
+    const descContent = await this.describe({ table: 'message_content' });
+    const messageContent = descContent.columns.reduce((a, b) => {
+      if (opts[b.name] !== undefined)a[b.name] = opts[b.name];
+      return a;
+    }, {});
+    if (Object.keys(messageContent).length === 0) return { id: message_id };
+    const r = await knex.table('message_content')
+      .select('id')
+      .where({ message_id });
+    if (messageContent.content) messageContent.content = parseJSON5(messageContent.content);
+    if (messageContent.remote_data) {
+      messageContent.remote_data = parseJSON5(messageContent.remote_data);
+    }
+    if (r.length === 0) {
+      messageContent.message_id = message_id;
+      await knex.table('message_content').insert(messageContent);
+    } else {
+      await knex.table('message_content').where({ id: r[0].id }).update(messageContent);
+    }
+
+    return { id: message_id };
+  });
+};
+Worker.prototype.upsertMessage.metadata = {
+  options: {
+    id: {},
+    name: {},
+    channel: {},
+    subject: {},
+    content: {},
+    remote_data: {},
+  },
+};
+
+Worker.prototype.updateOne = async function ({
+  table, id, data,
+}) {
+  const knex = await this.connect();
+  knex.table(table).where({ id }).update(data);
 };
 
 Worker.prototype.stringToType = function (_v, _t, length, nullable, nullAsString) {

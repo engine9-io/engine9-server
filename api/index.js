@@ -26,6 +26,14 @@ if (isDevelopment) app.set('json spaces', 2); // number of spaces for indentatio
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const data = require('./object/data');
+
+try {
+  // eslint-disable-next-line global-require
+  require('../account-config.json');
+} catch (e) {
+  throw new Error('Error loading account-config.json file -- make sure to create one from account-config.template.json before running');
+}
+
 const ui = require('./object/ui.console.config');
 const { addUserToRequest } = require('./object/permissions');
 const packetServer = require('./packet-server/index');
