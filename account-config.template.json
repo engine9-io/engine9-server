@@ -1,6 +1,7 @@
 {
     "accounts":{
         "engine9":{
+            "name":"Engine9 Default",
             "packet_repository":"s3://<s3bucket>/<prefix>",
             "auth":{
                 "database_connection":"mysql://engine9:engine9@localhost/engine9"

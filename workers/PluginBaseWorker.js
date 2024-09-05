@@ -181,7 +181,7 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
           }
           const sql = `/* ${cleanPath} */ select * from ${this.escapeTable(binding.table)}`
           + ` where ${this.escapeColumn(binding.lookup[0])} in (${[...values].map(() => '?').join(',')})`;
-          const { data } = await this.query(sql, [...values]);
+          const { data } = await this.query({ sql, values: [...values] });
           transformArguments[name] = data;
         } else if (binding.type === 'sql.tables.upsert') {
           transformArguments[name] = tablesToUpsert;

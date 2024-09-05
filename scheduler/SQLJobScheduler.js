@@ -124,12 +124,12 @@ Scheduler.prototype.handleEvent = async function (event) {
     case 'job_kill': {
       this.toManagerQueue.push(event);
       debugJob(`Updating job ${jobId} with status kill_sent`);
-      await this.sqlWorker.query('update job set status=? where id=?', ['kill_sent', jobId]);
+      await this.sqlWorker.query({ sql: 'update job set status=? where id=?', values: ['kill_sent', jobId] });
 
       break;
     }
     case 'job_go': {
-      const job = (await this.sqlWorker.query('select * from job where id=?', [jobId]))?.data?.[0];
+      const job = (await this.sqlWorker.query({ sql: 'select * from job where id=?', values: [jobId] }))?.data?.[0];
       // map to camel case
       Object.entries({
         jobId: 'id',
@@ -140,7 +140,7 @@ Scheduler.prototype.handleEvent = async function (event) {
       job.options = job.options || {};
       if (typeof job.options === 'string')job.options = JSON.parse(job.options);
       debugJob(`Updating job ${jobId} set status=sent_to_queue`);
-      await this.sqlWorker.query('update job set status=? where id=?', ['sent_to_queue', jobId]);
+      await this.sqlWorker.query({ sql: 'update job set status=? where id=?', values: ['sent_to_queue', jobId] });
       this.toManagerQueue.push({ eventType: 'job_start', job });
 
       break;
@@ -148,7 +148,7 @@ Scheduler.prototype.handleEvent = async function (event) {
     /* these return from the manager */
     case 'job_modify':
     {
-      const job = (await this.sqlWorker.query('select * from job where id=?', [jobId]))?.data?.[0];
+      const job = (await this.sqlWorker.query({ sql: 'select * from job where id=?', values: [jobId] }))?.data?.[0];
 
       const fields = []; const values = [];
 
@@ -178,12 +178,12 @@ Scheduler.prototype.handleEvent = async function (event) {
 
       values.push(jobId);
       debugJob(`job_modify: Updating job ${jobId} with ${fields.map((f, i) => f.slice(0, -1) + values[i])}`);
-      await this.sqlWorker.query(`update job set ${fields.join(',')} where id=?`, values);
+      await this.sqlWorker.query({ sql: `update job set ${fields.join(',')} where id=?`, values });
       break;
     }
     case 'job_error':
     {
-      const job = (await this.sqlWorker.query('select * from job where id=?', [jobId]))?.data?.[0];
+      const job = (await this.sqlWorker.query({ sql: 'select * from job where id=?', values: [jobId] }))?.data?.[0];
 
       const newJob = event.job || event;
       let { error } = newJob;
@@ -245,7 +245,7 @@ Scheduler.prototype.handleEvent = async function (event) {
         }
       }
       debugJob(`After error #${errors.length}, updating job ${jobId} to status ${status}, starting after ${startAfter ? dayjs(startAfter).format('HH:mm:ss') : 'now'},error=`, String(err.message || err).split('\n')[0]);
-      await this.sqlWorker.query('update job set status=?,errors=?,progress=?,start_after=? where id=?', [status, JSON.stringify(errors, null, 4), null, startAfter, jobId]);
+      await this.sqlWorker.query({ sql: 'update job set status=?,errors=?,progress=?,start_after=? where id=?', values: [status, JSON.stringify(errors, null, 4), null, startAfter, jobId] });
       break;
     }
     case 'job_complete': {
@@ -275,7 +275,7 @@ Scheduler.prototype.handleEvent = async function (event) {
 
       values.push(jobId);
       debugJob(`job_complete: Updating job ${jobId} with ${fields.map((f, i) => f.slice(0, -1) + values[i])}`);
-      await this.sqlWorker.query(`update job set ${fields.join(',')} where id=?`, values);
+      await this.sqlWorker.query({ sql: `update job set ${fields.join(',')} where id=?`, values });
 
       break;
     }

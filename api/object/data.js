@@ -268,6 +268,8 @@ async function getData(options, databaseWorker) {
 router.get([
   '/tables/:table/:id',
   '/tables/:table'], async (req, res) => {
+  const start = new Date().getTime();
+  console.log('Starting get data');
   try {
     const table = req.params?.table;
     if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
@@ -278,7 +280,7 @@ router.get([
     if (req.query.schema === 'true') {
       output.schema = await req.databaseWorker.describe({ table: req.params.table });
     }
-
+    console.log(`Returning in ${new Date().getTime() - start}`);
     return res.json(output);
   } catch (e) {
     debug('Error handling request:', e, e.code, e.message);

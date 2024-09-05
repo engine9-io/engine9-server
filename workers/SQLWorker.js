@@ -71,16 +71,16 @@ Worker.prototype.ok.metadata = {
 };
 // values can be undefined or null,
 // implying we don't want to use any bindings -- may have already been bound
-Worker.prototype.query = async function (_sql, values) {
-  let sql = _sql;
-  if (typeof _sql !== 'string') sql = _sql.sql;
+Worker.prototype.query = async function (options) {
+  let sql = options;
+  if (typeof options !== 'string') sql = options.sql;
   if (!sql) throw new Error('No sql provided');
   try {
     const knex = await this.connect();
-    const [data, columns] = await knex.raw(sql, values);
+    const [data, columns] = await knex.raw(sql, options.values);
     return { data, columns };
   } catch (e) {
-    info('Error running query:', { _sql, values }, e);
+    info('Error running query:', options, e);
     throw e;
   }
 };
@@ -106,7 +106,7 @@ Worker.prototype.tables = async function f(options = {}) {
     sql += " and table_type='BASE TABLE'";
   }
 
-  let d = await this.query(sql, values);
+  let d = await this.query({ sql, values });
   d = d.data.map((t) => t.TABLE_NAME || t.table_name);
   d.sort((a, b) => (a < b ? -1 : 1));
 
