@@ -186,7 +186,7 @@ async function getData(options, databaseWorker) {
   try {
     includeOption = JSON5.parse(options.include);
   } catch (e) {
-    debug(e);
+    debug(options.include, e);
     throw new ObjectError({ status: 422, message: 'Invalid JSON5 for includes' });
   }
   if (Array.isArray(includeOption)) {
@@ -204,7 +204,7 @@ async function getData(options, databaseWorker) {
     }).filter(Boolean);
   }
   const dataLookup = {};
-  data.forEach((d) => { dataLookup[parseInt(d.id, 10)] = d; });
+  data.forEach((d) => { dataLookup[d.id] = d; });
   const allIds = data.map((d) => {
     if (Number.isNaN(d.id)) {
       throw new ObjectError({
@@ -223,7 +223,11 @@ async function getData(options, databaseWorker) {
     inc.conditions = makeArray(inc.conditions);
     inc.foreign_id_field = inc.foreign_id_field || `${table}_id`;
     inc.conditions.push({
-      eql: `${inc.foreign_id_field} in (${allIds.map((id) => `${id}`).join(',')})`,
+      eql: `${inc.foreign_id_field} in (${allIds.map((id) => {
+        if (uuidMatch.test(id)) return `'${options.id}'`;
+        if (Number.isNaN(id)) throw new Error('Invalid id');
+        return `${id}`;
+      }).join(',')})`,
     });
     inc.limit = allIds.length * 25; // limit to 25x the number of records
 
@@ -247,14 +251,21 @@ async function getData(options, databaseWorker) {
   let includes = [];
   includeData.forEach((includeResults, i) => {
     const inc = cleanedIncludes[i];
-    includes = includes.concat(includeResults.map((r) => {
+    includes = includes.concat(includeResults.data.map((r) => {
       if (!inc.foreign_id_field) {
         throw new ObjectError('no foreign_id_field');
       }
-      const referenceId = r[inc.foreign_id_field];
+      const referenceId = r.attributes[inc.foreign_id_field];
+      if (referenceId === undefined) {
+        throw new Error(`Could not find id field ${inc.foreign_id_field} in included result object:${JSON.stringify(r)}`);
+      }
+      if (!dataLookup[referenceId]) {
+        console.error(`Could not find referenceId ${referenceId} from field ${inc.foreign_id_field} in lookup ids of length:${Object.keys(dataLookup).length}`, ' sample:', Object.keys(dataLookup).slice(0, 30));
+        throw new Error(`Error merging includes:, could not find referenceId ${referenceId} from field ${inc.foreign_id_field}`);
+      }
       dataLookup[referenceId][inc.property] = dataLookup[referenceId][inc.property] || { data: [] };
       dataLookup[referenceId][inc.property].push({ type: inc.table, id: r.id });
-      const { id, ...attributes } = r;
+      const { id, attributes } = r;
       return {
         type: inc.table,
         id,

@@ -302,22 +302,25 @@ Worker.prototype.upsertMessage = async function (opts) {
     debug(`Finished upserting message id ${message_id}`);
     const descContent = await this.describe({ table: 'message_content' });
     const messageContent = descContent.columns.reduce((a, b) => {
+      if (b.name === 'id') return a;// don't assign ids
       if (opts[b.name] !== undefined)a[b.name] = opts[b.name];
       return a;
     }, {});
     if (Object.keys(messageContent).length === 0) return { id: message_id };
-    const r = await knex.table('message_content')
+    const existingMessageContentRecord = await knex.table('message_content')
       .select('id')
       .where({ message_id });
-    if (messageContent.content) messageContent.content = parseJSON5(messageContent.content);
-    if (messageContent.remote_data) {
-      messageContent.remote_data = parseJSON5(messageContent.remote_data);
+    if (messageContent.content) {
+      messageContent.content = JSON.stringify(parseJSON5(messageContent.content));
     }
-    if (r.length === 0) {
+    if (messageContent.remote_data) {
+      messageContent.remote_data = JSON.stringify(parseJSON5(messageContent.remote_data));
+    }
+    if (existingMessageContentRecord.length === 0) {
       messageContent.message_id = message_id;
       await knex.table('message_content').insert(messageContent);
     } else {
-      await knex.table('message_content').where({ id: r[0].id }).update(messageContent);
+      await knex.table('message_content').where({ id: existingMessageContentRecord[0].id }).update(messageContent);
     }
 
     return { id: message_id };
