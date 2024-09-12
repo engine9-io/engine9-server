@@ -24,6 +24,19 @@ const { relativeDate } = require('../utilities');
 function Scheduler(opts) {
   this.opts = opts;
 }
+Scheduler.prototype.initSQLWorker = function () {
+  if (this.sqlWorker) return this.sqlWorker;
+  try {
+    const runner = new WorkerRunner();
+    const env = runner.getWorkerEnvironment({ accountId: process.env.SCHEDULER_JOB_ACCOUNT_ID || this.opts.accountId || 'engine9' });
+    this.sqlWorker = new SQLWorker(env);
+    return this.sqlWorker;
+  } catch (e) {
+    debugError(e);
+    throw new Error('Could not set up the Scheduler environment and database connection');
+  }
+};
+
 Scheduler.prototype.init = async function () {
   const scheduler = this;
 
@@ -62,14 +75,7 @@ Scheduler.prototype.init = async function () {
     },
   });
 
-  try {
-    const runner = new WorkerRunner();
-    const env = runner.getWorkerEnvironment({ accountId: process.env.SCHEDULER_JOB_ACCOUNT_ID || 'engine9' });
-    this.sqlWorker = new SQLWorker(env);
-  } catch (e) {
-    debugError(e);
-    throw new Error('Could not set up the Scheduler environment and database connection');
-  }
+  this.initSQLWorker();
 
   this.toSchedulerQueue.on.push.subscribe({
     consumer: ({ items }) => {

@@ -75,7 +75,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
       schema = JSON5.parse(content);
     } catch (error) {
       debug(content);
-      throw new Error(`Invalid content at ${_schema}, ${error.message}`);
+      throw new Error(`Error attempting to parse schema file at ${_schema}, ${error.message}`);
     }
   }
   // Create a deep copy, but clear out any functions, etc, those will need to be

@@ -9,6 +9,7 @@ const { getUUIDv7 } = require('@engine9/packet-tools');
 const { Readable } = require('stream');
 const through2 = require('through2');
 const JSON5 = require('json5');
+const config = require('../account-config.json');
 const {
   bool, toCharCodes, parseRegExp, parseJSON5,
 } = require('../utilities');
@@ -24,10 +25,14 @@ function Worker(worker) {
   if (!this.accountId) throw new Error('No accountId provided to SQLWorker constructor');
   if (worker.knex) {
     this.knex = worker.knex;
-  } else {
+  } else if (worker.auth) {
     this.auth = {
       ...worker.auth,
     };
+  } else {
+    debug(`Getting auth from account-config.json for account ${worker.accountId}`);
+    this.auth = config.accounts?.[worker.accountId]?.auth;
+    if (!this.auth) throw new Error(`No authorization available for accountId:${worker.accountId}`);
   }
 }
 
@@ -50,16 +55,16 @@ Worker.prototype.connect = async function connect() {
   const { accountId } = this;
   if (!accountId) throw new Error('accountId is required for connect method');
 
-  let config = null;
+  let authConfig = null;
   const s = this.auth.database_connection;
-  if (!s) throw new Error(`SQLWorker Could not find database_connection settings in auth configuration for account ${accountId} with keys ${Object.keys(this.auth)}`);
+  if (!s) throw new Error(`SQLWorker Could not find database_connection settings in auth configuration for account ${accountId} with keys: ${Object.keys(this.auth)}`);
 
-  config = {
+  authConfig = {
     client: 'mysql2',
     connection: s,
   };
 
-  this.knex = Knex(config);
+  this.knex = Knex(authConfig);
   return this.knex;
 };
 Worker.prototype.ok = async function f() {
@@ -266,7 +271,7 @@ Worker.prototype.getSupportedSQLFunctions = function () {
   return SQLTypes.mysql.supportedFunctions();
 };
 
-Worker.prototype.stream = async function describe({ sql }) {
+Worker.prototype.stream = async function ({ sql }) {
   const knex = await this.connect();
   return knex.raw(sql).stream();
 };
@@ -274,6 +279,20 @@ Worker.prototype.stream = async function describe({ sql }) {
 Worker.prototype.stream.metadata = {
   options: {
     sql: { required: true },
+  },
+};
+
+Worker.prototype.insertFromQuery = async function (options) {
+  const knex = await this.connect();
+  const stream = await knex.raw(options.sql).stream();
+  return this.insertFromStream({ ...options, stream });
+};
+
+Worker.prototype.insertFromQuery.metadata = {
+  options: {
+    sql: { required: true },
+    table: { required: true },
+    upsert: {},
   },
 };
 
@@ -577,7 +596,7 @@ Worker.prototype.buildInsertSql = function (options) {
     knex, table, columns, rows, upsert = false, ignoreDupes = false, returning = [],
   } = options;
 
-  if (columns.length === 0) throw new Error('no columns set before createInsert was called');
+  if (columns.length === 0) throw new Error(`no columns provided for table ${table} before createInsert was called`);
   let sql = 'INSERT';
   if (bool(ignoreDupes, false)) {
     sql += ' ignore ';
@@ -616,6 +635,7 @@ Worker.prototype.insertFromStream = async function (options) {
     }
 
     const nullAsString = bool(options.nullAsString, false);
+    const upsert = bool(options.upsert, false);
 
     let defaults = options.defaults || {};
     if (typeof defaults === 'string') defaults = JSON5.parse(defaults);
@@ -658,7 +678,7 @@ Worker.prototype.insertFromStream = async function (options) {
         o[k.trim()] = o[k];// Sometimes leading blanks are an issue
       });
       if (sqlCounter === 1) {
-        debug('Insert from stream to table ', table, desc.columns.map((d) => d.name)?.join(','));
+        debug('Insert from stream to table', table, desc.columns.map((d) => d.name)?.join(','), { upsert });
       }
       if (columns == null) {
         const includedObjectColumns = getIncludedObjectColumns(o);
@@ -699,7 +719,7 @@ Worker.prototype.insertFromStream = async function (options) {
         if (rows.length > 0) {
           try {
             const sql = worker.buildInsertSql({
-              knex, table, columns, rows,
+              knex, table, columns, rows, upsert,
             });
             if ((counter % 50000 === 0) || (counter < 1000 && counter % 200 === 0)) debug(`Inserting ${rows.length} rows, Total:${counter}`);
 
@@ -733,7 +753,7 @@ Worker.prototype.insertFromStream = async function (options) {
       if (rows.length > 0) {
         try {
           const complete = worker.buildInsertSql({
-            knex, table, columns, rows,
+            knex, table, columns, rows, upsert,
           });
           this.push(complete);
         } catch (e) {
@@ -758,7 +778,7 @@ Worker.prototype.insertFromStream = async function (options) {
           reject(hasError);
           return;
         }
-        resolve(null, {
+        resolve({
           table: options.table,
           records: counter,
         });
@@ -781,6 +801,7 @@ Worker.prototype.insertFromStream.metadata = {
 /* Standard tables have an id field that is used to */
 Worker.prototype.upsertArray = async function ({ table, array }) {
   if (!Array.isArray(array)) throw new Error('an array is required to upsert');
+  debug('arr:', { array });
   if (array.length === 0) return [];
 
   const desc = await this.describe({ table });
@@ -795,6 +816,10 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
     .filter((f) => f.name.indexOf('_hidden_') !== 0)
     .filter((f) => ignore.indexOf(f.name) < 0)
     .filter((f) => array[0][f.name] !== undefined);
+  if (includedColumns.length === 0) {
+    debug('Table columns:', desc.columns.map((d) => d.name).join(), 'data columns:', Object.keys(array[0]).join(','));
+    throw new Error('The incoming data does not have any attributes that match column names');
+  }
 
   const rows = array.map((o) => {
     const values = includedColumns.map((def) => {

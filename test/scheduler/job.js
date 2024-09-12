@@ -7,19 +7,19 @@ const {
 
 const debug = require('debug')('insert.test.js');
 const assert = require('node:assert');
-const config = require('../../account-config.json');
+
 const { rebuildDB, truncateDB } = require('./db_setup');
 const Scheduler = require('../../scheduler/SQLJobScheduler');
 
 describe('Schedule and run jobs', async () => {
   const accountId = 'test';
-  const opts = { accountId, ...config.accounts.test };
+  const opts = { accountId };
   const scheduler = new Scheduler(opts);
-  scheduler.init();
+  await scheduler.init();
 
   before(async () => {
     const { data: [{ database }] } = await scheduler.sqlWorker.query('select database() as database');
-    assert.equal(database, 'test', 'Not in the correct test database');
+    assert.equal(database, 'test', `Not in the correct test database, in ${database}`);
     if (process.argv.indexOf('rebuild') >= 0) {
       await rebuildDB(opts);
     } else {
@@ -31,17 +31,14 @@ describe('Schedule and run jobs', async () => {
     await scheduler.sqlWorker.knex.destroy();
   });
   it('should insert an echo job and receive a result', async () => {
-    await scheduler.sqlWorker.insertFromStream({
-      table: 'job',
-      stream: [
-        {
-          account_id: 'test',
-          worker_path: 'EchoWorker',
-          worker_method: 'echo',
-          options: JSON.stringify({ foo: 'bar' }),
-        },
-      ],
-    });
+    await scheduler.addJob(
+      {
+        account_id: 'test',
+        worker_path: 'EchoWorker',
+        worker_method: 'echo',
+        options: JSON.stringify({ foo: 'bar' }),
+      },
+    );
     const { data: [{ records }] } = await scheduler.sqlWorker.query('select count(*) as records from job where status=\'pending\'');
     assert.equal(records, 1, 'No matching records in job');
     await scheduler.poll({ repeatMilliseconds: false });

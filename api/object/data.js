@@ -232,14 +232,17 @@ async function getData(options, databaseWorker) {
     inc.limit = allIds.length * 25; // limit to 25x the number of records
 
     // prefill empty data
-    data.forEach((d) => { d[inc.property] = []; });
+    data.forEach((d) => {
+      d.relationships = d.relationships || {};
+      d.relationships[inc.property] = [];
+    });
     return inc;
   });
   /*
     Here we've validated the includes, but don't bother running them
   as there's no primary data */
   if (allIds.length === 0) {
-    return data;
+    return { data };
   }
 
   const includeData = await Promise.all(
@@ -255,16 +258,16 @@ async function getData(options, databaseWorker) {
       if (!inc.foreign_id_field) {
         throw new ObjectError('no foreign_id_field');
       }
-      const referenceId = r.attributes[inc.foreign_id_field];
-      if (referenceId === undefined) {
+      const relId = r.attributes[inc.foreign_id_field];
+      if (relId === undefined) {
         throw new Error(`Could not find id field ${inc.foreign_id_field} in included result object:${JSON.stringify(r)}`);
       }
-      if (!dataLookup[referenceId]) {
-        console.error(`Could not find referenceId ${referenceId} from field ${inc.foreign_id_field} in lookup ids of length:${Object.keys(dataLookup).length}`, ' sample:', Object.keys(dataLookup).slice(0, 30));
-        throw new Error(`Error merging includes:, could not find referenceId ${referenceId} from field ${inc.foreign_id_field}`);
+      if (!dataLookup[relId]) {
+        console.error(`Could not find referenceId ${relId} from field ${inc.foreign_id_field} in lookup ids of length:${Object.keys(dataLookup).length}`, ' sample:', Object.keys(dataLookup).slice(0, 30));
+        throw new Error(`Error merging includes:, could not find referenceId ${relId} from field ${inc.foreign_id_field}`);
       }
-      dataLookup[referenceId][inc.property] = dataLookup[referenceId][inc.property] || { data: [] };
-      dataLookup[referenceId][inc.property].push({ type: inc.table, id: r.id });
+
+      dataLookup[relId].relationships[inc.property].push({ type: inc.table, id: r.id });
       const { id, attributes } = r;
       return {
         type: inc.table,
@@ -280,7 +283,7 @@ router.get([
   '/tables/:table/:id',
   '/tables/:table'], async (req, res) => {
   const start = new Date().getTime();
-  console.log('Starting get data');
+
   try {
     const table = req.params?.table;
     if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
@@ -312,7 +315,6 @@ router.post([
     return res.status(e.status || 500).json({ errors: [{ message: e.message || 'Error with request' }] });
   }
 });
-
 router.post([
   '/tables/:table/:id',
   '/tables/:table'], async (req, res) => {
@@ -321,6 +323,7 @@ router.post([
     if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
     let id = req.params?.id;
     const { body } = req;
+    body.accountId = req.accountId;
     if (id) {
       body.id = id;
       await req.databaseWorker.updateOne({ table, data: body });

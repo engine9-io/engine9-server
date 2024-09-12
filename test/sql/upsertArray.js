@@ -29,7 +29,7 @@ describe('Upsert ids', async () => {
   });
   it('should be assigned and returned', async () => {
     const array = [
-      { sample: 'value1' },
+      { id: 1, sample: 'value1' },
       { sample: 'value2' },
     ];
     await sqlWorker.upsertArray({ table, array });
