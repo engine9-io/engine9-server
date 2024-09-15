@@ -253,7 +253,7 @@ Worker.prototype.describe = async function describe(opts) {
     try {
       return SQLTypes.mysql.dialectToStandard(o, {} || Worker.defaultColumn);
     } catch (e) {
-      info(`Error describing ${table}:`);
+      info(`Error while describing table ${table}`);
       throw e;
     }
   });
@@ -262,6 +262,43 @@ Worker.prototype.describe = async function describe(opts) {
 };
 
 Worker.prototype.describe.metadata = {
+  options: {
+    table: { required: true },
+  },
+};
+
+Worker.prototype.getTypeQuery = function (table) {
+  return `SELECT TABLE_TYPE as type FROM information_schema.tables where table_schema = Database() AND table_name = ${this.escapeValue(table)}`;
+};
+
+Worker.prototype.tableType = async function (options) {
+  const sql = this.getTypeQuery(options.table);
+  const { data } = await this.query(sql);
+
+  if (!data[0]) {
+    debug({ sql, data });
+    const error = new Error(`tableType: Could not find type of table ${options.table}`);
+    error.does_not_exist = true;
+    throw error;
+  }
+
+  let t = null;
+  const test = data[0].type || data[0].TYPE;
+
+  switch (test) {
+    case 'BASE TABLE':
+    case 'TABLE':
+      t = 'table'; break;
+    case 'VIEW':
+      t = 'view'; break;
+    default:
+      throw new Error(`tableType does not recognize type ${test}`);
+  }
+
+  return t;
+};
+
+Worker.prototype.tableType.metadata = {
   options: {
     table: { required: true },
   },
