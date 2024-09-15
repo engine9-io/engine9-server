@@ -210,7 +210,7 @@ Worker.prototype.deploy = async function (opts) {
   if (tables.length === 0) return { no_changes: true };
   const { prefix = '' } = opts;
   debug(`Deploying ${tables.length} tables, including`, JSON.stringify(tables[0], null, 4));
-  await Promise.all(
+  const output = await Promise.all(
     tables.map(async ({
       table, differences, columns = [], indexes = [],
     }) => {
@@ -223,7 +223,7 @@ Worker.prototype.deploy = async function (opts) {
           }
           if (columns.length > 0 || indexes.length > 0) {
             const type = await this.tableType({ table: prefix + table });
-            if (type === 'view') return { table: `FOO${table}`, difference, did_nothing_because_view: true };
+            if (type === 'view') return { table, difference, did_nothing_because_view: true };
             debug(`Altering table ${prefix}${table} with difference ${difference}`);
             return this.alterTable({ table: prefix + table, columns, indexes });
           }
@@ -234,7 +234,7 @@ Worker.prototype.deploy = async function (opts) {
     }),
   );
 
-  return { tables };
+  return { tables: output };
 };
 Worker.prototype.deploy.metadata = {
   options: {
