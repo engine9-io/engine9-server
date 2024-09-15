@@ -223,7 +223,7 @@ Worker.prototype.deploy = async function (opts) {
           }
           if (columns.length > 0 || indexes.length > 0) {
             const type = await this.tableType({ table: prefix + table });
-            if (type === 'view') return { table, difference, did_nothing_because_view: true };
+            if (type === 'view') return { table: `FOO${table}`, difference, did_nothing_because_view: true };
             debug(`Altering table ${prefix}${table} with difference ${difference}`);
             return this.alterTable({ table: prefix + table, columns, indexes });
           }
