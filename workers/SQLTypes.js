@@ -55,7 +55,7 @@ const mysqlTypes = [
     type: 'currency', column_type: 'decimal(19,2)', knex_method: 'decimal', knex_args: [19, 2],
   },
   {
-    type: 'decimal', column_type: 'decimal(19,4)', knex_method: 'decimal', knex_args: (() => ([19, 4])),
+    type: 'decimal', column_type: 'decimal', knex_method: 'decimal', knex_args: (() => ([19, 4])),
   },
   { type: 'double', column_type: 'double', knex_method: 'double' },
   {
@@ -95,6 +95,7 @@ const mysqlTypes = [
   },
   { type: 'date', column_type: 'date', knex_method: 'date' },
   { type: 'datetime', column_type: 'datetime', knex_method: 'datetime' },
+  { type: 'timestamp', column_type: 'timestamp', knex_method: 'timestamp' },
   { type: 'time', column_type: 'time', knex_method: 'time' },
   {
     type: 'enum',
@@ -199,6 +200,9 @@ module.exports = {
       }
       if (input.column_type.indexOf('int') === 0) {
         input.column_type = 'int';
+      }
+      if (input.column_type.indexOf('decimal') === 0) {
+        input.column_type = 'decimal';
       }
       const log = [];
       const typeDef = mysqlTypes.find(

@@ -323,11 +323,14 @@ router.post([
     if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
     let id = req.params?.id;
     const { body } = req;
-    body.accountId = req.accountId;
+    // no need to add accountId here, it's used in the connection to the correct database
+    // body.accountId = req.accountId;
     if (id) {
       body.id = id;
-      await req.databaseWorker.updateOne({ table, data: body });
+      debug('Updating ', { table, id, data: body });
+      await req.databaseWorker.updateOne({ table, id, data: body });
     } else {
+      debug('Inserting', { table, data: body });
       const response = await req.databaseWorker.insertOne({ table, data: body });
 
       [id] = response;

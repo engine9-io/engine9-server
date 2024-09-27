@@ -396,8 +396,10 @@ Worker.prototype.upsertMessage.metadata = {
 Worker.prototype.updateOne = async function ({
   table, id, data,
 }) {
+  if (!id) throw new Error('No id to update');
   const knex = await this.connect();
-  knex.table(table).where({ id }).update(data);
+  await knex.table(table).where({ id }).update(data);
+  return { id };
 };
 
 Worker.prototype.stringToType = function (_v, _t, length, nullable, nullAsString) {
