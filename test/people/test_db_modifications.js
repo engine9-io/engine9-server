@@ -15,6 +15,7 @@ async function rebuildDB(opts) {
   ];
   debug('Deploying schemas');
   await Promise.all(schemas.map((s) => schemaWorker.deploy(s)));
+  debug('Deployed all schemas');
   schemaWorker.destroy();
 }
 async function truncateDB(opts) {

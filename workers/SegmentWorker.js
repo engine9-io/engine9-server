@@ -1,5 +1,5 @@
 const util = require('util');
-// const debug = require('debug')('QueryWorker');
+// const debug = require('debug')('SegmentWorker');
 // const debugMore = require('debug')('debug:SQLWorker');
 
 const JSON5 = require('json5');// Useful for parsing extended JSON
@@ -11,7 +11,7 @@ require('dotenv').config({ path: '.env' });
 function Worker(worker) {
   SQLWorker.call(this, worker);
   this.accountId = worker.accountId;
-  if (!this.accountId) throw new Error('No accountId provided to QueryWorker constructor');
+  if (!this.accountId) throw new Error('No accountId provided to SegmentWorker constructor');
   if (worker.knex) {
     this.knex = worker.knex;
   } else {
@@ -93,9 +93,11 @@ Worker.prototype.buildRule = function (rule) {
     return `${rule.not ? ' NOT ' : ''}(${rule.rules
       .map((r) => this.buildRule(r))
       .join(rule.combinator === 'or' ? ' OR ' : ' AND ')})`;
+  } if (rule.field) {
+    return this.escapeColumn(rule.field)
+      + this.getOperation(rule.operator, rule.valueSource, rule.value);
   }
-  return this.escapeColumn(rule.field)
-    + this.getOperation(rule.operator, rule.valueSource, rule.value);
+  return '1=1';// placeholder truthy check
 };
 
 Worker.prototype.build = async function (queryProp) {
@@ -108,6 +110,31 @@ Worker.prototype.build = async function (queryProp) {
 };
 
 Worker.prototype.build.metadata = {
+  options: {
+    query: {},
+  },
+};
+
+Worker.prototype.count = async function (queryProp) {
+  const whereClause = await this.build(queryProp);
+  const sql = `select count(*) as records from person WHERE ${whereClause}`;
+  const { data } = await this.query(sql);
+  return { data };
+};
+
+Worker.prototype.count.metadata = {
+  options: {
+    query: {},
+  },
+};
+Worker.prototype.sample = async function (queryProp) {
+  const whereClause = await this.build(queryProp);
+  const sql = `select id from person WHERE ${whereClause} order by id limit 10`;
+  const { data } = await this.query(sql);
+  return { data };
+};
+
+Worker.prototype.count.metadata = {
   options: {
     query: {},
   },

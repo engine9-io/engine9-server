@@ -410,7 +410,6 @@ router.get('/query/fields', async (req, res) => {
         ],
       },
       { name: 'height', label: 'Height' },
-      { name: 'job', label: 'Job' },
       { name: 'description', label: 'Description', valueEditorType: 'textarea' },
       { name: 'birthdate', label: 'Birth Date', inputType: 'date' },
       { name: 'datetime', label: 'Show Time', inputType: 'datetime-local' },
