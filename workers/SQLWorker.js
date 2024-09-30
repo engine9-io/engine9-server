@@ -211,8 +211,9 @@ Worker.prototype.describe = async function describe(opts) {
   if (!table) throw new Error(`No table provided to describe with opts ${Object.keys(opts)}`);
   debug(`Describing ${table}`);
   const sql = `select database() as DB,COLUMN_NAME,COLUMN_TYPE,DATA_TYPE,IS_NULLABLE,COLUMN_DEFAULT,CHARACTER_MAXIMUM_LENGTH,EXTRA FROM information_schema.columns WHERE  table_schema = Database() AND table_name = '${this.escapeTable(table)}' order by ORDINAL_POSITION`;
-
-  const cols = (await this.query(sql)).data;
+  const r = await this.query(sql);
+  debug(sql, r);
+  const cols = r.data;
   if (cols.length === 0) throw new Error(`Could not find table ${table}`, { cause: 'DOES_NOT_EXIST' });
   // databases return back arbitrary capitalization from information_schema
   cols.forEach((c) => { Object.keys(c).forEach((k) => { c[k.toUpperCase()] = c[k]; }); });
