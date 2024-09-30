@@ -88,8 +88,12 @@ router.use((req, res, next) => {
 });
 
 router.use((req, res, next) => {
-  req.databaseWorker = getSQLWorkerForRequest(req);
-  next();
+  try {
+    req.databaseWorker = getSQLWorkerForRequest(req);
+  } catch (e) {
+    return next(e);
+  }
+  return next();
 });
 
 router.get('/ok', (req, res) => {
