@@ -91,7 +91,7 @@ router.use((req, res, next) => {
   try {
     req.databaseWorker = getSQLWorkerForRequest(req);
   } catch (e) {
-    return next(e);
+    return res.status(401).json({ error: `No connection for account ${this.accountId}` });
   }
   return next();
 });
