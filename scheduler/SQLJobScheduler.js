@@ -22,13 +22,16 @@ const { relativeDate } = require('../utilities');
 */
 
 function Scheduler(opts) {
-  this.opts = opts;
+  this.opts = opts || {};
 }
 Scheduler.prototype.initSQLWorker = function () {
   if (this.sqlWorker) return this.sqlWorker;
   try {
     const runner = new WorkerRunner();
-    const env = runner.getWorkerEnvironment({ accountId: process.env.SCHEDULER_JOB_ACCOUNT_ID || this.opts.accountId || 'engine9' });
+    const accountId = process.env.SCHEDULER_JOB_ACCOUNT_ID || this.opts.accountId || 'engine9';
+    if (!accountId) throw new Error('No env.SCHEDULER_JOB_ACCOUNT_ID, or opts.accountId ');
+    const env = runner.getWorkerEnvironment({ accountId });
+    if (!env) throw new Error(`Could not find configuration for account ${accountId}`);
     this.sqlWorker = new SQLWorker(env);
     return this.sqlWorker;
   } catch (e) {
@@ -84,6 +87,10 @@ Scheduler.prototype.init = async function () {
       });
     },
   });
+};
+
+Scheduler.prototype.addJob = async function (data) {
+  return (await this.sqlWorker.insertOne({ table: 'job', data }))?.data?.[0];
 };
 
 Scheduler.prototype.poll = async function ({ repeatMilliseconds = 2000 } = {}) {

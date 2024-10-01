@@ -17,7 +17,12 @@ async function rebuildDB(opts) {
 async function truncateDB(opts) {
   const schemaWorker = new SchemaWorker(opts);
   debug('Truncating tables');
-  await schemaWorker.truncate({ table: 'job' });
-  schemaWorker.destroy();
+  try {
+    await schemaWorker.truncate({ table: 'job' });
+  } catch (e) {
+    throw new Error('Error truncating test.job, try to rebuild');
+  } finally {
+    schemaWorker.destroy();
+  }
 }
 module.exports = { rebuildDB, truncateDB };

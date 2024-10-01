@@ -189,7 +189,7 @@ Manager.prototype.forkJob = function (_job, callback) {
       `_jobId=${job.jobId}`,
       `_jobLog=${manager.getLogPath(job)}`,
     ];
-    const runnerPath = 'WorkerRunner.js';
+    const runnerPath = `${__dirname}/WorkerRunner.js`;
 
     debug(`Forking job ${job.jobId} ${prefix} ${runnerPath} ${forkParams.join(' ')} ${Object.keys(job.options).map((k) => `--${k}=${JSON.stringify(job.options[k])}`).join(' ')}`);
 
