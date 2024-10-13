@@ -83,7 +83,7 @@ describe('Deploy schemas,upsert people,test segments', async () => {
     const r1 = await segmentWorker.query('select count(*) as records from person');
     const actual = r1?.data?.[0]?.records;
 
-    const r2 = await segmentWorker.count({});
+    const r2 = await segmentWorker.stats({});
     const segment = r2?.data?.[0]?.records;
     assert.equal(actual, segment, `Actual count of ${JSON.stringify(r1?.data)
     } does not equal segment output: ${JSON.stringify(r2?.data)}`);

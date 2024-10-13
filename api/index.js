@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+const http = require('node:http');
 const https = require('node:https');
 const fs = require('node:fs');
 const express = require('express');
@@ -6,6 +8,7 @@ const app = express();
 const cors = require('cors');
 const compression = require('compression');
 const bodyParser = require('body-parser');
+const { Server } = require('socket.io');
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -67,20 +70,43 @@ app.use((err, req, res, next) => {
 
 let port = 443; // default to ssl port
 
+function initSocketIO(httpServer) {
+  if (process.env.USE_WEBSOCKET !== 'true') return;
+  const io = new Server(httpServer, {
+    cors: corsOptions,
+  });
+
+  io.on('connection', (socket) => {
+    // eslint-disable-next-line no-console
+    console.log(`Socket IO connection made from ${socket?.handshake?.address} to ${socket?.handshake?.url}`);
+    socket.emit('hello', 'world');
+    socket.on('ping', (val) => {
+      console.log('received ping:', val);
+      socket.emit('pong', val);
+      setTimeout(() => {
+        socket.emit('pong', `Delayed ${val}`);
+      }, 2000);
+    });
+  });
+}
+
 if (process.env.API_PORT) port = parseInt(process.env.API_PORT, 10);
 if (process.env.SSL_CERT_PATH) {
-  https.createServer({
+  const httpServer = https.createServer({
     key: fs.readFileSync(`${process.env.SSL_CERT_PATH}/key.pem`),
     cert: fs.readFileSync(`${process.env.SSL_CERT_PATH}/cert.pem`),
   }, app).listen(port, (e) => {
     if (e) throw e;
     // eslint-disable-next-line no-console
-    console.log('listening on:', port);
+    console.log('listening securely on:', port);
   });
+  initSocketIO(httpServer);
 } else {
+  const httpServer = http.createServer(app);
+  initSocketIO(httpServer);
   app.listen(port, (e) => {
     if (e) throw e;
     // eslint-disable-next-line no-console
-    console.log('listening on:', port);
+    console.log('listening insecurely on:', port);
   });
 }

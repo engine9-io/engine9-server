@@ -12,6 +12,7 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 const Knex = require('knex');
 
 const SQLWorker = require('../../workers/SQLWorker');
+const SegmentWorker = require('../../workers/SegmentWorker');
 const { ObjectError } = require('../../utilities');
 
 const router = express.Router({ mergeParams: true });
@@ -105,7 +106,7 @@ router.get('/tables/describe/:table', async (req, res) => {
     const desc = await req.databaseWorker.describe({ table: req.params.table });
     return res.json(desc);
   } catch (e) {
-    return res.status(422).json({ error: 'Invalid table' });
+    return res.status(404).json({ error: 'Invalid table' });
   }
 });
 
@@ -123,10 +124,10 @@ function makeArray(s) {
 const uuidMatch = /^[0-9,a-f]{8}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{12}$/;
 async function getData(options, databaseWorker) {
   const { table, limit = 100, offset = 0 } = options;
-  if (!table) throw new ObjectError({ code: 422, message: 'No table provided' });
+  if (!table) throw new ObjectError({ status: 422, message: 'No table provided' });
   // Limit include calls to not beat up the DB
   if (options.includes && !options.id && parseInt(limit, 10) > 100) {
-    throw new ObjectError({ code: 422, message: 'No includes allowed with limits>100.  Please adjust the limit' });
+    throw new ObjectError({ status: 422, message: 'No includes allowed with limits>100.  Please adjust the limit' });
   }
 
   const eqlObject = {
@@ -195,7 +196,7 @@ async function getData(options, databaseWorker) {
   }
   if (Array.isArray(includeOption)) {
     throw new ObjectError({
-      code: 422,
+      status: 422,
       message: 'Invalid include, use an object not an array',
     });
   } else {
@@ -212,7 +213,7 @@ async function getData(options, databaseWorker) {
   const allIds = data.map((d) => {
     if (Number.isNaN(d.id)) {
       throw new ObjectError({
-        code: 422,
+        status: 422,
         message: `An id that was not a number was returned:${d.id}`,
       });
     }
@@ -290,7 +291,7 @@ router.get([
 
   try {
     const table = req.params?.table;
-    if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
+    if (!table) throw new ObjectError({ status: 422, message: 'No table provided in the uri' });
 
     const output = await getData({
       table, id: req.params?.id, ...req.query,
@@ -299,6 +300,20 @@ router.get([
       output.schema = await req.databaseWorker.describe({ table: req.params.table });
     }
     console.log(`Returning in ${new Date().getTime() - start}`);
+    return res.json(output);
+  } catch (e) {
+    debug('Error handling request:', e, e.code, e.message);
+    return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
+  }
+});
+
+router.get('/segment/:id/stats', async (req, res) => {
+  try {
+    const segmentWorker = new SegmentWorker(req.databaseWorker);
+
+    const output = await segmentWorker.stats({});
+
+    // console.log(`Returning in ${new Date().getTime() - start}`);
     return res.json(output);
   } catch (e) {
     debug('Error handling request:', e, e.code, e.message);
@@ -324,11 +339,22 @@ router.post([
   '/tables/:table'], async (req, res) => {
   try {
     const table = req.params?.table;
-    if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
+    if (!table) throw new ObjectError({ status: 422, message: 'No table provided in the uri' });
     let id = req.params?.id;
     const { body } = req;
+
+    try {
+      await req.databaseWorker.describe({ table });
+    } catch (e) {
+      debug(e);
+      throw new ObjectError({
+        status: 404,
+        message: `No such table: ${table}`,
+      });
+    }
     // no need to add accountId here, it's used in the connection to the correct database
-    // body.accountId = req.accountId;
+    // is it though?  Sometimes the data needs the accountId, e.g. jobs
+    if (table === 'job') body.account_id = req.accountId;
     if (id) {
       body.id = id;
       debug('Updating ', { table, id, data: body });
@@ -358,6 +384,7 @@ router.post(['/eql'], async (req, res) => {
     return res.status(e.status || 500).json({ errors: [{ message: e.message || 'Error with request' }] });
   }
 });
+
 router.get('/query/fields', async (req, res) => {
   res.json({
     fields: [
@@ -421,21 +448,5 @@ router.get('/query/fields', async (req, res) => {
     ],
   });
 });
-
-/*
-router.post(['/tables/:table/:id'], async (req, res) => {
-  try {
-    const table = req.params?.table;
-    if (!table) throw new ObjectError({ code: 422, message: 'No table provided in the uri' });
-    const data = await saveData({
-      table, id: req.params?.id, ...req.query,
-    }, req.databaseWorker);
-    return res.json({ data });
-  } catch (e) {
-    debug('Error handling request:', e, e.code, e.message);
-    return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
-  }
-});
-*/
 
 module.exports = router;

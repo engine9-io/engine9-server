@@ -10,6 +10,7 @@ const { Readable } = require('stream');
 const through2 = require('through2');
 const JSON5 = require('json5');
 const config = require('../account-config.json');
+const { ObjectError } = require('../utilities');
 const {
   bool, toCharCodes, parseRegExp, parseJSON5,
 } = require('../utilities');
@@ -213,7 +214,7 @@ Worker.prototype.describe = async function describe(opts) {
   const sql = `select database() as DB,COLUMN_NAME,COLUMN_TYPE,DATA_TYPE,IS_NULLABLE,COLUMN_DEFAULT,CHARACTER_MAXIMUM_LENGTH,EXTRA FROM information_schema.columns WHERE  table_schema = Database() AND table_name = '${this.escapeTable(table)}' order by ORDINAL_POSITION`;
   const r = await this.query(sql);
   const cols = r.data;
-  if (cols.length === 0) throw new Error(`Could not find table ${table}`, { cause: 'DOES_NOT_EXIST' });
+  if (cols.length === 0) throw new ObjectError({ message: `Could not find table ${table}`, code: 'DOES_NOT_EXIST' });
   // databases return back arbitrary capitalization from information_schema
   cols.forEach((c) => { Object.keys(c).forEach((k) => { c[k.toUpperCase()] = c[k]; }); });
 
@@ -323,6 +324,37 @@ Worker.prototype.insertFromQuery = async function (options) {
   const knex = await this.connect();
   const stream = await knex.raw(options.sql).stream();
   return this.insertFromStream({ ...options, stream });
+};
+
+Worker.prototype.insertFromQuery.metadata = {
+  options: {
+    sql: { required: true },
+    table: { required: true },
+    upsert: {},
+  },
+};
+
+/*
+  Loads a table from a query by
+    a) Getting field names by running the sql with 0 records
+    b) using the field names to pick the target field names
+    c) running an insert <sql>
+*/
+
+Worker.prototype.loadTableFromQuery = async function (options) {
+  const { table } = options;
+  if (!table) throw new Error('table required');
+  const unlimitedSQL = options.sql.replace(/limit\s*[0-9]+/, '');
+  const { columns } = await this.query(`${unlimitedSQL} limit 0`);
+
+  return this.query(`insert into ${table} (${columns.map((d) => d.name).join(',')}) ${options.sql}`);
+};
+
+Worker.prototype.loadTableFromQuery.metadata = {
+  options: {
+    sql: { required: true },
+    table: { required: true },
+  },
 };
 
 Worker.prototype.insertFromQuery.metadata = {
