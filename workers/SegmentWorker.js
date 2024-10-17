@@ -172,13 +172,21 @@ Worker.prototype.build = async function (options) {
     default:
       break;
   }
-  const whereClause = this.buildSQLFromQuery(segment.query);
+  const whereClause = await this.buildSQLFromQuery(segment.query);
   await this.query({ sql: `update segment set build_status='building',build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [segment.id] });
 
-  const { data } = await this.query({ sql: `insert ignore into segment_people (segment_id,person_id) select ?,id ${whereClause}`, values: [segment.id] });
+  const { data } = await this.query({ sql: `insert ignore into person_segment (segment_id,person_id) select ?,id ${whereClause}`, values: [segment.id] });
 
-  await this.query({ sql: `update segment set people=?,status='built',build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [data.records, segment.id] });
-  return {};
+  await this.query({ sql: `update segment set people=?,build_status='built',build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [data.records, segment.id] });
+
+  return {
+    id: segment.id,
+    count: data.records,
+    build_type: segment.build_type,
+    build_status: segment.build_status,
+    people: data.records,
+    reported_people: segment.reported_people,
+  };
 };
 
 Worker.prototype.build.metadata = {
