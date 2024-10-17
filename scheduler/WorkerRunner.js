@@ -575,7 +575,7 @@ WorkerRunner.prototype.runAccount = function runAccount(accountId, callback) {
           try {
             debug(`Running async ${method.name} with options `, Object.keys(options));
             const l = workerInstance[method.name].length;
-            if (l > 1) throw new Error(`async functions must take zero or one parameter, ${method.name} has ${l}`);
+            if (l > 1) throw new Error(`command line async functions must take zero or one parameter, '${method.name}' has ${l}`);
             const response = await (workerInstance[method.name](options));
             if (response === undefined || response === null) throw new Error('No return value from method -- be sure to return something');
             if (response.modify) return cb(null, null, response.modify);

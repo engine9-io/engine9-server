@@ -1,6 +1,6 @@
 const util = require('util');
-const debug = require('debug')('SegmentWorker');
-// const debugMore = require('debug')('debug:SQLWorker');
+// const debug = require('debug')('SegmentWorker');
+const debugInfo = require('debug')('info:SegmentWorker');
 
 const JSON5 = require('json5');// Useful for parsing extended JSON
 
@@ -104,42 +104,54 @@ Worker.prototype.buildRule = function (rule) {
   Get all the configuration for the segment
 */
 Worker.prototype.getSegment = async function (options) {
+  if (options.segment_id) throw new Error('Please specify id, not segment_id');
   if (!options.id) return options;
-  const { data } = await this.query('select * from segment where id=?', [options.id]);
+  const { data } = await this.query({ sql: 'select * from segment where id=?', values: [options.id] });
   if (data.length === 0) throw new Error(`Could not find segment ${options.id}`);
   return data[0];
 };
 
 Worker.prototype.buildSQLFromQuery = async function (queryProp) {
+  if (!queryProp) throw new Error('No query provided to buildSQLFromQuery');
   let query = queryProp;
   if (typeof query === 'string') {
     try {
       query = JSON5.parse(query);
     } catch (e) {
-      debug(e);
-      throw new Error('Badly structured query');
+      debugInfo(queryProp, e);
+      throw new Error('Query cannot be parsed from segment');
     }
   }
-  let sql = null;
+  let conditions = null;
   try {
-    sql = this.buildRule(query);
+    conditions = this.buildRule(query);
   } catch (e) {
-    debug(e);
-    throw new Error('Badly structured query');
+    debugInfo(e, query);
+    throw new Error('Cannot build SQL from query');
   }
-  return sql;
+  if (!conditions || conditions === '()') conditions = '1=1';
+
+  return `from person where ${conditions}`;
 };
 
 /*
 
-build_mechanism:
+build_type:
   query
   scheduled_query
   remote
   remote_count
 
 build_schedule: 'string',
-build_status: 'string',
+build_status:
+  new
+  counting
+  counted
+  building
+  built
+  loading_statistics
+  loaded_statistics
+
 build_status_modified_at: 'modified_at',
 last_built: 'datetime',
 */
@@ -161,11 +173,11 @@ Worker.prototype.build = async function (options) {
       break;
   }
   const whereClause = this.buildSQLFromQuery(segment.query);
-  await this.query(`update segment set status='building',build_status_modified_at=${this.getNowFunction()} where id=?`, [segment.id]);
+  await this.query({ sql: `update segment set build_status='building',build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [segment.id] });
 
-  await this.query(`insert ignore into segment_people (segment_id,person_id) select ?,id ${whereClause}`, [segment.id]);
+  const { data } = await this.query({ sql: `insert ignore into segment_people (segment_id,person_id) select ?,id ${whereClause}`, values: [segment.id] });
 
-  await this.query(`update segment set status='built',build_status_modified_at=${this.getNowFunction()} where id=?`, [segment.id]);
+  await this.query({ sql: `update segment set people=?,status='built',build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [data.records, segment.id] });
   return {};
 };
 
@@ -175,11 +187,50 @@ Worker.prototype.build.metadata = {
   },
 };
 
-Worker.prototype.count = async function (queryProp) {
-  const whereClause = await this.buildSQLFromQuery(queryProp);
-  const sql = `select count(*) as people from person WHERE ${whereClause} limit 10`;
-  const { data } = await this.query(sql);
-  return data[0];
+Worker.prototype.count = async function (options) {
+  const segment = await this.getSegment(options);
+  if (!segment.id) throw new Error('No segment_id');
+
+  // remote counts we don't need to count them
+  if (segment.build_type === 'remote_count') {
+    return {
+      id: segment.id,
+      count: segment.reported_people,
+      build_type: segment.build_type,
+      build_status: segment.build_status,
+      people: segment.people,
+      reported_people: segment.reported_people,
+    };
+  }
+  // We're already counted, just return that
+  if (['counted', 'built'].indexOf(segment.build_status) >= 0) {
+    if (segment.people === null) throw new Error(`Segment ${segment.id} has a build status of ${segment.build_status} but null people`);
+    return {
+      id: segment.id,
+      count: segment.people,
+      build_type: segment.build_type,
+      build_status: segment.build_status,
+      people: segment.people,
+      reported_people: segment.reported_people,
+      source: 'table',
+    };
+  }
+
+  const whereClause = await this.buildSQLFromQuery(segment.query);
+  await this.query({ sql: `update segment set build_status='counting',people=null,build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [segment.id] });
+
+  const { data } = await this.query(`select count(*) as people ${whereClause}`);
+
+  await this.query({ sql: `update segment set build_status='counted',people=?,build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [data[0].people, segment.id] });
+  return {
+    id: segment.id,
+    count: data[0].people,
+    build_type: segment.build_type,
+    build_status: 'counted',
+    people: data[0].people,
+    reported_people: segment.reported_people,
+    source: 'recount',
+  };
 };
 
 Worker.prototype.count.metadata = {
@@ -198,7 +249,7 @@ Worker.prototype.getSampleFields = async function () {
 
 Worker.prototype.sample = async function (queryProp) {
   const whereClause = await this.buildSQLFromQuery(queryProp);
-  const sql = `select id,given_name,family_name from person WHERE ${whereClause} limit 10`;
+  const sql = `select id,given_name,family_name ${whereClause} limit 10`;
   const { data } = await this.query(sql);
   return { data };
 };
@@ -210,7 +261,7 @@ Worker.prototype.sample.metadata = {
 
 Worker.prototype.stats = async function (queryProp) {
   const whereClause = await this.buildSQLFromQuery(queryProp);
-  const sql = `select count(*) as records from person WHERE ${whereClause}`;
+  const sql = `select count(*) as records WHERE ${whereClause}`;
   const { data } = await this.query(sql);
   return { data };
 };

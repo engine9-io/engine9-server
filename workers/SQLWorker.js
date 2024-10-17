@@ -35,6 +35,7 @@ function Worker(worker) {
     this.auth = config.accounts?.[worker.accountId]?.auth;
     if (!this.auth) throw new Error(`No authorization available for accountId:${worker.accountId}`);
   }
+  this.sql_functions = this.getSupportedSQLFunctions();
 }
 
 util.inherits(Worker, BaseWorker);
@@ -78,12 +79,17 @@ Worker.prototype.ok.metadata = {
 // values can be undefined or null,
 // implying we don't want to use any bindings -- may have already been bound
 Worker.prototype.query = async function (options) {
-  let sql = options;
-  if (typeof options !== 'string') sql = options.sql;
-  if (!sql) throw new Error('No sql provided');
+  let opts = options;
+  if (typeof options === 'string') {
+    opts = { sql: options };
+  }
+  if (!opts.sql) throw new Error('No sql provided');
   try {
     const knex = await this.connect();
-    const [data, columns] = await knex.raw(sql, options.values);
+    debug('Running:', `${opts.sql.slice(0, 300)}...`, opts.values);
+    const [data, columns] = await knex.raw(opts.sql, opts.values);
+    data.records = data.affectedRows;
+    data.modified = data.changedRows;
     return { data, columns };
   } catch (e) {
     info('Error running query:', options, e);

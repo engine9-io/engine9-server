@@ -138,7 +138,7 @@ Worker.prototype.diff = async function (opts) {
       try {
         desc = await this.describe({ table: prefix + table });
       } catch (e) {
-        if (e?.cause === 'DOES_NOT_EXIST') {
+        if (e?.code === 'DOES_NOT_EXIST') {
           desc = { columns: [], indexes: [] };
           return {
             table, differences: 'missing', columns: schemaColumns, indexes: schemaIndexes,
@@ -167,6 +167,9 @@ Worker.prototype.diff = async function (opts) {
         const differenceKeys = Object.keys(c).reduce((out, k) => {
           // Ignore these attributes
           if (['type', 'description', 'knex_args', 'values'].indexOf(k) >= 0) return out;
+          // enum lengths are not really standardized
+
+          if (c.type === 'enum' && k === 'length') return out;
           if (c[k] !== dbColumn[k]) {
             // debug(c.name, k, c[k], '!=', dbColumn[k]);
             out[k] = { schema: c[k], db: dbColumn[k] };
@@ -215,7 +218,7 @@ Worker.prototype.deploy = async function (opts) {
       table, differences, columns = [], indexes = [],
     }) => {
       const diffs = Array.isArray(differences) ? differences : [differences];
-      await Promise.all(
+      const diffResults = await Promise.all(
         diffs.map(async (difference) => {
           if (difference === 'missing') {
             debug(`Creating table ${prefix}${table}`);
@@ -231,6 +234,7 @@ Worker.prototype.deploy = async function (opts) {
           return { table, difference, did_nothing: true };
         }),
       );
+      return diffResults;
     }),
   );
 
