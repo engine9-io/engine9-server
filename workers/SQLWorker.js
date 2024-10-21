@@ -719,7 +719,7 @@ Worker.prototype.insertFromStream = async function (options) {
     if (typeof defaults === 'string') defaults = JSON5.parse(defaults);
 
     const batchSize = parseInt(options.batchSize || 300, 10);
-    const counter = 0;
+    let counter = 0;
 
     let columns = null;
     let rows = [];
@@ -825,6 +825,7 @@ Worker.prototype.insertFromStream = async function (options) {
       });
 
       rows.push(`(${values.join(',')})`);
+      counter += 1;
 
       return cb();
     }, function (cb) {
