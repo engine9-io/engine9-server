@@ -699,6 +699,7 @@ Worker.prototype.insertFromStream = async function (options) {
   const worker = this;
   const desc = await this.describe(options);
   const knex = await this.connect();
+  debug('Connected, starting insertFromStream');
   return new Promise((resolve, reject) => {
     const table = this.escapeTable(options.table);
     let { stream } = options;
@@ -717,7 +718,7 @@ Worker.prototype.insertFromStream = async function (options) {
     let defaults = options.defaults || {};
     if (typeof defaults === 'string') defaults = JSON5.parse(defaults);
 
-    const batchSize = parseInt(options.batchSize || 3, 10);
+    const batchSize = parseInt(options.batchSize || 300, 10);
     const counter = 0;
 
     let columns = null;
