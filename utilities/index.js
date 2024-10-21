@@ -1,4 +1,7 @@
 const dayjs = require('dayjs');
+const customParseFormat = require('dayjs/plugin/customParseFormat');
+
+dayjs.extend(customParseFormat);
 const crypto = require('node:crypto');
 const JSON5 = require('json5');
 
@@ -67,6 +70,32 @@ function relativeDate(s, _initialDate) {
   r = dayjs(new Date(s)).toDate();
   if (r === 'Invalid Date') throw new Error(`Invalid Date: ${s}`);
   return r;
+}
+
+const dateRegex = [
+  { regex: /^[0-9]{1,2}\/[0-9]{2}$/, clean: (s) => `01/${s}`, format: 'DD/MM/YY' },
+  { regex: /^[0-9]{1,2}\/[0-9]{4}$/, clean: (s) => `01/${s}`, format: 'DD/MM/YYYY' },
+  { regex: /^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2}$/, format: 'MM/DD/YY' },
+  { regex: /^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4}$/, format: 'MM/DD/YYYY' },
+  { regex: /^[0-9]{4}$/, clean: (s) => `01/01/${s}`, format: 'DD/MM/YYYY' },
+  { regex: /^.*$/ }, // try the normal parser
+];
+// Smart date parsing based on a few key heuristics
+// Returns a valid ISO date, or NULL -- if you want invalid dates, parse them yourself
+function parseDate(d) {
+  if (!d) return null;
+  if (typeof d !== 'string') {
+    const o = dayjs(d);
+    if (Number.isNaN(o)) return null;
+    return o.toISOString();
+  }
+  const matching = dateRegex.find((r) => d.match(r.regex));
+  if (!matching) return null;// not a valid date
+
+  const input = matching.clean ? matching.clean(d) : d;
+
+  const o = dayjs(input, matching.format);
+  return Number.isNaN(o) ? null : o.toISOString();
 }
 
 function parseRegExp(o, opts) {
@@ -239,6 +268,7 @@ module.exports = {
   bool,
   parseRegExp,
   parseJSON5,
+  parseDate,
   relativeDate,
   toCharCodes,
   getIntArray,

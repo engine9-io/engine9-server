@@ -10,8 +10,8 @@ const { Readable } = require('stream');
 const through2 = require('through2');
 const JSON5 = require('json5');
 const config = require('../account-config.json');
-const { ObjectError } = require('../utilities');
 const {
+  ObjectError,
   bool, toCharCodes, parseRegExp, parseJSON5,
 } = require('../utilities');
 const SQLTypes = require('./SQLTypes');
