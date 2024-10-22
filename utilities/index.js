@@ -95,7 +95,8 @@ function parseDate(d) {
   const input = matching.clean ? matching.clean(d) : d;
 
   const o = dayjs(input, matching.format);
-  return Number.isNaN(o) ? null : o.toISOString();
+  if (!o.isValid()) return null;
+  return o.toISOString();
 }
 
 function parseRegExp(o, opts) {
