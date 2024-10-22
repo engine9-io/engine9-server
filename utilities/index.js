@@ -72,22 +72,22 @@ function relativeDate(s, _initialDate) {
   return r;
 }
 
-function zeds(i, l = 2) {
+function zeds(i) {
   let s = i;
-  while (s.length < l)s = `0${s}`;
+  while (s.length < 2)s = `0${s}`;
   return s;
 }
 const dateRegex = [
-  { regex: /^[0-9]{1,2}\/[0-9]{2}$/, clean: (s) => `01/${s}`, format: 'DD/MM/YY' },
-  { regex: /^[0-9]{1,2}\/[0-9]{4}$/, clean: (s) => `01/${s}`, format: 'DD/MM/YYYY' },
+  { regex: /^[0-9]{1,2}\/[0-9]{2}$/, clean: (s) => `01/${s.split('/').map(zeds).join('/')}`, format: 'DD/MM/YY' },
+  { regex: /^[0-9]{1,2}\/[0-9]{4}$/, clean: (s) => `01/${s.split('/').map(zeds).join('/')}`, format: 'DD/MM/YYYY' },
   {
     regex: /^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2}$/,
-    clean: (s) => s.split('/').map((r) => zeds(r, 2)).join(','),
+    clean: (s) => s.split('/').map(zeds).join(','),
     format: 'MM/DD/YY',
   },
   {
     regex: /^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4}$/,
-    clean: (s) => s.split('/').map((r) => zeds(r, 2)).join(','),
+    clean: (s) => s.split('/').map(zeds).join(','),
     format: 'MM/DD/YYYY',
   },
   { regex: /^[0-9]{4}$/, clean: (s) => `01/01/${s}`, format: 'DD/MM/YYYY' },
