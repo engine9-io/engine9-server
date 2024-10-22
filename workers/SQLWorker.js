@@ -823,7 +823,6 @@ Worker.prototype.insertFromStream = async function (options) {
 
         return knex.raw('?', [v]);
       });
-
       rows.push(`(${values.join(',')})`);
       counter += 1;
 
