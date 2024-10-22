@@ -72,11 +72,24 @@ function relativeDate(s, _initialDate) {
   return r;
 }
 
+function zeds(i, l = 2) {
+  let s = i;
+  while (s.length < l)s = `0${s}`;
+  return s;
+}
 const dateRegex = [
   { regex: /^[0-9]{1,2}\/[0-9]{2}$/, clean: (s) => `01/${s}`, format: 'DD/MM/YY' },
   { regex: /^[0-9]{1,2}\/[0-9]{4}$/, clean: (s) => `01/${s}`, format: 'DD/MM/YYYY' },
-  { regex: /^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2}$/, format: 'MM/DD/YY' },
-  { regex: /^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4}$/, format: 'MM/DD/YYYY' },
+  {
+    regex: /^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2}$/,
+    clean: (s) => s.split('/').map((r) => zeds(r, 2)).join(','),
+    format: 'MM/DD/YY',
+  },
+  {
+    regex: /^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4}$/,
+    clean: (s) => s.split('/').map((r) => zeds(r, 2)).join(','),
+    format: 'MM/DD/YYYY',
+  },
   { regex: /^[0-9]{4}$/, clean: (s) => `01/01/${s}`, format: 'DD/MM/YYYY' },
   { regex: /^.*$/ }, // try the normal parser
 ];
@@ -89,7 +102,10 @@ function parseDate(d) {
     if (Number.isNaN(o)) return null;
     return o.toISOString();
   }
-  const matching = dateRegex.find((r) => d.match(r.regex));
+  const matching = dateRegex.find((r) => {
+    const m = d.match(r.regex);
+    return !!m;
+  });
   if (!matching) return null;// not a valid date
 
   const input = matching.clean ? matching.clean(d) : d;

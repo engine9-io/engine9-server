@@ -17,6 +17,7 @@ describe('Test date parsing', async () => {
       { input: '2024-02-01', correct: new Date('2024-02-01').toISOString() },
       { input: '2024-02', correct: new Date('2024-02-01').toISOString() },
       { input: '2024-2', correct: new Date('2024-02-01').toISOString() },
+      { input: '5/1/1970', correct: new Date('1970-05-01').toISOString() },
     ];
     tests.forEach((t) => {
       const output = parseDate(t.input);
