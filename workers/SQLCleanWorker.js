@@ -1,5 +1,5 @@
 const util = require('util');
-const debug = require('debug')('SQLCleanWorker');
+// const debug = require('debug')('SQLCleanWorker');
 const { Transform } = require('node:stream');
 const { parseDate } = require('../utilities');
 const SQLWorker = require('./SQLWorker');
@@ -29,14 +29,11 @@ Worker.prototype.cleanDate = async function cleanDate(options) {
   const dateTransform = new Transform({
     objectMode: true,
     transform(obj, enc, cb) {
-      debug('Cleaning ', obj);
       try {
         obj[targetField] = parseDate(obj[field]);
       } catch (e) {
-        debug('Error parsing date:', e);
         return cb(e);
       }
-      debug('Calling back ', obj);
       return cb(null, obj);
     },
   });
