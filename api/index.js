@@ -46,6 +46,9 @@ app.use(compression());
 app.use(bodyParser.json());
 
 app.get('/ok', (req, res) => { res.json({ ok: true }); });
+app.get('/error', () => {
+  throw new Error('Sample Error');
+});
 
 app.use('/ui', ui);
 app.use(addUserToRequest);

@@ -5,6 +5,8 @@ require('dotenv').config({ path: '../.env' });
 process.env.DEBUG = '*';
 const debug = require('debug')('api');
 
+debug('Initialized debugging for api');
+
 const express = require('express');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 
