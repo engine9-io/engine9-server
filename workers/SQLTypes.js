@@ -204,6 +204,10 @@ module.exports = {
       if (input.column_type.indexOf('decimal') === 0) {
         input.column_type = 'decimal';
       }
+      /* some engines have commented out descriptions */
+      if (input.column_type.indexOf('/*') > 0) {
+        [input.column_type] = input.column_type.split(' ');
+      }
       const log = [];
       const typeDef = mysqlTypes.find(
         (type) => {
