@@ -169,7 +169,9 @@ module.exports = {
     dialectToStandard(o, defaultColumn) {
       const input = { ...defaultColumn, ...o };
       // test first for strings
-      if (input.column_type.indexOf('varchar') === 0) {
+      if (input.column_type.indexOf('varchar') === 0
+          || input.column_type === 'mediumtext'
+      ) {
         // this is a string, which can have all the variations
         input.column_type = 'varchar';
         if (input.default_value
