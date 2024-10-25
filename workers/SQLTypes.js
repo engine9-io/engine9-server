@@ -197,6 +197,9 @@ module.exports = {
         input.column_type = input.column_type.slice(0, -9);
         input.unsigned = true;
       }
+      if (input.column_type.indexOf('tinyint') === 0) {
+        input.column_type = 'tinyint';
+      }
       if (input.column_type.indexOf('bigint') === 0) {
         input.column_type = 'bigint';
       }
