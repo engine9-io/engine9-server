@@ -1,3 +1,8 @@
+// A lot of libraries initialize using the process.env object, so keep this first
+require('dotenv').config({ path: '../.env' });
+
+process.env.DEBUG = '*';
+
 /* eslint-disable no-console */
 const http = require('node:http');
 const https = require('node:https');

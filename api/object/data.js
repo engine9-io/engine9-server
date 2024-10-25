@@ -1,8 +1,4 @@
 /* eslint-disable no-console */
-// A lot of libraries initialize using the process.env object, so keep this first
-require('dotenv').config({ path: '../.env' });
-
-process.env.DEBUG = '*';
 const debug = require('debug')('api');
 
 debug('Initialized debugging for api');
