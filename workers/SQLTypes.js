@@ -60,7 +60,7 @@ const mysqlTypes = [
   { type: 'double', column_type: 'double', knex_method: 'double' },
   {
     type: 'boolean',
-    column_type: 'tinyint(1)',
+    column_type: 'tinyint',
     // nullable: true, //don't set this, otherwise we can't look up type boolean
     //  Defaults to nullable anyhow
     knex_method: 'boolean',
