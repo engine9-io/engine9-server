@@ -203,7 +203,9 @@ module.exports = {
       if (input.column_type.indexOf('bigint') === 0) {
         input.column_type = 'bigint';
       }
-      if (input.column_type.indexOf('int') === 0) {
+      if (input.column_type.indexOf('int') === 0
+      || input.column_type.indexOf('smallint') === 0 // smallint isn't small enough to matter significantly
+      ) {
         input.column_type = 'int';
       }
       if (input.column_type.indexOf('decimal') === 0) {
