@@ -88,9 +88,12 @@ Worker.prototype.query = async function (options) {
     const knex = await this.connect();
     debug('Running:', `${opts.sql.slice(0, 300)}...`, opts.values);
     const [data, columns] = await knex.raw(opts.sql, opts.values);
-    data.records = data.affectedRows;
-    data.modified = data.changedRows;
-    return { data, columns };
+    const records = data.affectedRows;
+    const modified = data.changedRows;
+
+    return {
+      data, records, modified, columns,
+    };
   } catch (e) {
     info('Error running query:', options, e);
     throw e;
