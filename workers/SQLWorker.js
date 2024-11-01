@@ -65,7 +65,7 @@ Worker.prototype.connect = async function connect() {
     client: 'mysql2',
     connection: s,
   };
-
+  debug('Connecting with ', authConfig);
   this.knex = Knex(authConfig);
   return this.knex;
 };
