@@ -4,14 +4,17 @@ require('dotenv').config({ path: '../.env' });
 /* eslint-disable no-console */
 const http = require('node:http');
 const https = require('node:https');
+const path = require('node:path');
 const fs = require('node:fs');
 const express = require('express');
 
-const app = express();
+const debug = require('debug');
 const cors = require('cors');
 const compression = require('compression');
 const bodyParser = require('body-parser');
 const { Server } = require('socket.io');
+
+const app = express();
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -33,11 +36,14 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 const data = require('./object/data');
 
+const configPath = path.resolve(__dirname, '../account-config.json');
 try {
-  // eslint-disable-next-line global-require
-  require('../account-config.json');
+  // eslint-disable-next-line global-require, import/no-dynamic-require
+  // eslint-disable-next-line
+  config = require(configPath);
 } catch (e) {
-  throw new Error('Error loading account-config.json file -- make sure to create one from account-config.template.json before running');
+  debug(e);
+  throw new Error(`Error loading ${configPath} file -- make sure to create one from config.template.json before running`);
 }
 
 const ui = require('./object/ui.console.config');

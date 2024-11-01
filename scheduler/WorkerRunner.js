@@ -10,12 +10,14 @@ const debugError = require('debug')('error:WorkerRunner');
 const { relativeDate } = require('../utilities');
 
 let config = null;
+const configPath = path.resolve(__dirname, '../account-config.json');
 try {
-  // eslint-disable-next-line global-require
-  config = require('../account-config.json');
+  // eslint-disable-next-line global-require, import/no-dynamic-require
+  // eslint-disable-next-line
+  config = require(configPath);
 } catch (e) {
   debug(e);
-  throw new Error('Error loading config.json file -- make sure to create one from config.template.json before running');
+  throw new Error(`Error loading ${configPath} file -- make sure to create one from config.template.json before running`);
 }
 
 let prompt = null;
