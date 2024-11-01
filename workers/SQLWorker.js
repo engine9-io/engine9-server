@@ -60,12 +60,12 @@ Worker.prototype.connect = async function connect() {
   let authConfig = null;
   const s = this.auth.database_connection;
   if (!s) throw new Error(`SQLWorker Could not find database_connection settings in auth configuration for account ${accountId} with keys: ${Object.keys(this.auth)}`);
+  if (s.match(/[#{}+]+/)) throw new Error('Invalid connection string, contains some unescaped characters');
 
   authConfig = {
     client: 'mysql2',
     connection: s,
   };
-  debug('Connecting with ', authConfig);
   this.knex = Knex(authConfig);
   return this.knex;
 };
