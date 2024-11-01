@@ -341,7 +341,10 @@ function getAccountIds() {
   }
   accountIds = accountIds.split(',');
   accountIds.forEach((accountId) => {
-    if (!accountId.match(/^[a-zA-Z0-9_-]+$/)) throw new Error(`invalid accountId=${accountId}`);
+    if (!accountId.match(/^[a-zA-Z0-9_-]+$/)) {
+      debug('argv=', argv);
+      throw new Error(`invalid accountId=${accountId}`);
+    }
   });
   // don't need this in the options
   delete argv.accountId;
