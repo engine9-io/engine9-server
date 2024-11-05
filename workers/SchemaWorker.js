@@ -95,7 +95,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
         if (col.column_type) {
           invalidColumns.push({ ...col, name, error: 'column_type is reserved for sql dialect' });
         }
-        const typeDetails = SQLTypes.getType(col.type) || {};
+        const typeDetails = SQLTypes.default.getType(col.type) || {};
         try {
           return {
             ...SQLWorker.defaultStandardColumn, ...typeDetails, ...col, name,

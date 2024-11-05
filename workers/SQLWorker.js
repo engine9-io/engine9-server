@@ -14,6 +14,7 @@ const {
   ObjectError,
   bool, toCharCodes, parseRegExp, parseJSON5,
 } = require('../utilities');
+const analyze = require('../utilities/analyze');
 const SQLTypes = require('./SQLTypes');
 
 const BaseWorker = require('./BaseWorker');
@@ -1220,8 +1221,21 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
   return toSql();
 };
 Worker.prototype.buildSqlFromEQLObject.metadata = {
-  bot: true,
   options: {},
+};
+
+Worker.prototype.analyze = async function describe(opts) {
+  const { table } = opts;
+  const { columns } = await this.describe({ table });
+
+  const stream = await this.stream({ sql: `select * from ${this.escapeTable(table)}` });
+  return analyze({ stream, field: columns });
+};
+
+Worker.prototype.analyze.metadata = {
+  options: {
+    sql: {},
+  },
 };
 
 module.exports = Worker;

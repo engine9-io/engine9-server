@@ -21,7 +21,7 @@ async function rebuildDB(opts) {
 async function truncateDB(opts) {
   const schemaWorker = new SchemaWorker(opts);
   debug('Truncating tables');
-  const { tables } = await schemaWorker.tables();
+  const { tables } = await schemaWorker.tables({ type: 'table' });
   await Promise.all(tables.map((table) => schemaWorker.truncate({ table })));
   schemaWorker.destroy();
 }

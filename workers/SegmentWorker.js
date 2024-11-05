@@ -11,7 +11,6 @@ require('dotenv').config({ path: '.env' });
 function Worker(worker) {
   SQLWorker.call(this, worker);
   this.accountId = worker.accountId;
-  if (!this.accountId) throw new Error('No accountId provided to SegmentWorker constructor');
   if (worker.knex) {
     this.knex = worker.knex;
   } else {
@@ -22,9 +21,6 @@ function Worker(worker) {
 }
 
 util.inherits(Worker, SQLWorker);
-Worker.metadata = {
-  alias: 'query',
-};
 
 /*
 build an array of rules
