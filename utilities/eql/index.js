@@ -373,6 +373,7 @@ function withAnalysis(options) {
   const { eql, baseTable } = options;
 
   if (!baseTable) throw new Error('baseTable required');
+  if (!eql) throw new Error('No eql provided');
 
   const parsed = parse(eql);
   if (!parsed) throw new Error('parsed is null from: ', eql);

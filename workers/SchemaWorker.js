@@ -63,8 +63,8 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
       }
       content = await r.text();
     } else {
-      debug('schema does not start with @engine9-interfaces/, trying local file ');
-      content = await fs.promises.readFile(_schema);
+      debug('schema does not start with @engine9-interfaces/, trying local file');
+      content = await fs.promises.readFile(await this.resolveLocalSchemaPath(_schema));
     }
 
     if (!content) throw new Error(`No content found for ${_schema}`);
@@ -132,7 +132,8 @@ Worker.prototype.diff = async function (opts) {
   const { prefix = '' } = opts;
   if (prefix && prefix.slice(-1) !== '_') throw new Error(`A prefix should end with '_', it is ${prefix}`);
   const diffTables = await Promise.all(
-    schema.tables.map(async ({ name: table, columns: schemaColumns, indexes: schemaIndexes }) => {
+    schema.tables.map(async (tableDefinition) => {
+      const { name: table, columns: schemaColumns, indexes: schemaIndexes } = tableDefinition;
       debug(`Checking table ${table}`);
       let desc = null;
       try {
@@ -140,9 +141,12 @@ Worker.prototype.diff = async function (opts) {
       } catch (e) {
         if (e?.code === 'DOES_NOT_EXIST') {
           desc = { columns: [], indexes: [] };
-          return {
-            table, differences: 'missing', columns: schemaColumns, indexes: schemaIndexes,
-          };
+          tableDefinition.differences = ['missing'];
+          return tableDefinition;
+
+          /* return {table, differences: 'missing',
+           columns: schemaColumns, indexes: schemaIndexes,};
+           */
         }
         throw e;
       }
@@ -214,19 +218,24 @@ Worker.prototype.deploy = async function (opts) {
   const { prefix = '' } = opts;
   debug(`Deploying ${tables.length} tables, including`, JSON.stringify(tables[0], null, 4));
   const output = await Promise.all(
-    tables.map(async ({
-      table, differences, columns = [], indexes = [],
-    }) => {
+    tables.map(async (tableDefinition) => {
+      const {
+        name: table, type, differences, columns = [], indexes = [],
+      } = tableDefinition;
       const diffs = Array.isArray(differences) ? differences : [differences];
       const diffResults = await Promise.all(
         diffs.map(async (difference) => {
           if (difference === 'missing') {
+            if (type === 'view') {
+              return this.createView(tableDefinition);
+            }
             debug(`Creating table ${prefix}${table}`);
             return this.createTable({ table: prefix + table, columns, indexes });
           }
+          // Okay, it's not missing
           if (columns.length > 0 || indexes.length > 0) {
-            const type = await this.tableType({ table: prefix + table });
-            if (type === 'view') return { table, difference, did_nothing_because_view: true };
+            const databaseType = await this.tableType({ table: prefix + table });
+            if (databaseType === 'view') return { table, difference, did_nothing_because_view: true };
             debug(`Altering table ${prefix}${table} with difference ${difference}`);
             return this.alterTable({ table: prefix + table, columns, indexes });
           }

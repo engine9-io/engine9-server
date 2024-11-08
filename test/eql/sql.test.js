@@ -56,6 +56,41 @@ describe('Test SQL builder', async () => {
     debug('Results of ', sql, data);
   });
 
+  it('should build sql joins', async () => {
+    const sql = await sqlWorker.buildSqlFromEQLObject({
+      table: 'person',
+      joins: [
+        {
+          table: 'person_email',
+          join_eql: 'person.id=person_email.person_id',
+        },
+        {
+          table: 'person_email',
+          alias: 'work_emails',
+          join_eql: "person.id=work_emails.person_id and work_emails.email_type='Work'",
+        },
+        {
+          table: 'person_phone',
+          alias: 'phones',
+          join_eql: 'person.id=phones.person_id',
+        },
+      ],
+      columns: [
+        { eql: 'person.id', alias: 'id' },
+        { eql: 'person_email.email', alias: 'email' },
+        { eql: 'work_emails.email', alias: 'work_email' },
+        { eql: 'phones.phone', alias: 'phone' },
+      ],
+      conditions: [
+        { eql: "YEAR(person.created_at)>'2020-01-01'" },
+      ],
+      groupBy: [{ eql: 'person.id' }],
+      limit: 0,
+    });
+    debug(typeof sql, '%o', sql);
+    await sqlWorker.query(sql);
+  });
+
   // subqueries not working with aliases right now
   it('should build sql with a valid subquery', async () => {
     const sql = await sqlWorker.buildSqlFromEQLObject({
