@@ -119,7 +119,8 @@ const mysqlTypes = [
   {
     type: 'uuid',
     column_type: 'uuid',
-    knex_method: 'uuid',
+    // knex_method: 'uuid', //this often defaults to char(36)
+    knex_method: 'specificType',
     knex_args: (() => (['uuid'])),
   },
 ];

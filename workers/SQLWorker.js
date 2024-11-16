@@ -608,10 +608,11 @@ Worker.prototype.createTable = async function ({
     const primaries = columns.filter((d) => d.primary_key).map((c) => c.name);
     if (primaries.length > 0) table.primary(primaries);
     indexes.forEach((x) => {
+      const indexName = getUUIDv7();
       if (x.unique) {
-        table.unique(x.columns);
+        table.unique(indexName, x.columns);
       } else {
-        table.index(x.columns);
+        table.index(x.columns, indexName);
       }
     });
     if (timestamps) table.timestamps();

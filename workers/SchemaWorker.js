@@ -186,7 +186,7 @@ Worker.prototype.diff = async function (opts) {
         return null;
       }).filter(Boolean);
 
-      const out = { table, differences: [] };
+      const out = { name: table, differences: [] };
       if (columnDifferences.length > 0) {
         out.differences.push('columns');
         out.columns = columnDifferences;
@@ -222,6 +222,10 @@ Worker.prototype.deploy = async function (opts) {
       const {
         name: table, type, differences, columns = [], indexes = [],
       } = tableDefinition;
+      if (!table) {
+        debug(tableDefinition);
+        throw new Error('Invalid definition of table, no name');
+      }
       const diffs = Array.isArray(differences) ? differences : [differences];
       const diffResults = await Promise.all(
         diffs.map(async (difference) => {
@@ -235,7 +239,7 @@ Worker.prototype.deploy = async function (opts) {
           // Okay, it's not missing
           if (columns.length > 0 || indexes.length > 0) {
             const databaseType = await this.tableType({ table: prefix + table });
-            if (databaseType === 'view') return { table, difference, did_nothing_because_view: true };
+            if (databaseType === 'view') return { name: table, difference, did_nothing_because_view: true };
             debug(`Altering table ${prefix}${table} with difference ${difference}`);
             return this.alterTable({ table: prefix + table, columns, indexes });
           }

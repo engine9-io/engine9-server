@@ -6,6 +6,7 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
 
 const PacketTools = require('@engine9/packet-tools');
+const { LRUCache } = require('lru-cache');
 const SchemaWorker = require('./SchemaWorker');
 
 function Worker(worker) {
@@ -246,6 +247,108 @@ Worker.prototype.deployAllSchemas = async function () {
 
 Worker.prototype.deployAllSchemas.metadata = {
   options: {},
+};
+
+Worker.prototype.appendDatabaseIdWithCaching = async function ({
+  batch,
+  table,
+  inputField,
+  outputField,
+  additionalWhere = {},
+  idColumn = 'id',
+
+}) {
+  const type = table;
+  let itemsWithNoIds = batch.filter((o) => {
+    o[outputField] = o[outputField] || 0;// ensure the field exists, even if it doesn't have a value
+    return o[inputField] && !o[outputField];// returns if there is no value and it's not blank
+  });
+  if (itemsWithNoIds.length === 0) return batch;
+  this.itemCaches = this.itemCaches || {};
+  this.itemCaches[type] = this.itemCaches[type] || new LRUCache({ max: 10000 });
+  itemsWithNoIds.forEach((o) => {
+    o[outputField] = this.itemCaches[type].get(o[inputField]);
+  });
+  itemsWithNoIds = itemsWithNoIds.filter((o) => !o[outputField]);
+  if (itemsWithNoIds.length === 0) return batch;
+
+  const valuesToLookup = itemsWithNoIds
+    .reduce((a, b) => { a.add(b[inputField]); return a; }, new Set());
+  const knex = await this.connect();
+
+  const existingIds = await knex.select([`${idColumn} as id`, `${inputField} as lookup`])
+    .from(table)
+    .where(inputField, 'in', Array.from(valuesToLookup))
+    .andWhere(additionalWhere);
+  debug('loading ids for', itemsWithNoIds, Array.from(valuesToLookup), existingIds);
+
+  // Populate the cache
+  existingIds.forEach((r) => this.itemCaches[type].set(r.lookup, r.id));
+
+  // Filter out ones in the database already
+  itemsWithNoIds = itemsWithNoIds.filter((o) => {
+    const id = this.itemCaches[type].get(o[inputField]);
+    debug('Assigning existing Id', id, ' for ', inputField);
+    o[outputField] = id;
+    if (!o[outputField]) return true;
+    return false;
+  });
+
+  const valuesToInsert = Object.values(itemsWithNoIds.reduce((a, b) => {
+    a[b[inputField]] = {
+      [outputField]: null,
+      [inputField]: b[inputField],
+    };
+    return a;
+  }, {}));
+  if (valuesToInsert.length > 0) { await knex.table(table).insert(valuesToInsert); }
+
+  const newIds = await knex.select([`${idColumn} as id`, `${inputField} as lookup`])
+    .from(table)
+    .where(inputField, 'in', valuesToInsert.map((d) => d[inputField]))
+    .andWhere(additionalWhere);
+
+  // Populate the cache
+  newIds.forEach((r) => this.itemCaches[type].set(r.lookup, r.id));
+
+  itemsWithNoIds = itemsWithNoIds.filter((o) => {
+    const id = this.itemCaches[type].get(o[inputField]);
+    debug('Assigning Id', id, ' for ', inputField);
+    o[outputField] = id;
+    if (!o[outputField]) return true;
+    return false;
+  });
+  if (itemsWithNoIds.length > 0) {
+    throw new Error(`Error assigning ${type} ids to some records, including ${JSON.stringify(itemsWithNoIds.slice(0, 3))}`);
+  }
+
+  return batch;
+};
+
+Worker.prototype.appendSourceCodeId = async function ({
+  batch,
+}) {
+  return this.appendDatabaseIdWithCaching({
+    batch,
+    table: 'source_code_dictionary',
+    inputField: 'source_code',
+    outputField: 'source_code_id',
+    idColumn: 'source_code_id',
+  });
+};
+
+Worker.prototype.appendInputId = async function ({
+  pluginId,
+  batch,
+}) {
+  return this.appendDatabaseIdWithCaching({
+    batch,
+    table: 'input',
+    inputField: 'remote_input_id',
+    additionalWhere: { plugin_id: pluginId },
+    outputField: 'input_id',
+    idColumn: 'id',
+  });
 };
 
 module.exports = Worker;

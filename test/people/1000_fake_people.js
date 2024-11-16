@@ -8,7 +8,7 @@ const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-const { rebuildDB, truncateDB } = require('./test_db_modifications');
+const { rebuildDB, truncateDB } = require('../test_db_modifications');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'engine9';
