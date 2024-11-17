@@ -5,6 +5,7 @@ const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
 const { getUUIDv7 } = require('@engine9/packet-tools');
+const { v5: uuidv5 } = require('uuid');
 
 const PacketTools = require('@engine9/packet-tools');
 const { LRUCache } = require('lru-cache');
@@ -72,11 +73,11 @@ Worker.prototype.compileTransform = async function ({ transform, path }) {
     };
   }
   if (transform) throw new Error('transform should be a function');
-  if (path === 'person.appendPersonIds') {
+  if (path === 'person.appendPersonId') {
     return {
       path,
       bindings: {},
-      transform: (opts) => this.appendPersonIds(opts),
+      transform: (opts) => this.appendPersonId(opts),
     };
   } if (path === 'sql.upsertTables') {
     return {
@@ -359,6 +360,24 @@ Worker.prototype.appendInputId = async function ({
     additionalWhere: { plugin_id: pluginId },
     outputField: 'input_id',
     idColumn: 'id',
+  });
+};
+
+/*
+ Entry ids are either
+ A) Provided by the incoming object, and assumed to be unique
+ or
+ B) Generated as a UUIDv5, using the input_id as the source UUID
+    and swapping out the timestamp portion to assist with sorting
+ provided by the input, or calculated from the
+  ts+
+*/
+Worker.prototype.appendEntryId = async function ({
+  batch,
+}) {
+  batch.forEach((b) => {
+    if (b.entry_id) return;
+    b.entry_id = uuidv5(b.ts + b.person_id + b.entry_type_id + b.source_code_id, b.input_id);
   });
 };
 

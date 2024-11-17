@@ -7,6 +7,7 @@ async function drop(opts) {
 
   const { tables } = await schemaWorker.tables();
   await Promise.all(tables.map((table) => schemaWorker.drop({ table })));
+  schemaWorker.destroy();
 }
 
 async function deploy(opts) {

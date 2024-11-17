@@ -34,12 +34,12 @@ describe('Insert File of people with options', async () => {
     }
     if (process.argv.indexOf('truncate') >= 0) {
       await truncate(env);
+      await truncate(env);
       await insertDefaults(env);
     }
   });
 
   after(async () => {
-    debug('Destroying knex');
     await knex.destroy();
   });
 
@@ -84,6 +84,17 @@ describe('Insert File of people with options', async () => {
     await personWorker.appendInputId({ pluginId, batch });
     batch.forEach((o) => {
       assert.ok(o.input_id?.length > 0, `No valid input for ${o.input_id}`);
+    });
+
+    await personWorker.appendPersonId({ batch });
+    batch.forEach((o) => {
+      debug(`${o.email}->${o.person_id}`);
+      assert.ok(o.person_id > 0, `No valid person information for ${o.email}`);
+    });
+
+    await personWorker.appendEntryId({ pluginId, batch });
+    batch.forEach((o) => {
+      assert.ok(o.entry_id?.length > 0, `No valid input for ${o.input_id}`);
     });
   });
 });
