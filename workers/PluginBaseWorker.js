@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
+const { getUUIDv7 } = require('@engine9/packet-tools');
 
 const PacketTools = require('@engine9/packet-tools');
 const { LRUCache } = require('lru-cache');
@@ -288,15 +289,25 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   // Filter out ones in the database already
   itemsWithNoIds = itemsWithNoIds.filter((o) => {
     const id = this.itemCaches[type].get(o[inputField]);
-    debug('Assigning existing Id', id, ' for ', inputField);
     o[outputField] = id;
     if (!o[outputField]) return true;
     return false;
   });
 
+  if (!table) throw new Error('Table required');
+  this.descriptionCache = this.descriptionCache || {};
+  if (!this.descriptionCache[table]) {
+    this.descriptionCache[table] = await this.describe({ table });
+  }
+  const desc = this.descriptionCache[table];
+  const idType = desc.columns.find((d) => d.name === idColumn)?.type;
+  if (!idType) throw new Error(`No idType found for ${idColumn}`);
+  if (idType === 'foreign_uuid') throw new Error(`Unsupported id type:${idType}`);
+
   const valuesToInsert = Object.values(itemsWithNoIds.reduce((a, b) => {
     a[b[inputField]] = {
-      [outputField]: null,
+      ...additionalWhere,
+      [idColumn]: idType === 'id_uuid' ? getUUIDv7() : null,
       [inputField]: b[inputField],
     };
     return a;

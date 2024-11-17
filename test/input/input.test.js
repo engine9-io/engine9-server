@@ -83,9 +83,7 @@ describe('Insert File of people with options', async () => {
 
     await personWorker.appendInputId({ pluginId, batch });
     batch.forEach((o) => {
-      assert.ok(o.input_id > 0, `No valid input for ${o.input_id}`);
+      assert.ok(o.input_id?.length > 0, `No valid input for ${o.input_id}`);
     });
-
-    debug();
   });
 });

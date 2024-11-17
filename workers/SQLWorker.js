@@ -610,7 +610,7 @@ Worker.prototype.createTable = async function ({
     indexes.forEach((x) => {
       const indexName = getUUIDv7();
       if (x.unique) {
-        table.unique(indexName, x.columns);
+        table.unique(x.columns, indexName);
       } else {
         table.index(x.columns, indexName);
       }
