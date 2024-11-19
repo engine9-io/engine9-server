@@ -2,6 +2,7 @@ const {
   describe, it, before, after,
 } = require('node:test');
 const assert = require('node:assert');
+const { getUUIDTimestamp } = require('@engine9/packet-tools');
 
 process.env.DEBUG = '*';
 const debug = require('debug')('test-framework');
@@ -48,7 +49,7 @@ describe('Insert File of people with options', async () => {
       {
         remote_id: '5bbbc3a9-ee40-41b8-b243-1176007346fb',
         ts: '2024-04-27T18:12:36.191Z',
-        entry_type: 'FORM_SUBMISSION',
+        entry_type: 'FORM_SUBMIT',
         remote_input_id: 'form_0',
         email: 'Margie_Von57@gmail.com',
         remote_input_name: 'Q1 Advocacy Action',
@@ -59,7 +60,7 @@ describe('Insert File of people with options', async () => {
       {
         remote_id: '7a23d9fc-5f53-4c30-89ca-07a79d7af682',
         ts: '2024-08-15T00:37:30.391Z',
-        entry_type: 'FORM_SUBMISSION',
+        entry_type: 'FORM_SUBMIT',
         remote_input_id: 'form_2',
         email: 'Constantin54@gmail.com',
         remote_input_name: 'Whales are cool',
@@ -76,14 +77,19 @@ describe('Insert File of people with options', async () => {
     const pluginId = data?.[0]?.id;
     if (!pluginId) throw new Error('Could not find a plugin id with name Stub Plugin');
 
-    await personWorker.appendSourceCodeId({ batch });
+    await personWorker.appendInputId({ pluginId, batch });
+    batch.forEach((o) => {
+      assert.ok(o.input_id?.length > 0, `No valid input for ${o.input_id}`);
+    });
+
+    await personWorker.appendEntryTypeId({ batch });
     batch.forEach((o) => {
       assert.ok(o.source_code_id > 0, `No valid source code for ${o.source_code}`);
     });
 
-    await personWorker.appendInputId({ pluginId, batch });
+    await personWorker.appendSourceCodeId({ batch });
     batch.forEach((o) => {
-      assert.ok(o.input_id?.length > 0, `No valid input for ${o.input_id}`);
+      assert.ok(o.source_code_id > 0, `No valid source code for ${o.source_code}`);
     });
 
     await personWorker.appendPersonId({ batch });
@@ -95,6 +101,9 @@ describe('Insert File of people with options', async () => {
     await personWorker.appendEntryId({ pluginId, batch });
     batch.forEach((o) => {
       assert.ok(o.entry_id?.length > 0, `No valid input for ${o.input_id}`);
+      const ts = new Date(o.ts).getTime();
+      const entryts = getUUIDTimestamp(o.entry_id).getTime();
+      assert.ok(ts === entryts, 'Timestamps for entry_id (a v7 uuid) and ts don\'t match');
     });
   });
 });

@@ -30,4 +30,13 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
   };
 };
 
+Worker.prototype.import=async function(({filename})=>{
+    await personWorker.appendInputId({ pluginId, batch });
+    await personWorker.appendEntryTypeId({ batch });
+    await personWorker.appendSourceCodeId({ batch });
+    await personWorker.appendPersonId({ batch });
+    await personWorker.appendEntryId({ pluginId, batch });
+    
+});
+
 module.exports = Worker;
