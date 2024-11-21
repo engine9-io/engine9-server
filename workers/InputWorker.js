@@ -17,26 +17,14 @@ function Worker(worker) {
 
 util.inherits(Worker, PersonWorker);
 
-Worker.prototype.getDefaultPipelineConfig = async function () {
-  return {
-    transforms: [
-      { path: 'engine9-interfaces/person_email/transforms/inbound/extract_identifiers.js', options: { dedupe_with_email: true } },
-      /* { path: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js',
-          options: { dedupe_with_phone: true } }, */
-      { path: 'person.appendPersonIds' },
-      { path: 'engine9-interfaces/person_email/transforms/inbound/upsert_tables.js', options: {} },
-      { path: 'sql.upsertTables' },
-    ],
-  };
+/*
+Worker.prototype.import = async ({ filename }) => {
+  await personWorker.appendInputId({ pluginId, batch });
+  await personWorker.appendEntryTypeId({ batch });
+  await personWorker.appendSourceCodeId({ batch });
+  await personWorker.appendPersonId({ batch });
+  await personWorker.appendEntryId({ pluginId, batch });
 };
-
-Worker.prototype.import=async function(({filename})=>{
-    await personWorker.appendInputId({ pluginId, batch });
-    await personWorker.appendEntryTypeId({ batch });
-    await personWorker.appendSourceCodeId({ batch });
-    await personWorker.appendPersonId({ batch });
-    await personWorker.appendEntryId({ pluginId, batch });
-    
-});
+*/
 
 module.exports = Worker;

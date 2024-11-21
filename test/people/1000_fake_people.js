@@ -1,5 +1,5 @@
 const {
-  describe, it, before, after,
+  describe, it, after,
 } = require('node:test');
 
 process.env.DEBUG = '*';
@@ -8,7 +8,7 @@ const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-const { rebuildDB, truncateDB } = require('../test_db_modifications');
+require('../test_db_schema');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'engine9';
@@ -21,21 +21,12 @@ describe('Insert File of people with options', async () => {
   debug('Completed connecting to database');
   const personWorker = new PersonWorker({ accountId, knex });
 
-  before(async () => {
-    if (process.argv.indexOf('rebuild') >= 0) {
-      await rebuildDB(env);
-    } else if (process.argv.indexOf('truncate') >= 0) {
-      await truncateDB(env);
-    }
-  });
-
   after(async () => {
     debug('Destroying knex');
     await knex.destroy();
   });
 
   it('Should be able to upsert and deduplicate people and email addresses from a file', async () => {
-    await truncateDB(env);
     debug('Argv=', process.argv);
     let filename = process.argv.pop();
     if (filename.indexOf('.csv') >= 0) {

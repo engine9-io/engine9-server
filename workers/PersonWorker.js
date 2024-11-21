@@ -190,10 +190,13 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
   return {
     transforms: [
       { path: 'engine9-interfaces/person_email/transforms/inbound/extract_identifiers.js', options: { dedupe_with_email: true } },
-      /* { path: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js',
-          options: { dedupe_with_phone: true } }, */
+      {
+        path: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js',
+        options: { dedupe_with_phone: true },
+      },
       { path: 'person.appendPersonId' },
       { path: 'engine9-interfaces/person_email/transforms/inbound/upsert_tables.js', options: {} },
+      { path: 'engine9-interfaces/person_phone/transforms/inbound/upsert_tables.js', options: {} },
       // { path: 'engine9-interfaces/person_address/transforms/inbound/upsert_tables.js' },
       // { path: 'engine9-interfaces/segment/transforms/inbound/upsert_tables.js' },
       { path: 'sql.upsertTables' },

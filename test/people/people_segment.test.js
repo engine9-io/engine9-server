@@ -1,9 +1,9 @@
 const {
-  describe, it, before, after,
+  describe, it, after,
 } = require('node:test');
 const debug = require('debug')('insert.test.js');
 const assert = require('node:assert');
-const { rebuildDB, truncateDB } = require('./test_db_modifications');
+require('../test_db_schema');
 
 const PersonWorker = require('../../workers/PersonWorker');
 const SchemaWorker = require('../../workers/SchemaWorker');
@@ -19,14 +19,6 @@ describe('Deploy schemas,upsert people,test segments', async () => {
   const segmentWorker = new SegmentWorker(env);
   const personWorker = new PersonWorker(env);
   const schemaWorker = new SchemaWorker(env);
-
-  before(async () => {
-    if (process.argv.indexOf('rebuild') >= 0) {
-      await rebuildDB(env);
-    } else if (process.argv.indexOf('truncate') >= 0) {
-      await truncateDB(env);
-    }
-  });
 
   after(async () => {
     debug('Destroying knex');

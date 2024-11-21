@@ -179,7 +179,7 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
             const v = b[binding.lookup[0]];
             if (v) values.add(v);
           });
-          if (values.length === 0) {
+          if (values.size === 0) {
             transformArguments[name] = [];
             return;
           }

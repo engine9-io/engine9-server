@@ -1,6 +1,7 @@
 const debug = require('debug')('test_db_schema.js');
 
 const SchemaWorker = require('../workers/SchemaWorker');
+const WorkerRunner = require('../scheduler/WorkerRunner');
 
 async function drop(opts) {
   const schemaWorker = new SchemaWorker(opts);
@@ -40,6 +41,27 @@ async function insertDefaults(opts) {
   await schemaWorker.query('insert into plugin (path,name) values (\'engine9StubPlugin\',\'Stub Plugin\')');
   schemaWorker.destroy();
 }
+
+const accountId = 'engine9';
+const runner = new WorkerRunner();
+const env = runner.getWorkerEnvironment({ accountId });
+
+async function run() {
+  if (process.argv.indexOf('drop') >= 0) {
+    await drop(env);
+  }
+  if (process.argv.indexOf('deploy') >= 0) {
+    await deploy(env);
+    await insertDefaults(env);
+  }
+  if (process.argv.indexOf('truncate') >= 0) {
+    await truncate(env);
+    await truncate(env);
+    await insertDefaults(env);
+  }
+}
+run();
+
 module.exports = {
   drop, deploy, truncate, insertDefaults,
 };

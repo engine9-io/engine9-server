@@ -1,5 +1,5 @@
 const {
-  describe, it, before, after,
+  describe, it, after,
 } = require('node:test');
 const assert = require('node:assert');
 const { getUUIDTimestamp } = require('@engine9/packet-tools');
@@ -10,9 +10,7 @@ const debug = require('debug')('test-framework');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-const {
-  drop, deploy, truncate, insertDefaults,
-} = require('../test_db_schema');
+require('../test_db_schema');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'engine9';
@@ -24,21 +22,6 @@ describe('Insert File of people with options', async () => {
   const knex = await sqlWorker.connect();
   debug('Completed connecting to database');
   const personWorker = new PersonWorker({ accountId, knex });
-
-  before(async () => {
-    if (process.argv.indexOf('drop') >= 0) {
-      await drop(env);
-    }
-    if (process.argv.indexOf('deploy') >= 0) {
-      await deploy(env);
-      await insertDefaults(env);
-    }
-    if (process.argv.indexOf('truncate') >= 0) {
-      await truncate(env);
-      await truncate(env);
-      await insertDefaults(env);
-    }
-  });
 
   after(async () => {
     await knex.destroy();

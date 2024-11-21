@@ -1,14 +1,14 @@
 const {
-  describe, it, before, after,
+  describe, it, after,
 } = require('node:test');
 
 process.env.DEBUG = '*';
 const debug = require('debug')('test-framework');
 const assert = require('node:assert');
-const WorkerRunner = require('../../../scheduler/WorkerRunner');
-const SQLWorker = require('../../../workers/SQLWorker');
-const PersonWorker = require('../../../workers/PersonWorker');
-const { rebuildDB, truncateDB } = require('../test_db_modifications');
+const WorkerRunner = require('../../scheduler/WorkerRunner');
+const SQLWorker = require('../../workers/SQLWorker');
+const PersonWorker = require('../../workers/PersonWorker');
+require('../test_db_schema');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'engine9';
@@ -20,14 +20,6 @@ describe('Insert File of people with options', async () => {
   const knex = await sqlWorker.connect();
   debug('Completed connecting to database');
   const personWorker = new PersonWorker({ accountId, knex });
-
-  before(async () => {
-    if (process.argv.indexOf('rebuild') >= 0) {
-      await rebuildDB(env);
-    } else if (process.argv.indexOf('truncate') >= 0) {
-      await truncateDB(env);
-    }
-  });
 
   after(async () => {
     debug('Destroying knex');
