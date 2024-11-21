@@ -112,7 +112,8 @@ const mysqlTypes = [
   {
     type: 'foreign_uuid',
     column_type: 'uuid',
-    knex_method: 'uuid',
+    // knex_method: 'uuid', //this often defaults to char(36), so use specific type
+    knex_method: 'specificType',
     knex_args: (() => (['uuid'])),
     nullable: true,
   },
