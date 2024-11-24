@@ -354,6 +354,7 @@ Worker.prototype.appendInputId = async function ({
   pluginId,
   batch,
 }) {
+  if (!pluginId) throw new Error('pluginId is required to appendInputId');
   return this.appendDatabaseIdWithCaching({
     batch,
     table: 'input',

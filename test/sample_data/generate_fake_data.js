@@ -4,9 +4,11 @@ const fs = require('node:fs');
 const { stringify } = require('csv');
 const debug = require('debug')('generate_fake_data');
 const { Readable } = require('node:stream');
+const { pipeline } = require('node:stream/promises');
+const { getTempFilename } = require('@engine9/packet-tools');
 
 let personId = 100000000;
-function createRandomUser() {
+function createRandomPerson() {
   const region = faker.location.state({ abbreviated: true });
   personId += Math.floor(Math.random() * 5);
   return {
@@ -29,56 +31,102 @@ function createRandomUser() {
 }
 
 const count = 1000;
-const userArray = faker.helpers.multiple(createRandomUser, {
-  count,
-});
 const recurs = ['', '', '', '', '', '', '', '', '', 'daily', 'weekly', 'monthly', 'monthly', 'monthly', 'monthly', 'monthly', 'quarterly', 'annually', 'annually'];
 const formNames = ['Q1 Advocacy Action', 'Q2 Petition', 'Whales are cool'];
 const sourceCodes = ['ACQ_EM_2023_X_123', 'EM_2023_X_123_A', 'EM_2023_X_123_B'];
-const transactionArray = [];
-const actionArray = [];
+const actionTargets = ['Dog Catcher Smith', 'Senator Tim Who', 'Congressman Agi Wannabe'];
+function pick(a) {
+  return a[Math.floor(Math.random() * a.length)];
+}
+const postfix = '.csv';
 
-userArray.forEach((user) => {
-  if (Math.random() > 0.3) return null;
-  const { email } = user;
-  const transCount = Math.random() * 4;
-  for (let i = 0; i < transCount; i += 1) {
-    transactionArray.push({
-      remote_id: faker.uuid,
-      entry_date: faker.date.past().toISOString(),
-      entry_type: 'TRANSACTION',
-      remote_input_id: faker.uuid,
-      email,
-      amount: faker.finance.amount({ max: 200, min: 5 }),
-      recurs: recurs[Math.floor(Math.random() * recurs.length)],
-      source_code: sourceCodes[Math.floor(Math.random() * sourceCodes.length)],
-    });
-    const formId = Math.floor(Math.random() * formNames.length);
-    actionArray.push({
-      ts: faker.date.past().toISOString(),
-      remote_id: faker.string.uuid(),
-      entry_type: 'FORM_SUBMISSION',
-      remote_input_id: `form_${formId}`,
-      remote_input_name: formNames[formId],
-      email,
-      source_code: sourceCodes[Math.floor(Math.random() * sourceCodes.length)],
-      action_target: faker.internet.email(),
-      action_content: faker.lorem.lines(),
-    });
-  }
-  return null;
-});
+async function createPersonFile() {
+  const userArray = faker.helpers.multiple(createRandomPerson, {
+    count,
+  });
+  const filename = await getTempFilename({ postfix });
+  debug('Saving filename:', filename);
+  await pipeline(
+    Readable.from(userArray),
+    stringify({ header: true }),
+    fs.createWriteStream(filename),
+  );
+  return filename;
+}
 
-debug(`Creating ${count} fake people`);
-Readable.from(userArray)
-  .pipe(stringify({ header: true }))
-  .pipe(fs.createWriteStream(`${__dirname}/../people/${count}_fake_people.csv`));
-debug(`Creating ${count} fake transactions`);
-Readable.from(transactionArray)
-  .pipe(stringify({ header: true }))
-  .pipe(fs.createWriteStream(`${__dirname}/${count}_fake_transactions.csv`));
-debug(`Creating ${count} fake actions`);
-Readable.from(actionArray)
-  .pipe(stringify({ header: true }))
-  .pipe(fs.createWriteStream(`${__dirname}/../actions/${count}_fake_actions.csv`));
-console.log(actionArray.slice(0, 10));
+async function createTransactionFile() {
+  const transactionArray = [];
+
+  const userArray = faker.helpers.multiple(createRandomPerson, {
+    count,
+  });
+  userArray.forEach((user) => {
+    if (Math.random() > 0.3) return null;
+    const { email } = user;
+    const transCount = Math.random() * 4;
+    for (let i = 0; i < transCount; i += 1) {
+      transactionArray.push({
+        remote_id: faker.uuid,
+        entry_date: faker.date.past().toISOString(),
+        entry_type: 'TRANSACTION',
+        remote_input_id: faker.uuid,
+        email,
+        amount: faker.finance.amount({ max: 200, min: 5 }),
+        recurs: pick(recurs),
+        source_code: pick(sourceCodes),
+      });
+    }
+    return null;
+  });
+  const filename = await getTempFilename({ postfix });
+  await pipeline(
+    Readable.from(transactionArray),
+    stringify({ header: true }),
+    fs.createWriteStream(filename),
+  );
+  return filename;
+}
+
+async function createActionFile() {
+  const actionArray = [];
+  const userArray = faker.helpers.multiple(createRandomPerson, {
+    count,
+  });
+  userArray.forEach((user) => {
+    if (Math.random() > 0.3) return null;
+    const { email } = user;
+    const transCount = Math.random() * 4;
+    for (let i = 0; i < transCount; i += 1) {
+      const formId = Math.floor(Math.random() * formNames.length);
+      actionArray.push({
+        remote_id: faker.string.uuid(),
+        ts: faker.date.past().toISOString(),
+        entry_type: 'FORM_SUBMIT',
+        remote_input_id: `form_${formId}`,
+        remote_input_name: formNames[formId],
+        email,
+        source_code: pick(sourceCodes),
+        action_target: pick(actionTargets),
+        action_content: faker.lorem.lines(),
+      });
+    }
+    return null;
+  });
+  const filename = await getTempFilename({ postfix });
+  await pipeline(
+    Readable.from(actionArray),
+    stringify({ header: true }),
+    fs.createWriteStream(filename),
+  );
+  return filename;
+}
+
+if (require.main === module) {
+  debug(`Creating ${count} fake people`);
+  createPersonFile();
+}
+module.exports = {
+  createPersonFile,
+  createTransactionFile,
+  createActionFile,
+};

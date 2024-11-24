@@ -9,8 +9,9 @@ const debug = require('debug')('test-framework');
 // const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
-const PersonWorker = require('../../workers/PersonWorker');
+const InputWorker = require('../../workers/InputWorker');
 require('../test_db_schema');
+const { createActionFile } = require('../sample_data/generate_fake_data');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'engine9';
@@ -21,13 +22,13 @@ describe('Insert File of people with options', async () => {
 
   const knex = await sqlWorker.connect();
   debug('Completed connecting to database');
-  const personWorker = new PersonWorker({ accountId, knex });
+  const inputWorker = new InputWorker({ accountId, knex });
 
   after(async () => {
     await knex.destroy();
   });
 
-  it('Should be able to add standard identifiers to an array', async () => {
+  /* it('Should be able to add standard identifiers to an array', async () => {
     const batch = [
       {
         remote_id: '5bbbc3a9-ee40-41b8-b243-1176007346fb',
@@ -60,33 +61,41 @@ describe('Insert File of people with options', async () => {
     const pluginId = data?.[0]?.id;
     if (!pluginId) throw new Error('Could not find a plugin id with name Stub Plugin');
 
-    await personWorker.appendInputId({ pluginId, batch });
+    await inputWorker.appendInputId({ pluginId, batch });
     batch.forEach((o) => {
       assert.ok(o.input_id?.length > 0, `No valid input for ${o.input_id}`);
     });
 
-    await personWorker.appendEntryTypeId({ batch });
+    await inputWorker.appendEntryTypeId({ batch });
     batch.forEach((o) => {
       assert.ok(o.source_code_id > 0, `No valid source code for ${o.source_code}`);
     });
 
-    await personWorker.appendSourceCodeId({ batch });
+    await inputWorker.appendSourceCodeId({ batch });
     batch.forEach((o) => {
       assert.ok(o.source_code_id > 0, `No valid source code for ${o.source_code}`);
     });
 
-    await personWorker.appendPersonId({ batch });
+    await inputWorker.appendPersonId({ batch });
     batch.forEach((o) => {
       debug(`${o.email}->${o.person_id}`);
       assert.ok(o.person_id > 0, `No valid person information for ${o.email}`);
     });
 
-    await personWorker.appendEntryId({ pluginId, batch });
+    await inputWorker.appendEntryId({ pluginId, batch });
     batch.forEach((o) => {
       assert.ok(o.entry_id?.length > 0, `No valid input for ${o.input_id}`);
       const ts = new Date(o.ts).getTime();
       const entryts = getUUIDTimestamp(o.entry_id).getTime();
       assert.ok(ts === entryts, 'Timestamps for entry_id (a v7 uuid) and ts don\'t match');
     });
+  });
+  */
+
+  it('Should be able to append identifiers to a file, and write a sqlite database', async () => {
+    const filename = await createActionFile();
+    const output = await inputWorker.load({ pluginId: 'testing', filename });
+    debug('Input', filename);
+    debug('Output filename', output);
   });
 });

@@ -125,9 +125,9 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
         (item.identifiers || []).forEach((id) => {
           personIdentifersToInsert[id.value] = {
             person_id: item.person_id,
-            // source_plugin_id is the connection this record first came from.  It
+            // source_input_id is the connection this record first came from.  It
             // should be provided by the source stream, or null
-            source_plugin_id: id.source_plugin_id || null,
+            source_input_id: id.source_input_id || null,
             id_type: id.type,
             id_value: id.value,
           };
