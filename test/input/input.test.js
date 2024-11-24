@@ -28,7 +28,7 @@ describe('Insert File of people with options', async () => {
     await knex.destroy();
   });
 
-  /* it('Should be able to add standard identifiers to an array', async () => {
+  it('Should be able to add standard identifiers to an array', async () => {
     const batch = [
       {
         remote_id: '5bbbc3a9-ee40-41b8-b243-1176007346fb',
@@ -90,7 +90,6 @@ describe('Insert File of people with options', async () => {
       assert.ok(ts === entryts, 'Timestamps for entry_id (a v7 uuid) and ts don\'t match');
     });
   });
-  */
 
   it('Should be able to append identifiers to a file, and write a sqlite database', async () => {
     const filename = await createActionFile();
