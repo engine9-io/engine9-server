@@ -78,6 +78,26 @@ Worker.prototype.ok = async function f() {
 Worker.prototype.ok.metadata = {
   options: {},
 };
+
+// This is engine dependent
+Worker.prototype.parseQueryResults = function ({ results }) {
+  let data; let records; let modified; let columns;
+  if (Array.isArray(results)) {
+    [data, columns] = results;
+    records = data.affectedRows;
+    modified = data.changedRows;
+  } else {
+    // probably not a select
+    data = [];
+    records = results.changes;
+    modified = results.changes;
+    columns = [];
+  }
+
+  return {
+    data, records, modified, columns,
+  };
+};
 // values can be undefined or null,
 // implying we don't want to use any bindings -- may have already been bound
 Worker.prototype.query = async function (options) {
@@ -89,13 +109,9 @@ Worker.prototype.query = async function (options) {
   try {
     const knex = await this.connect();
     debug('Running:', `${opts.sql.slice(0, 300)}...`, opts.values);
-    const [data, columns] = await knex.raw(opts.sql, opts.values);
-    const records = data.affectedRows;
-    const modified = data.changedRows;
+    const results = await knex.raw(opts.sql, opts.values || []);
 
-    return {
-      data, records, modified, columns,
-    };
+    return this.parseQueryResults({ sql: opts.sql, results });
   } catch (e) {
     info('Error running query:', options, e);
     throw e;
@@ -898,11 +914,15 @@ Worker.prototype.insertFromStream.metadata = {
 /* Standard tables have an id field that is used to */
 Worker.prototype.upsertArray = async function ({ table, array }) {
   if (!Array.isArray(array)) throw new Error('an array is required to upsert');
-  debug('arr:', { array });
+
   if (array.length === 0) return [];
 
   const desc = await this.describe({ table });
   const knex = await this.connect();
+  if (!desc.columns?.length) {
+    debug(desc);
+    throw new Error(`Error describing ${table}, no columns`);
+  }
 
   // Use the first object to define the columns we're trying to upsert
   // Otherwise we have to do much less efficient per-item updates.
@@ -962,8 +982,8 @@ Worker.prototype.upsertTables = async function ({ tablesToUpsert }) {
 
 Worker.prototype.drop = async function ({ table }) {
   if (!table) throw new Error('table is required');
-
-  return this.query(`drop table if exists ${this.escapeTable(table)}`);
+  const o = await this.query(`drop table if exists ${this.escapeTable(table)}`);
+  return o;
 };
 
 Worker.prototype.drop.metadata = {

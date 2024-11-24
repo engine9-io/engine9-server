@@ -369,7 +369,9 @@ Worker.prototype.appendEntryTypeId = function ({
   batch,
 }) {
   batch.forEach((o) => {
-    if (!o.entry_type) throw new Error('No entry_type specified');
+    if (!o.entry_type) {
+      throw new Error('No entry_type specified');
+    }
     const id = TIMELINE_ENTRY_TYPES[o.entry_type];
     if (!id) throw new Error(`Invalid entry_type: ${o.entry_type}`);
     o.entry_type_id = id;
@@ -390,14 +392,14 @@ Worker.prototype.appendEntryId = async function ({
 }) {
   const req = ['input_id', 'ts', 'entry_type_id', 'person_id'];
   batch.forEach((b) => {
-    if (b.entry_id) return;
+    if (b.id) return;
     const missing = req.filter((d) => !b[d]);
     if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
     // get a temp ID
     const uuid = uuidv5(`${b.ts}-${b.person_id}-${b.entry_type_id}-${b.source_code_id}`, b.input_id);
     // Change out the ts to match the v7 sorting.
     // Because outside entry ids may not match this standard, uuid sorting isn't guaranteed
-    b.entry_id = getUUIDv7(b.ts, uuid);
+    b.id = getUUIDv7(b.ts, uuid);
   });
 };
 

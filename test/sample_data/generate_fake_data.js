@@ -30,7 +30,7 @@ function createRandomPerson() {
   };
 }
 
-const count = 1000;
+const count = 5;
 const recurs = ['', '', '', '', '', '', '', '', '', 'daily', 'weekly', 'monthly', 'monthly', 'monthly', 'monthly', 'monthly', 'quarterly', 'annually', 'annually'];
 const formNames = ['Q1 Advocacy Action', 'Q2 Petition', 'Whales are cool'];
 const sourceCodes = ['ACQ_EM_2023_X_123', 'EM_2023_X_123_A', 'EM_2023_X_123_B'];

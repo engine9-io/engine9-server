@@ -57,18 +57,16 @@ describe('Insert File of people with options', async () => {
           + 'Centum veritatis spero corporis cruentus mollitia defleo auditor.',
       },
     ];
-    const { data } = await sqlWorker.query('select id from plugin where name=\'Stub Plugin\'');
-    const pluginId = data?.[0]?.id;
-    if (!pluginId) throw new Error('Could not find a plugin id with name Stub Plugin');
+    const pluginId = 'testing';
 
     await inputWorker.appendInputId({ pluginId, batch });
     batch.forEach((o) => {
-      assert.ok(o.input_id?.length > 0, `No valid input for ${o.input_id}`);
+      assert.ok(o.input_id?.length > 0, `Not a valid input_id ${o.input_id}`);
     });
 
     await inputWorker.appendEntryTypeId({ batch });
     batch.forEach((o) => {
-      assert.ok(o.source_code_id > 0, `No valid source code for ${o.source_code}`);
+      assert.ok(o.entry_type_id > 0, `No valid entry_type_id for ${o.entry_type}`);
     });
 
     await inputWorker.appendSourceCodeId({ batch });
@@ -83,10 +81,11 @@ describe('Insert File of people with options', async () => {
     });
 
     await inputWorker.appendEntryId({ pluginId, batch });
+    debug(batch);
     batch.forEach((o) => {
-      assert.ok(o.entry_id?.length > 0, `No valid input for ${o.input_id}`);
+      assert.ok(o.id?.length > 0, `Not a valid entry.id: ${o.id}`);
       const ts = new Date(o.ts).getTime();
-      const entryts = getUUIDTimestamp(o.entry_id).getTime();
+      const entryts = getUUIDTimestamp(o.id).getTime();
       assert.ok(ts === entryts, 'Timestamps for entry_id (a v7 uuid) and ts don\'t match');
     });
   });
