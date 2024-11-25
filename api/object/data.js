@@ -134,7 +134,7 @@ async function getData(options, databaseWorker) {
     offset,
   };
 
-  const invalid = ['conditions', 'groupBy', 'columns'].filter((k) => {
+  const invalid = ['conditions', 'groupBy', 'columns', 'orderBy'].filter((k) => {
     try {
       eqlObject[k] = makeArray(options[k]);
       return false;
@@ -282,11 +282,13 @@ async function getData(options, databaseWorker) {
   return { data, includes };
 }
 
+function nameToLabel(table, name) {
+  return (String(name).charAt(0).toUpperCase() + String(name).slice(1)).replace(/_/g, ' ');
+}
+
 router.get([
   '/tables/:table/:id',
   '/tables/:table'], async (req, res) => {
-  const start = new Date().getTime();
-
   try {
     const table = req.params?.table;
     if (!table) throw new ObjectError({ status: 422, message: 'No table provided in the uri' });
@@ -295,9 +297,13 @@ router.get([
       table, id: req.params?.id, ...req.query,
     }, req.databaseWorker);
     if (req.query.schema === 'true') {
-      output.schema = await req.databaseWorker.describe({ table: req.params.table });
+      output.schema = await req.databaseWorker.describe({ table });
+      output.schema.columns = output.schema.columns.map((c) => ({
+        column_name: c.name,
+        column_type: c.column_type,
+        label: nameToLabel(table, c.name),
+      }));
     }
-    console.log(`Returning in ${new Date().getTime() - start}`);
     return res.json(output);
   } catch (e) {
     debug('Error handling request:', e, e.code, e.message);
