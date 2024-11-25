@@ -570,6 +570,9 @@ Worker.prototype.stringToType = function (_v, _t, length, nullable, nullAsString
       if (typeof v === 'string') v = v.replace(/[,$]/g, '');
       v = parseFloat(v) || 0;
       break;
+    case 'jsonb':
+      v = typeof v === 'object' ? JSON.stringify(v) : v;
+      break;
     default:
   }
   return v;

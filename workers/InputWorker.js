@@ -28,7 +28,7 @@ Worker.prototype.getInputStorageDB = async function ({ inputId, datePrefix }) {
   const exists = await fs.stat(sqliteFile).then(() => true).catch(() => false);
   const db = new SQLiteWorker({ accountId: this.accountId, sqliteFile });
   if (exists) {
-    return db;
+    return { filename: sqliteFile, db };
   }
 
   await db.query('BEGIN;');
@@ -43,13 +43,13 @@ Worker.prototype.getInputStorageDB = async function ({ inputId, datePrefix }) {
         )`);
   await db.query('CREATE INDEX timeline_ts ON timeline (ts)');
   await db.query('CREATE INDEX timeline_person_id ON timeline (person_id)');
-  await db.query(`create table timeline_details(
+  await db.query(`create table timeline_detail(
           id text not null primary key,
           details jsonb not null      
         )`);
   await db.query('COMMIT;');
 
-  return db;
+  return { filename: sqliteFile, db };
 };
 
 Worker.prototype.load = async function (options) {
@@ -77,8 +77,8 @@ Worker.prototype.load = async function (options) {
 
         const output = await worker.upsertTimelineInputFile({ batch });
         // const { recordCounts }
-        debug(output.files);
-        Object.entries(output.files).forEach(([k, r]) => {
+        debug(output);
+        Object.entries(output).forEach(([k, r]) => {
           outputFiles[k] = (outputFiles[k] || 0) + r;
         });
         return cb();
@@ -104,19 +104,56 @@ Worker.prototype.upsertTimelineInputFile = async function ({ batch }) {
     let info = timelineFiles[`${datePrefix}:${inputId}`];
     if (!info) {
       // eslint-disable-next-line no-await-in-loop
-      const db = await this.getInputStorageDB({ inputId, datePrefix });
-      info = { records: 0, db, array: [] };
+      const { filename, db } = await this.getInputStorageDB({ inputId, datePrefix });
+      info = {
+        filename, records: 0, db, array: [],
+      };
       timelineFiles[`${datePrefix}:${inputId}`] = info;
     }
     info.array.push(o);
   }
-  const output = { files: {} };
-  // eslint-disable-next-line no-restricted-syntax
-  for (const [filename, { db, array }] of Object.entries(timelineFiles)) {
-    // eslint-disable-next-line no-await-in-loop
-    const resultArray = await db.upsertArray({ table: 'timeline', array });
+  const output = { };
+  const ignoreFields = {
+    id: 1,
+    ts: 1,
+    input_id: 1,
+    entry_type_id: 1,
+    entry_type: 1,
+    person_id: 1,
+    source_code: 1,
+    source_code_id: 1,
+  };
 
-    output.files[filename] = resultArray.length;
+  // eslint-disable-next-line no-restricted-syntax
+  for (const [dbKey, timelineObj] of Object.entries(timelineFiles)) {
+    const { db, array, filename } = timelineObj;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const results = await db.upsertArray({ table: 'timeline', array });
+      const detailArray = array.map((d) => {
+        const details = {};
+        let include = false;
+        Object.entries(d).forEach(([k, v]) => {
+          if (!ignoreFields[k]) {
+            details[k] = v;
+            include = true;
+          }
+        });
+        return include ? { id: d.id, details } : false;
+      }).filter(Boolean);
+      let details = null;
+      if (detailArray.length > 0) {
+        // eslint-disable-next-line no-await-in-loop
+        details = await db.upsertArray({ table: 'timeline_detail', array: detailArray });
+      }
+
+      output[dbKey] = { timeline: results, details };
+    } catch (e) {
+      debug(`Error for key ${dbKey} in filename ${filename}`);
+      throw e;
+    } finally {
+      db.destroy();
+    }
   }
   return output;
 };
