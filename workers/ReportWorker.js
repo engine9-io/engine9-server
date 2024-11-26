@@ -63,7 +63,7 @@ function getDateConditions(start, end, date_column) {
   return c;
 }
 
-Worker.prototype.run = async function run({ report, qs = {} }) {
+Worker.prototype.runReport = async function run({ report, overrides = {} }) {
   if (typeof report !== 'object') throw new Error('run requires a report object');
 
   // eslint-disable-next-line no-restricted-syntax
@@ -95,7 +95,7 @@ Worker.prototype.run = async function run({ report, qs = {} }) {
         // Don't predefine the domain -- the data should do that even without filters
         // domain=[relativeDate("-3M").getTime(),relativeDate("now").getTime()];
           const dimension_name = 'dimension_name';
-          const { days } = qs;
+          const { days } = overrides;
           let date_group = null;
           if (days > 1200) {
             date_group = { name: dimension_name, eql: `YEAR(${dimension.eql})` };
@@ -137,18 +137,22 @@ Worker.prototype.run = async function run({ report, qs = {} }) {
           conditions: conditions || [],
           groupBy: groupBy || [],
           orderBy: c.orderBy || [],
-          limit: parseInt(qs.limit || c.limit || 1000, 10),
-          offset: qs.offset || c.offset || 0,
+          limit: parseInt(overrides.limit || overrides.limit || 1000, 10),
+          offset: overrides.offset || c.offset || 0,
         };
         if (data_source.date_column) {
           query.conditions = query.conditions
-            .concat(getDateConditions(qs.start, qs.end, data_source.date_column));
+            .concat(getDateConditions(overrides.start, overrides.end, data_source.date_column));
         }
         if (data_source.subquery) {
           query.subquery = data_source.subquery;
           if (data_source.subquery.date_column) {
             query.subquery.conditions = (query.subquery.conditions || [])
-              .concat(getDateConditions(qs.start, qs.end, data_source.subquery.date_column));
+              .concat(getDateConditions(
+                overrides.start,
+                overrides.end,
+                data_source.subquery.date_column,
+              ));
             delete data_source.subquery.date_column;
           } else {
           // do nothing
@@ -172,9 +176,10 @@ Worker.prototype.run = async function run({ report, qs = {} }) {
   return report;
 };
 
-Worker.prototype.run.metadata = {
+Worker.prototype.runReport.metadata = {
   options: {
-    query: {},
+    report: {},
+    overrides: {},
   },
 };
 

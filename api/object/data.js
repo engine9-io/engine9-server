@@ -9,9 +9,14 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 // knex starts up it's own debugger,
 const Knex = require('knex');
 
-const SQLWorker = require('../../workers/SQLWorker');
+const ReportWorker = require('../../workers/ReportWorker');
 const SegmentWorker = require('../../workers/SegmentWorker');
 const { ObjectError } = require('../../utilities');
+
+const reports = {
+  // eslint-disable-next-line global-require
+  people: require('../../reports/people'),
+};
 
 const router = express.Router({ mergeParams: true });
 
@@ -33,7 +38,7 @@ function knexConfigForTenant(accountId) {
   }
 }
 
-function getSQLWorkerForRequest(req) {
+function getDataWorkerForRequest(req) {
   // the account_id comes from authentication step, or in the headers,
   // NOT the url parameters, engine9 is the default
   const { accountId } = req;
@@ -44,7 +49,7 @@ function getSQLWorkerForRequest(req) {
     const config = knexConfigForTenant(accountId);
 
     const knex = Knex(config);
-    databaseWorker = new SQLWorker({ accountId, knex });
+    databaseWorker = new ReportWorker({ accountId, knex });
     databaseWorkerCache.set(accountId, databaseWorker);
   }
 
@@ -88,7 +93,7 @@ router.use((req, res, next) => {
 
 router.use((req, res, next) => {
   try {
-    req.databaseWorker = getSQLWorkerForRequest(req);
+    req.databaseWorker = getDataWorkerForRequest(req);
   } catch (e) {
     return res.status(401).json({ error: `No connection for account ${this.accountId}` });
   }
@@ -285,6 +290,19 @@ async function getData(options, databaseWorker) {
 function nameToLabel(table, name) {
   return (String(name).charAt(0).toUpperCase() + String(name).slice(1)).replace(/_/g, ' ');
 }
+
+router.get(
+  '/reports/:report',
+  async (req, res) => {
+    try {
+      const report = reports.people;
+      return req.databaseWorker.runReport({ report, overrides: req.query });
+    } catch (e) {
+      debug('Error handling request:', e, e.code, e.message);
+      return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
+    }
+  },
+);
 
 router.get([
   '/tables/:table/:id',
