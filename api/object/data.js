@@ -296,7 +296,8 @@ router.get(
   async (req, res) => {
     try {
       const report = reports.people;
-      return req.databaseWorker.runReport({ report, overrides: req.query });
+      const output = await req.databaseWorker.runReport({ report, overrides: req.query });
+      return res.json(output);
     } catch (e) {
       debug('Error handling request:', e, e.code, e.message);
       return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
