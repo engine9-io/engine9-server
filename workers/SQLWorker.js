@@ -237,6 +237,7 @@ Worker.prototype.indexes.metadata = {
 Worker.prototype.describe = async function describe(opts) {
   const { table } = opts;
   if (!table) throw new Error(`No table provided to describe with opts ${Object.keys(opts)}`);
+  if (table === 'dual') return { database: 'dual', columns: [] };// special handling for function calls
   debug(`Describing ${table}`, { accountId: this.accountId });
   const sql = `select database() as DB,COLUMN_NAME,COLUMN_TYPE,DATA_TYPE,IS_NULLABLE,COLUMN_DEFAULT,CHARACTER_MAXIMUM_LENGTH,EXTRA FROM information_schema.columns WHERE  table_schema = Database() AND table_name = '${this.escapeTable(table)}' order by ORDINAL_POSITION`;
   const r = await this.query(sql);

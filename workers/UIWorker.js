@@ -30,8 +30,8 @@ const DEFAULT_UI = {
             {
               table: 'person',
               columns: [
-                { eql: 'YEAR(modified_at)', alias: 'year_modified' },
-                { eql: 'count(id)', alias: 'count' },
+                { eql: 'YEAR(modified_at)', name: 'year_modified' },
+                { eql: 'count(id)', name: 'count' },
               ],
               conditions: [
                 { eql: "YEAR(modified_at)>'2020-01-01'" },

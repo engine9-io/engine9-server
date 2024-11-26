@@ -11,6 +11,12 @@ function parseJSON5(s) {
   return JSON5.parse(s);
 }
 
+function isValidDate(d) {
+  // we WANT to use isNaN, not the Number.isNaN -- we're checking the date type
+  // eslint-disable-next-line no-restricted-globals
+  return d instanceof Date && !isNaN(d);
+}
+
 function relativeDate(s, _initialDate) {
   let initialDate = _initialDate;
   if (!s || s === 'none') return null;
@@ -19,7 +25,7 @@ function relativeDate(s, _initialDate) {
   // eslint-disable-next-line eqeqeq
   if (parseInt(s, 10) == s) {
     const r = new Date(parseInt(s, 10));
-    if (r === 'Invalid Date') throw new Error(`Invalid integer date:${s}`);
+    if (!isValidDate(r)) throw new Error(`Invalid integer date:${s}`);
     return r;
   }
 
@@ -53,7 +59,7 @@ function relativeDate(s, _initialDate) {
     } else {
       d = d.subtract(parseInt(r[2], 10), period);
     }
-    if (d.toDate() === 'Invalid Date') throw new Error(`Invalid date configuration:${r}`);
+    if (!isValidDate(d.toDate())) throw new Error(`Invalid date configuration:${r}`);
     if (r[4]) {
       const opts = r[4].split('.').filter(Boolean);
       if (opts[0] === 'start') d = d.startOf(opts[1] || 'day');
@@ -68,7 +74,7 @@ function relativeDate(s, _initialDate) {
     return r;
   }
   r = dayjs(new Date(s)).toDate();
-  if (r === 'Invalid Date') throw new Error(`Invalid Date: ${s}`);
+  if (!isValidDate(r)) throw new Error(`Invalid Date: ${s}`);
   return r;
 }
 
@@ -287,6 +293,7 @@ module.exports = {
   parseJSON5,
   parseDate,
   relativeDate,
+  isValidDate,
   toCharCodes,
   getIntArray,
   getStringArray,

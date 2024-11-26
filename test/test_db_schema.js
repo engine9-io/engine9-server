@@ -42,7 +42,7 @@ async function insertDefaults(opts) {
   schemaWorker.destroy();
 }
 
-const accountId = 'engine9';
+const accountId = 'test';
 const runner = new WorkerRunner();
 const env = runner.getWorkerEnvironment({ accountId });
 

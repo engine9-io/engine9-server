@@ -97,7 +97,7 @@ describe('Test SQL builder', async () => {
       table: 'subquery_1',
       subquery: {
         table: 'person_email',
-        fields: [
+        columns: [
           { eql: 'person_id', alias: 'person_id' },
           { eql: 'count(*)', alias: 'emails' },
         ],
