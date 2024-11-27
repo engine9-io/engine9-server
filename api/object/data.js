@@ -292,10 +292,10 @@ function nameToLabel(table, name) {
 }
 
 router.get(
-  '/reports/*?',
+  '/reports/*reportPath',
   async (req, res) => {
     const path = req.params[0];
-    console.log(path);
+    console.log(req.params, path);
     try {
       const report = reports.people;
       const output = await req.databaseWorker.runReport({ report, overrides: req.query });
