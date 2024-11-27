@@ -32,13 +32,13 @@ function Worker(worker) {
 
 util.inherits(Worker, SQLWorker);
 
-Worker.prototype.compile = function compile({ report }) {
+Worker.prototype.compileReport = function compile({ report }) {
   if (typeof report !== 'object') throw new Error('compile requires a report object');
 
   return report;
 };
 
-Worker.prototype.compile.metadata = {
+Worker.prototype.compileReport.metadata = {
   options: {
     query: {},
   },
@@ -114,21 +114,18 @@ Worker.prototype.runReport = async function run({ report, overrides = {} }) {
           groupBy = [].concat(d);
         } else if (dimensions) {
           const d = [].concat(dimensions).filter(Boolean);
-          d.forEach((x) => {
-            x.name = x.name || x.label;
-          });
           columns = [].concat(d).concat(columns);
           groupBy = [].concat(d);
         }
         columns = columns.filter(Boolean).map((_f, i) => {
           let f = { ..._f };
           if (typeof f === 'string') f = { column: f, name: f };
-          if (!f.name) f.name = f.label || `col${i}`;
+          f.name = f.name || `col${i}`;
           // there are limited columns we can pass because of GraphQL, don't return everything
           return { eql: f.eql, name: f.name, column: f.column };
         });
         groupBy = groupBy.filter(Boolean).map((f, i) => {
-          if (!f.name) f.name = f.label || `col${i}`;
+          f.name = f.name || `col${i}`;
           return { eql: f.eql, name: f.name };
         });
         query = {

@@ -13,10 +13,7 @@ const ReportWorker = require('../../workers/ReportWorker');
 const SegmentWorker = require('../../workers/SegmentWorker');
 const { ObjectError } = require('../../utilities');
 
-const reports = {
-  // eslint-disable-next-line global-require
-  people: require('../../reports/people'),
-};
+const reports = require('./reports');
 
 const router = express.Router({ mergeParams: true });
 
@@ -294,12 +291,16 @@ function nameToLabel(table, name) {
 router.get(
   '/reports/*reportPath',
   async (req, res) => {
-    const path = req.params[0];
-    console.log(req.params, path);
+    const { reportPath } = req.params;
+    const report = reports[reportPath.join('/')];
+    if (!report) {
+      debug(req.params);
+      return res.status(404).json({ message: `Could not find report${reportPath.join('/')}` });
+    }
     try {
-      const report = reports.people;
       const output = await req.databaseWorker.runReport({ report, overrides: req.query });
-      return res.json(output);
+      debug(`Returning report ${reportPath.join('/')}`);
+      return res.json({ report: output });
     } catch (e) {
       debug('Error handling request:', e, e.code, e.message);
       return res.status(e.status || 500).json({ message: e.message || 'Error with request' });

@@ -1132,7 +1132,7 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
         result = await dbWorker.transformEql({ eql, table });
         // eslint-disable-next-line no-console
         if (ignore_alias) result = result.sql;
-        else result = `${result.sql} as ${dbWorker.escapeColumn(name)}`;
+        else result = `${result.sql} as ${dbWorker.escapeValue(name)}`;
         debugMore('Finished eql');
       } else if (input === '*' || column === '*') {
         debugMore('Using a * column');
