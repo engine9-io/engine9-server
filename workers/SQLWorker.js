@@ -108,7 +108,7 @@ Worker.prototype.query = async function (options) {
   if (!opts.sql) throw new Error('No sql provided');
   try {
     const knex = await this.connect();
-    debug('Running:', `${opts.sql.slice(0, 300)}...`, opts.values);
+    debug('Running:', `${opts.sql.slice(0, 300)}...`);
     const results = await knex.raw(opts.sql, opts.values || []);
 
     return this.parseQueryResults({ sql: opts.sql, results });
