@@ -95,7 +95,7 @@ router.use((req, res, next) => {
   try {
     req.databaseWorker = getDataWorkerForRequest(req);
   } catch (e) {
-    return res.status(401).json({ error: `No connection for account ${this.accountId}` });
+    return res.status(401).json({ error: `No database connection for account ${req.accountId}` });
   }
   return next();
 });
@@ -292,8 +292,10 @@ function nameToLabel(table, name) {
 }
 
 router.get(
-  '/reports/:report',
+  '/reports/*?',
   async (req, res) => {
+    const path = req.params[0];
+    console.log(path);
     try {
       const report = reports.people;
       const output = await req.databaseWorker.runReport({ report, overrides: req.query });
