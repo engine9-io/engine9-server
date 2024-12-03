@@ -145,7 +145,7 @@ Worker.prototype.createTable = async function ({
     return s;
   });
   const sql = `create table ${this.escapeColumn(name)} (${colSQL.join(',')})
-      ENGINE=ReplacingMergeTree(${pkey.columns.map((d) => this.escapeColumn(d)).join()})
+      ENGINE=MergeTree(${pkey.columns.map((d) => this.escapeColumn(d)).join()})
       ORDER BY ${pkey.columns.map((d) => this.escapeColumn(d)).join()}`;
   await knex.raw(sql);
   return { created: true, table: name };
