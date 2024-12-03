@@ -146,14 +146,22 @@ WorkerRunner.prototype.getLogger = function getLogger(job) {
 };
 
 WorkerRunner.prototype.getMethod = function getMethod(WorkerConstructor, callback) {
-  const methods = [];
+  let methods = [];
   if (!WorkerConstructor?.prototype) return callback(`Worker must be a function, it is ${typeof WorkerConstructor}`);
 
-  Object.entries(WorkerConstructor.prototype).forEach(([i, v]) => {
-    if (typeof v === 'function' && v.metadata) {
-      methods.push({ name: i, metadata: v.metadata });
-    }
-  });
+  function getNames(c) {
+    const methodNames = [];
+    Object.getOwnPropertyNames(c).forEach((name) => {
+      const v = c[name];
+      if (typeof v === 'function' && v.metadata) {
+        methodNames.push({ name, metadata: v.metadata });
+      }
+    });
+    return methodNames;
+  }
+
+  methods = methods.concat(getNames(WorkerConstructor.prototype))
+    .concat(getNames(Object.getPrototypeOf(WorkerConstructor.prototype)));
 
   if (methods.length === 0) {
     return callback(`There are no available method for this workerInstance, with prototype items:${Object.keys(WorkerConstructor.prototype)}`);
