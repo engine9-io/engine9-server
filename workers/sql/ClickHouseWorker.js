@@ -37,7 +37,7 @@ Worker.prototype.connect = async function connect() {
   whereas not every schema
 */
 
-const stringNames = ['given_name', 'family_name'];
+const stringNames = ['given_name', 'family_name', 'email_hash_v1', 'phone_hash_v1'];
 Worker.prototype.deduceColumnDefinition = function ({
   name,
   type,
@@ -214,8 +214,12 @@ Worker.prototype.sync = async function ({
   const sourceDesc = await source.describe({ table });
   const indexes = await source.indexes({ table });
 
-  const conn = process.env.ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION;
-  if (!conn) throw new Error('ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION is a required environment variable to sync directly from a source');
+  const conn = process.env.ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION || source.auth;
+  if (!conn) {
+    debug('Source keys=', Object.keys(source));
+    debug('Source=', source);
+    throw new Error('ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION or source auth is a required environment variable to sync directly from a source');
+  }
   const {
     host,
     username,
