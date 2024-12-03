@@ -214,7 +214,8 @@ Worker.prototype.sync = async function ({
   const sourceDesc = await source.describe({ table });
   const indexes = await source.indexes({ table });
 
-  const conn = process.env.ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION || source.auth;
+  const conn = process.env.ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION
+     || source.auth?.database_connection;
   if (!conn) {
     debug('Source keys=', Object.keys(source));
     debug('Source=', source);
