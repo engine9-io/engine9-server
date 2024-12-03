@@ -37,7 +37,14 @@ Worker.prototype.connect = async function connect() {
   whereas not every schema
 */
 
-const stringNames = ['given_name', 'family_name', 'email_hash_v1', 'phone_hash_v1'];
+const namedTypes = {
+  given_name: 'String',
+  family_name: 'String',
+  email_hash_v1: 'String',
+  phone_hash_v1: 'String',
+  amount: 'Decimal(19,2)',
+  refund_amount: 'Decimal(19,2)',
+};
 Worker.prototype.deduceColumnDefinition = function ({
   name,
   type,
@@ -61,8 +68,8 @@ Worker.prototype.deduceColumnDefinition = function ({
     nullable: false,
     defaultValue: 0,
   };
-  if (stringNames.indexOf(name) >= 0) {
-    return Object.assign(output, { method: 'specificType', args: ['String'], defaultValue: '' });
+  if (namedTypes[name]) {
+    return Object.assign(output, { method: 'specificType', args: [namedTypes[name]], defaultValue: '' });
   } if (type === 'int') {
     if (min === undefined || max === undefined) {
       // default to normal int
