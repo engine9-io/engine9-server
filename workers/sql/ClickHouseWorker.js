@@ -220,7 +220,7 @@ Worker.prototype.sync = async function ({
     debug('Source=', source);
     throw new Error('ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION or source auth is a required environment variable to sync directly from a source');
   }
-  debug(conn);
+  debug('Connection string=', conn);
   const {
     host,
     username,
