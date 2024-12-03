@@ -251,48 +251,48 @@ module.exports = {
     }
     this.getDayFunction = function (_column, skipEscape) {
       let column = _column;
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       return `DATE(${column})`;
     };
 
     this.getQuarterFunction = function (_column, skipEscape) {
       let column = _column;
       // Works on legacy SQLServer and modern
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       return `CONCAT(YEAR(${column}),'-Q',QUARTER(${column}))`;
     };
 
     this.getStartOfQuarterFunction = function (_column, skipEscape) {
       let column = _column;
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       return `MAKEDATE(YEAR(${column}), 1) + INTERVAL QUARTER(${column})-1 QUARTER`;
     };
 
     this.getDateIntervalFunction = function (column, days) {
-      return `${this.escapeField(column)}+ interval ${days} day`;
+      return `${this.escapeColumn(column)}+ interval ${days} day`;
     };
 
     this.getHourIntervalFunction = function (column, hours) {
-      return `${this.escapeField(column)}+ interval ${hours} hour`;
+      return `${this.escapeColumn(column)}+ interval ${hours} hour`;
     };
 
     // Short date function -- particularly for
     // Google that mishandles date/datetime types in mysql, and needs YYYYMMDD format
     this.getShortDateFunction = function (_column, skipEscape) {
       let column = _column;
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       return `DATE_FORMAT(${column},'%Y%m%d')`;
     };
 
     this.getWeekFunction = function (_column, skipEscape) {
       let column = _column;
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       return `FROM_DAYS(TO_DAYS(${column}) -MOD(TO_DAYS(${column}) -1, 7))`;
     };
 
     this.getMonthNameFunction = function (_column, skipEscape) {
       let column = _column;
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       return `MONTHNAME(${column})`;
     };
 
@@ -301,26 +301,26 @@ module.exports = {
       */
     this.getTimezoneFunction = function (_column, timezone, skipEscape) {
       let column = _column;
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       const tz = timezone || (this.auth || {}).timezone || 'America/New_York';
       return `CONVERT_TZ(${column},'UTC',${this.escapeValue(tz)})`;
     };
 
     this.getMonthFunction = function (_column, skipEscape) {
       let column = _column;
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       return `DATE_ADD(LAST_DAY(DATE_SUB(${column}, interval 31 day)), interval 1 day)`;
     };
 
     this.getStartOfYearFunction = function (_column, skipEscape) {
       let column = _column;
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       return `CONCAT(YEAR(${column}),'-01-01')`;
     };
 
     this.getYearFunction = function (_column, skipEscape) {
       let column = _column;
-      if (!skipEscape) column = this.escapeField(column);
+      if (!skipEscape) column = this.escapeColumn(column);
       return `YEAR(${column})`;
     };
 

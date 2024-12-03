@@ -181,8 +181,8 @@ Worker.prototype.tables.metadata = {
   options: {},
 };
 
-Worker.prototype.escapeField = function (f) {
-  return this.dialect.escapeField(f);
+Worker.prototype.escapeColumn = function (f) {
+  return this.dialect.escapeColumn(f);
 };
 Worker.prototype.escapeValue = function (t) {
   return this.dialect.escapeValue(t);
@@ -388,10 +388,10 @@ Worker.prototype.loadTableFromQuery.metadata = {
   },
 };
 
-Worker.prototype.createTableFromAnalysis = async function ({ table, analysis }) {
+Worker.prototype.createTableFromAnalysis = async function ({ table, analysis, indexes }) {
   if (!analysis) throw new Error('analysis is required');
   const columns = analysis.fields.map((f) => this.deduceColumnDefinition(f));
-  return this.createTable({ table, columns });
+  return this.createTable({ table, columns, indexes });
 };
 
 Worker.prototype.createTableFromAnalysis.metadata = {

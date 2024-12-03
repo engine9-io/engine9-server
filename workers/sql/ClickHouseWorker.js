@@ -1,7 +1,6 @@
 const util = require('node:util');
 
 const Knex = require('knex');
-const clickhouse = require('@march_ts/knex-clickhouse-dialect');
 const debug = require('debug')('ClickHouseWorker');
 const SQLWorker = require('../SQLWorker');
 
@@ -26,39 +25,11 @@ Worker.prototype.connect = async function connect() {
     throw new Error('ENGINE9_CLICKHOUSE_CONNECTION is a required environment variable');
   }
   this.knex = new Knex({
-    client: clickhouse,
+    client: 'mysql2', // use mysql protocol, as the only existing one has flaws with insert...select
     connection: () => connString + this.accountId,
-    // optional migrations config
-    migrations: {
-      directory: 'migrations_clickhouse',
-      disableTransactions: true,
-      disableMigrationsListValidation: true,
-    },
   });
   return this.knex;
 };
-// This is engine dependent
-Worker.prototype.parseQueryResults = function ({ results }) {
-  let data; let records; let modified; let columns;
-  if (Array.isArray(results)) {
-    [data, columns] = results;
-    records = data.affectedRows;
-    modified = data.changedRows;
-  } else {
-    // probably not a select
-    data = [];
-    records = results.changes;
-    modified = results.changes;
-    columns = [];
-  }
-
-  return {
-    data, records, modified, columns,
-  };
-};
-
-// Worker.prototype.onDuplicate = function () { return 'on conflict do update set'; };
-// Worker.prototype.onDuplicateFieldValue = function (f) { return `excluded.${f}`; };
 
 /*
   Try to determine a viable database structure from an analysis.  This needs to be more specific
@@ -66,6 +37,7 @@ Worker.prototype.parseQueryResults = function ({ results }) {
   whereas not every schema
 */
 
+const stringNames = ['given_name', 'family_name'];
 Worker.prototype.deduceColumnDefinition = function ({
   name,
   type,
@@ -80,6 +52,7 @@ Worker.prototype.deduceColumnDefinition = function ({
   if (!type) {
     throw new Error(`No type for field ${name}`);
   }
+
   const output = {
     name,
     isKnexDefinition: true, // use these directly, don't map through the standard types
@@ -88,7 +61,9 @@ Worker.prototype.deduceColumnDefinition = function ({
     nullable: false,
     defaultValue: 0,
   };
-  if (type === 'int') {
+  if (stringNames.indexOf(name) >= 0) {
+    return Object.assign(output, { method: 'specificType', args: ['String'], defaultValue: '' });
+  } if (type === 'int') {
     if (min === undefined || max === undefined) {
       // default to normal int
       output.method = 'int';
@@ -132,11 +107,59 @@ Worker.prototype.deduceColumnDefinition = function ({
   return output;
 };
 
-Worker.prototype.sync = async function ({
+Worker.prototype.createTable = async function ({
+  table: name, columns, indexes = [],
+}) {
+  if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
+  // get the primary key, but that's it
+  const pkey = indexes?.find((d) => d.primary);
+  const knex = await this.connect();
+
+  const noTypes = columns.filter((c) => {
+    if (c.type || c.isKnexDefinition) return false;
+    return true;
+  });
+  if (noTypes.length > 0) throw new Error(`Error creating table ${name}: No type for columns: ${noTypes.map((d) => JSON.stringify(d)).join()}`);
+
+  const colSQL = columns.map((c) => {
+    let o = c;
+    if (!o.isKnexDefinition) o = this.dialect.standardToKnex(c);
+    const {
+      args, nullable, defaultValue,
+    } = o;
+    let s = `${this.escapeColumn(c.name)} ${args[0]}`;
+
+    if (nullable) { // no nullables in ClickHouse!
+      // sql+=` NULL`;
+    }
+    if (defaultValue !== undefined) {
+      s += ` DEFAULT ${this.escapeValue(defaultValue)}`;
+    }
+    return s;
+  });
+  const sql = `create table ${this.escapeColumn(name)} (${colSQL.join(',')})
+      ENGINE=ReplacingMergeTree(${pkey.columns.map((d) => this.escapeColumn(d)).join()})
+      ORDER BY ${pkey.columns.map((d) => this.escapeColumn(d)).join()}`;
+  await knex.raw(sql);
+  return { created: true, table: name };
+};
+Worker.prototype.createTable.metadata = {
+  options: {
+    table: {},
+    columns: {},
+  },
+};
+
+/*
+Sync data by piping through this process.
+Less efficient, but more flexible for different infrastructures
+*/
+Worker.prototype.syncThroughPipe = async function ({
   table, start, end, dateField,
 }) {
   const source = new SQLWorker({ accountId: this.accountId });
   const sourceDesc = await source.describe({ table });
+  const indexes = await source.indexes({ table });
 
   let localDesc = null;
   try {
@@ -144,14 +167,20 @@ Worker.prototype.sync = async function ({
   } catch (e) {
     debug(`No such table, creating ${table}`);
   }
+
   if (!localDesc) {
     const analysis = await source.analyze({ table });
-    await this.createTableFromAnalysis({ table, analysis });
+    await this.createTableFromAnalysis({
+      table,
+      analysis,
+      indexes,
+    });
+
     localDesc = await this.describe({ table });
   }
   const conditions = [];
 
-  let sql = `select * from ${table}`;
+  let sql = `select ${localDesc.columns.map((d) => this.escapeColumn(d.name)).join()} from ${table}`;
   if (start || end) {
     const dateFields = [
       'modified_at',
@@ -161,15 +190,69 @@ Worker.prototype.sync = async function ({
     const df = dateField
     || dateFields.find((f) => sourceDesc.fields.find((x) => f === x.name));
     if (!df) throw new Error(`No available date fields in ${sourceDesc.fields.map((d) => d.name)}`);
-    if (start) conditions.push(`${this.escapeField(df)}>=${this.escapeDate(relativeDate(start))}`);
-    if (end) conditions.push(`${this.escapeField(df)}<${this.escapeDate(relativeDate(end))}`);
+    if (start) conditions.push(`${this.escapeColumn(df)}>=${this.escapeDate(relativeDate(start))}`);
+    if (end) conditions.push(`${this.escapeColumn(df)}<${this.escapeDate(relativeDate(end))}`);
   }
   if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
 
   const stream = await source.stream({ sql });
 
-  return this.insertFromStream({ batchSize: 3, table, stream });
+  return this.insertFromStream({ batchSize: 100, table, stream });
 };
+Worker.prototype.syncThroughPipe.metadata = {
+  options: {
+    table: {},
+    start: {},
+    end: {},
+  },
+};
+
+Worker.prototype.sync = async function ({
+  table, start, end, dateField,
+}) {
+  const source = new SQLWorker({ accountId: this.accountId });
+  const sourceDesc = await source.describe({ table });
+  const indexes = await source.indexes({ table });
+
+  const conn = process.env.ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION;
+  if (!conn) throw new Error('ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION is a required environment variable to sync directly from a source');
+  const {
+    host,
+    username,
+    password,
+  } = new URL(conn);
+
+  let localDesc = null;
+  try {
+    localDesc = await this.describe({ table });
+  } catch (e) {
+    debug(`No such table, creating ${table}`);
+  }
+  if (!localDesc) {
+    const analysis = await source.analyze({ table });
+    await this.createTableFromAnalysis({ table, analysis, indexes });
+    localDesc = await this.describe({ table });
+  }
+  const conditions = [];
+  let sql = `insert into ${table} (${localDesc.columns.map((d) => this.escapeColumn(d.name)).join()})
+      select ${localDesc.columns.map((d) => this.escapeColumn(d.name)).join()} from mysql(${this.escapeValue(host)}, ${this.escapeValue(this.accountId)}, ${this.escapeValue(table)}, ${this.escapeValue(username)}, ${this.escapeValue(password)})`;
+  if (start || end) {
+    const dateFields = [
+      'modified_at',
+      'last_modified',
+      'created_at',
+    ];
+    const df = dateField
+    || dateFields.find((f) => sourceDesc.fields.find((x) => f === x.name));
+    if (!df) throw new Error(`No available date fields in ${sourceDesc.fields.map((d) => d.name)}`);
+    if (start) conditions.push(`${this.escapeColumn(df)}>=${this.escapeDate(relativeDate(start))}`);
+    if (end) conditions.push(`${this.escapeColumn(df)}<${this.escapeDate(relativeDate(end))}`);
+  }
+  if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
+
+  return this.query({ sql });
+};
+
 Worker.prototype.sync.metadata = {
   options: {
     table: {},
