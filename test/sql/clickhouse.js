@@ -4,9 +4,8 @@ const {
   describe, it, after, before,
 } = require('node:test');
 const assert = require('node:assert');
-const ClickHouseWorker = require('../../workers/sql/ClickHouseWorker');
-
 const debug = require('debug')('test/sql/cickhouse');
+const ClickHouseWorker = require('../../workers/sql/ClickHouseWorker');
 
 const accountId = 'test';
 
