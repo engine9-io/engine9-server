@@ -168,7 +168,7 @@ Worker.prototype.sync = async function ({
 
   const stream = await source.stream({ sql });
 
-  return this.insertFromStream({ table, stream });
+  return this.insertFromStream({ batchSize: 3, table, stream });
 };
 Worker.prototype.sync.metadata = {
   options: {

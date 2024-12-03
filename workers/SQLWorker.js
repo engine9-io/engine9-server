@@ -634,14 +634,7 @@ Worker.prototype.createTable = async function ({
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       } = o;
-      /*
 
-      */
-      if (method === 'specificType') {
-        debug(`Adding knex for column ${c.name}`, c, {
-          method, args, nullable, unsigned, defaultValue, defaultRaw,
-        });
-      }
       const m = table[method].apply(table, [c.name, ...args]);
       if (unsigned) m.unsigned();
       if (nullable) {
