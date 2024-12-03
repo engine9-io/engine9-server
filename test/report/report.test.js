@@ -12,7 +12,39 @@ const WorkerRunner = require('../../scheduler/WorkerRunner');
 const ReportWorker = require('../../workers/ReportWorker');
 require('../test_db_schema');
 
-const report = require('../../reports/email_transactions');
+const report = {
+  description: 'An overview of data in the timeline',
+  include_date: true,
+  label: 'Person Count By Month',
+  template: 'primary',
+  data_sources: {
+    default: {
+      table: 'person',
+      date_field: 'ts',
+    },
+  },
+  components: {
+    aTitle: 'Count of People by Month Created',
+    a0: {
+      component: 'BarChart',
+      is_date: true,
+      dimension: { label: 'Month', eql: 'MONTH(created_at)' },
+      metrics: [{ label: 'People', eql: 'count(*)' }],
+      conditions: [],
+    },
+    a1: {
+      table: 'dual',
+      component: 'Scorecard',
+      metrics: [{ label: 'sleep_1', eql: 'sleep(1)' }],
+    },
+    a2: {
+      table: 'dual',
+      component: 'Scorecard',
+      metrics: [{ label: 'sleep_2', eql: 'sleep(1)' }],
+      conditions: [],
+    },
+  },
+};
 
 describe('Test Report Builder', async () => {
   const accountId = 'test';

@@ -77,7 +77,7 @@ Worker.prototype.runReport = async function run({ report, overrides = {} }) {
       let { query } = c; // hard coded query, no options
       if (!query) {
         const {
-          dimension, dimensions, is_date, breakdown, metric, metrics,
+          dimension, dimensions, isDate, breakdown, metric, metrics,
         } = c;
         let { conditions } = c;
         c.table = c.table || data_source.table;
@@ -91,7 +91,7 @@ Worker.prototype.runReport = async function run({ report, overrides = {} }) {
         });
 
         let groupBy = [].concat(breakdown);
-        if (is_date) {
+        if (isDate) {
         // Don't predefine the domain -- the data should do that even without filters
         // domain=[relativeDate("-3M").getTime(),relativeDate("now").getTime()];
           const dimension_name = 'dimension_name';

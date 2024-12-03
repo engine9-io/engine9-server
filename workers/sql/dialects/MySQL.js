@@ -131,19 +131,6 @@ module.exports = {
   getType(type) {
     return mysqlTypes.find((t) => t.type === type);
   },
-  standardToDialect(o, defaultColumn) {
-    const output = { ...defaultColumn };
-    let standardType = o;
-    if (typeof o === 'object') {
-      standardType = o.type;
-    }
-    if (!standardType) throw new Error('You must specify a type for');
-    const lookup = mysqlTypes.find((d) => d.type === standardType);
-    if (lookup) {
-      return Object.assign(output, lookup, { type: standardType });
-    }
-    throw new Error(`Invalid type:${standardType}`);
-  },
   standardToKnex(col) { // return {method,args} for knex
     // The name of the knex methods is ... inconsistent
     const { type } = col;

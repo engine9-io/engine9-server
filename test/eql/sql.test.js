@@ -25,8 +25,8 @@ describe('Test SQL builder', async () => {
       table: 'person',
       columns: [
         // 'id',
-        { eql: 'YEAR(modified_at)', alias: 'year_modified' },
-        { eql: 'count(id)', alias: 'count' },
+        { eql: 'YEAR(modified_at)', name: 'year_modified' },
+        { eql: 'count(id)', name: 'count' },
       ],
       conditions: [
         { eql: "YEAR(modified_at)>'2020-01-01'" },
@@ -76,10 +76,10 @@ describe('Test SQL builder', async () => {
         },
       ],
       columns: [
-        { eql: 'person.id', alias: 'id' },
-        { eql: 'person_email.email', alias: 'email' },
-        { eql: 'work_emails.email', alias: 'work_email' },
-        { eql: 'phones.phone', alias: 'phone' },
+        { eql: 'person.id', name: 'id' },
+        { eql: 'person_email.email', name: 'email' },
+        { eql: 'work_emails.email', name: 'work_email' },
+        { eql: 'phones.phone', name: 'phone' },
       ],
       conditions: [
         { eql: "YEAR(person.created_at)>'2020-01-01'" },
@@ -91,26 +91,26 @@ describe('Test SQL builder', async () => {
     await sqlWorker.query(sql);
   });
 
-  // subqueries not working with aliases right now
+  // subqueries not working with namees right now
   it('should build sql with a valid subquery', async () => {
     const sql = await sqlWorker.buildSqlFromEQLObject({
       table: 'subquery_1',
       subquery: {
         table: 'person_email',
         columns: [
-          { eql: 'person_id', alias: 'person_id' },
-          { eql: 'count(*)', alias: 'emails' },
+          { eql: 'person_id', name: 'person_id' },
+          { eql: 'count(*)', name: 'emails' },
         ],
         groupBy: [{ eql: 'person_id' }],
-        alias: 'subquery_1',
+        name: 'subquery_1',
       },
       columns: [
         {
           eql: `case when subquery_1.emails>1
           then 'multi-email' else 'one-email' end`,
-          alias: 'level',
+          name: 'level',
         },
-        { eql: 'count(person_id)', alias: 'people' },
+        { eql: 'count(person_id)', name: 'people' },
       ],
       groupBy: [{
         eql: `case when subquery_1.emails>1

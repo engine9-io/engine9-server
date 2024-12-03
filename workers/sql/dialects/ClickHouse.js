@@ -48,15 +48,45 @@ const types = [
     knex_args: ((o) => ([o.length || 64])),
   },
 
-  { type: 'int', column_type: 'Int32', knex_method: 'integer' },
-  { type: 'bigint', column_type: 'Int64', knex_method: 'Int64' },
+  {
+    type: 'tinyint',
+    column_type: 'Int8',
+    knex_method: 'specificType',
+    knex_args: (() => (['Int8'])),
+    nullable: false,
+
+  },
+  {
+    type: 'smallint',
+    column_type: 'Int16',
+    knex_method: 'specificType',
+    knex_args: (() => (['Int16'])),
+    nullable: false,
+
+  },
+  {
+    type: 'int',
+    column_type: 'Int32',
+    knex_method: 'specificType',
+    knex_args: (() => (['Int32'])),
+    nullable: false,
+
+  },
+  {
+    type: 'bigint',
+    column_type: 'Int64',
+    knex_method: 'specificType',
+    knex_args: (() => (['Int64'])),
+    nullable: false,
+  },
+
   /* decimal(19,2) is chosen for currency
   as 4 digit currencies are rare enough to warrant another type */
   {
-    type: 'currency', column_type: 'Decimal(19,2)', knex_method: 'decimal', knex_args: [19, 2],
+    type: 'currency', column_type: 'Decimal(19,2)', knex_method: 'specificType', knex_args: () => (['Decimal(19, 2)']),
   },
   {
-    type: 'decimal', column_type: 'Decimal', knex_method: 'decimal', knex_args: (() => ([19, 4])),
+    type: 'decimal', column_type: 'Decimal', knex_method: 'specificType', knex_args: (() => (['Decimal(19, 4)'])),
   },
   { type: 'double', column_type: 'Float64', knex_method: 'double' },
   {
@@ -67,10 +97,10 @@ const types = [
     knex_method: 'boolean',
   },
   {
-    type: 'text', column_type: 'String', length: 65535, knex_method: 'text',
+    type: 'text', column_type: 'String', knex_method: 'text',
   },
   {
-    type: 'json', column_type: 'JSON', length: 4294967295, knex_method: 'json',
+    type: 'json', column_type: 'JSON', knex_method: 'json',
   },
   {
     type: 'created_at',
@@ -130,19 +160,6 @@ module.exports = {
   getType(type) {
     return types.find((t) => t.type === type);
   },
-  standardToDialect(o, defaultColumn) {
-    const output = { ...defaultColumn };
-    let standardType = o;
-    if (typeof o === 'object') {
-      standardType = o.type;
-    }
-    if (!standardType) throw new Error('You must specify a type for');
-    const lookup = types.find((d) => d.type === standardType);
-    if (lookup) {
-      return Object.assign(output, lookup, { type: standardType });
-    }
-    throw new Error(`Invalid type:${standardType}`);
-  },
   standardToKnex(col) { // return {method,args} for knex
     // The name of the knex methods is ... inconsistent
     const { type } = col;
@@ -201,13 +218,17 @@ module.exports = {
     if (input.column_type.indexOf('Int64') === 0) {
       input.column_type = 'bigint';
     }
+    if (input.column_type === 'LowCardinality(String)') {
+      input.column_type = 'String';
+    }
     if (input.column_type.indexOf('Int32') === 0
       || input.column_type.indexOf('Int16') === 0 // smallint isn't small enough to matter significantly
+      || input.column_type.indexOf('UInt') === 0
     ) {
-      input.column_type = 'int';
+      input.column_type = 'Int32';
     }
     if (input.column_type.indexOf('Decimal') === 0) {
-      input.column_type = 'decimal';
+      input.column_type = 'Decimal';
     }
     /* some engines have commented out descriptions */
     if (input.column_type.indexOf('/*') > 0) {

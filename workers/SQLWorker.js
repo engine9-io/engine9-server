@@ -14,10 +14,11 @@ const {
   ObjectError,
   bool, toCharCodes, parseRegExp, parseJSON5,
 } = require('../utilities');
-const analyze = require('../utilities/analyze');
-const SQLTypes = require('./SQLTypes');
+const analyzeStream = require('../utilities/analyze');
+const mysqlDialect = require('./sql/dialects/MySQL');
 
 const BaseWorker = require('./BaseWorker');
+const FileWorker = require('./FileWorker');
 
 require('dotenv').config({ path: '.env' });
 
@@ -36,7 +37,7 @@ function Worker(worker) {
     this.auth = config.accounts?.[worker.accountId]?.auth;
     if (!this.auth) throw new Error(`No authorization available for accountId:${worker.accountId}`);
   }
-  this.sql_functions = this.getSupportedSQLFunctions();
+  this.dialect = mysqlDialect;
 }
 
 util.inherits(Worker, BaseWorker);
@@ -181,13 +182,13 @@ Worker.prototype.tables.metadata = {
 };
 
 Worker.prototype.escapeField = function (f) {
-  return SQLTypes.mysql.escapeField(f);
+  return this.dialect.escapeField(f);
 };
 Worker.prototype.escapeValue = function (t) {
-  return SQLTypes.mysql.escapeValue(t);
+  return this.dialect.escapeValue(t);
 };
 Worker.prototype.addLimit = function (sql, limit, offset) {
-  return SQLTypes.mysql.addLimit(sql, limit, offset);
+  return this.dialect.addLimit(sql, limit, offset);
 };
 
 const tableNameMatch = /^[a-zA-Z0-9_]+$/;
@@ -235,7 +236,7 @@ Worker.prototype.indexes.metadata = {
 };
 
 Worker.prototype.describe = async function describe(opts) {
-  const { table } = opts;
+  const { table, raw } = opts;
   if (!table) throw new Error(`No table provided to describe with opts ${Object.keys(opts)}`);
   if (table === 'dual') return { database: 'dual', columns: [] };// special handling for function calls
   debug(`Describing ${table}`, { accountId: this.accountId });
@@ -279,8 +280,11 @@ Worker.prototype.describe = async function describe(opts) {
       default_value: defaultValue,
       auto_increment: (d.EXTRA || '').toUpperCase().indexOf('AUTO_INCREMENT') >= 0,
     };
+    if (bool(raw)) {
+      return o;
+    }
     try {
-      return SQLTypes.mysql.dialectToStandard(o, {} || Worker.defaultColumn);
+      return this.dialect.dialectToStandard(o, {} || Worker.defaultColumn);
     } catch (e) {
       info(`Error while describing table ${table}`);
       throw e;
@@ -293,6 +297,9 @@ Worker.prototype.describe = async function describe(opts) {
 Worker.prototype.describe.metadata = {
   options: {
     table: { required: true },
+    raw: {
+      description: "Don't try to convert to standard, default false",
+    },
   },
 };
 
@@ -331,10 +338,6 @@ Worker.prototype.tableType.metadata = {
   options: {
     table: { required: true },
   },
-};
-
-Worker.prototype.getSupportedSQLFunctions = function () {
-  return SQLTypes.mysql.supportedFunctions();
 };
 
 Worker.prototype.stream = async function ({ sql }) {
@@ -385,11 +388,30 @@ Worker.prototype.loadTableFromQuery.metadata = {
   },
 };
 
-Worker.prototype.insertFromQuery.metadata = {
+Worker.prototype.createTableFromAnalysis = async function ({ table, analysis }) {
+  if (!analysis) throw new Error('analysis is required');
+  const columns = analysis.fields.map((f) => this.deduceColumnDefinition(f));
+  return this.createTable({ table, columns });
+};
+
+Worker.prototype.createTableFromAnalysis.metadata = {
+};
+
+Worker.prototype.createAndLoadTable = async function (options) {
+  const fworker = new FileWorker(this);
+  const stream = await fworker.getStream(options);
+  const analysis = await analyzeStream(stream);
+  const table = options.table || `temp_${new Date().toISOString().replace(/[^0-9]/g, '_')}`.slice(0, -1);
+  await this.createTableFromAnalysis({ table, analysis });
+  const stream2 = await fworker.getStream(options);
+
+  return this.insertFromStream({ table, stream: stream2.stream });
+};
+Worker.prototype.createAndLoadTable.metadata = {
   options: {
-    sql: { required: true },
-    table: { required: true },
-    upsert: {},
+    table: {},
+    filename: {},
+    stream: {},
   },
 };
 
@@ -488,7 +510,7 @@ Worker.prototype.stringToType = function (_v, _t, length, nullable, nullAsString
       // if (v === undefined && nullable) return null;
       dt = new Date(v);
       if (dt === 'Invalid Date') return null;
-      return dt.toISOString().slice(0, -1);
+      return dt.toISOString().slice(0, -5);
 
     case 'bit':
     case 'int':
@@ -600,18 +622,26 @@ Worker.prototype.createTable = async function ({
   if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
   const knex = await this.connect();
   await knex.schema.createTable(name, (table) => {
-    const noTypes = columns.filter((c) => !c.type);
-    if (noTypes.length > 0) throw new Error(`Error creating table ${name}: No type for columns: ${columns.map((d) => d.name).join()}`);
+    const noTypes = columns.filter((c) => {
+      if (c.type || c.isKnexDefinition) return false;
+      return true;
+    });
+    if (noTypes.length > 0) throw new Error(`Error creating table ${name}: No type for columns: ${noTypes.map((d) => JSON.stringify(d)).join()}`);
 
     columns.forEach((c) => {
+      let o = c;
+      if (!o.isKnexDefinition) o = this.dialect.standardToKnex(c);
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
-      } = SQLTypes.mysql.standardToKnex(c);
+      } = o;
       /*
-      debug(`Adding knex for column ${c.name}`, c, {
-        method, args, nullable, unsigned, defaultValue, defaultRaw,
-      });
+
       */
+      if (method === 'specificType') {
+        debug(`Adding knex for column ${c.name}`, c, {
+          method, args, nullable, unsigned, defaultValue, defaultRaw,
+        });
+      }
       const m = table[method].apply(table, [c.name, ...args]);
       if (unsigned) m.unsigned();
       if (nullable) {
@@ -658,7 +688,7 @@ Worker.prototype.alterTable = async function ({ table: name, columns = [], index
     columns.forEach((c) => {
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
-      } = SQLTypes.mysql.standardToKnex(c);
+      } = this.dialect.standardToKnex(c);
       debug(`Altering column ${c.name}`, c, 'Knex opts=', {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       });
@@ -1019,7 +1049,7 @@ Worker.prototype.withAnalysis = function (options) {
     columnFn: (f) => worker.escapeColumn(f),
     valueFn: (f) => worker.escapeValue(f),
     tableFn: (f) => worker.escapeTable(f),
-    functions: worker.getSupportedSQLFunctions(),
+    functions: worker.dialect.supportedFunctions(),
     date_expr: options.date_expr || ((node, internal) => {
       const { operator, left_side, interval } = node;
       // let fn = 'date_add';
@@ -1111,7 +1141,7 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
       MIN: async (x) => `MIN(${x})`,
     };
 
-    const functionFns = worker.getSupportedSQLFunctions();
+    const functionFns = worker.dialect.supportedFunctions();
 
     async function fromColumn(input, opts) {
       const {
@@ -1223,7 +1253,7 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
 
     debugMore('Checking orderBy');
     const orderBy = await Promise.all(
-      (_orderBy || []).map((f) => fromColumn(f, { orderBy: true, ignore_alias: true })),
+      [].concat(_orderBy || []).map((f) => fromColumn(f, { orderBy: true, ignore_alias: true })),
     );
 
     let orderByClause = '';
@@ -1269,8 +1299,8 @@ Worker.prototype.analyze = async function describe(opts) {
   const { table } = opts;
   const { columns } = await this.describe({ table });
 
-  const stream = await this.stream({ sql: `select * from ${this.escapeTable(table)}` });
-  return analyze({ stream, field: columns });
+  const stream = await this.stream({ sql: `select * from ${this.escapeTable(table)} limit 10000` });
+  return analyzeStream({ stream, fieldTypes: columns });
 };
 
 Worker.prototype.analyze.metadata = {

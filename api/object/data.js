@@ -125,8 +125,9 @@ const uuidMatch = /^[0-9,a-f]{8}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f
 async function getData(options, databaseWorker) {
   const { table, limit = 100, offset = 0 } = options;
   if (!table) throw new ObjectError({ status: 422, message: 'No table provided' });
+  if (options.includes) throw new ObjectError({ status: 422, message: 'includes is not allowed, use include' });
   // Limit include calls to not beat up the DB
-  if (options.includes && !options.id && parseInt(limit, 10) > 100) {
+  if (options.include && !options.id && parseInt(limit, 10) > 100) {
     throw new ObjectError({ status: 422, message: 'No includes allowed with limits>100.  Please adjust the limit' });
   }
 
@@ -209,6 +210,7 @@ async function getData(options, databaseWorker) {
     }).filter(Boolean);
   }
   const dataLookup = {};
+
   data.forEach((d) => { dataLookup[d.id] = d; });
   const allIds = data.map((d) => {
     if (Number.isNaN(d.id)) {
@@ -219,11 +221,11 @@ async function getData(options, databaseWorker) {
     }
     return d.id;
   });
-  debug('Retrieved Ids:', allIds);
+  debug('Ids to retrieve', allIds);
   // Still parse the includes, we still want to throw an invalid includes
   // even if there's no data
   const cleanedIncludes = includeOption.map((inc) => {
-    if (inc.includes) throw new ObjectError({ status: 422, message: `Invalid include property ${inc.property}. Includes cannot have sub-includes.` });
+    if (inc.include) throw new ObjectError({ status: 422, message: `Invalid include property ${inc.property}. Includes cannot have sub-includes.` });
     // Add in the primary key filter
     inc.conditions = makeArray(inc.conditions);
     inc.foreign_id_field = inc.foreign_id_field || `${table}_id`;
@@ -256,10 +258,10 @@ async function getData(options, databaseWorker) {
       return getData(inc, databaseWorker);
     }),
   );
-  let includes = [];
+  let included = [];
   includeData.forEach((includeResults, i) => {
     const inc = cleanedIncludes[i];
-    includes = includes.concat(includeResults.data.map((r) => {
+    included = included.concat(includeResults.data.map((r) => {
       if (!inc.foreign_id_field) {
         throw new ObjectError('no foreign_id_field');
       }
@@ -281,7 +283,7 @@ async function getData(options, databaseWorker) {
       };
     }));
   });
-  return { data, includes };
+  return { data, included };
 }
 
 function nameToLabel(table, name) {
@@ -298,9 +300,14 @@ router.get(
       return res.status(404).json({ message: `Could not find report${reportPath.join('/')}` });
     }
     try {
-      const output = await req.databaseWorker.runReport({ report, overrides: req.query });
-      debug(`Returning report ${reportPath.join('/')}`);
-      return res.json({ report: output });
+      const attributes = await req.databaseWorker.runReport({ report, overrides: req.query });
+      return res.json({
+        data: [{
+          type: 'report_results',
+          id: reportPath.join('/'),
+          attributes,
+        }],
+      });
     } catch (e) {
       debug('Error handling request:', e, e.code, e.message);
       return res.status(e.status || 500).json({ message: e.message || 'Error with request' });
