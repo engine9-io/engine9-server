@@ -38,12 +38,12 @@ Worker.prototype.connect = async function connect() {
 */
 
 const namedTypes = {
-  given_name: 'String',
-  family_name: 'String',
-  email_hash_v1: 'String',
-  phone_hash_v1: 'String',
-  amount: 'Decimal(19,2)',
-  refund_amount: 'Decimal(19,2)',
+  given_name: { method: 'specificType', args: ['String'], defaultValue: '' },
+  family_name: { method: 'specificType', args: ['String'], defaultValue: '' },
+  email_hash_v1: { method: 'specificType', args: ['String'], defaultValue: '' },
+  phone_hash_v1: { method: 'specificType', args: ['String'], defaultValue: '' },
+  amount: { method: 'specificType', args: ['Decimal(19,2)'], defaultValue: 0 },
+  refund_amount: { method: 'specificType', args: ['Decimal(19,2)'], defaultValue: 0 },
 };
 Worker.prototype.deduceColumnDefinition = function ({
   name,
@@ -69,7 +69,7 @@ Worker.prototype.deduceColumnDefinition = function ({
     defaultValue: 0,
   };
   if (namedTypes[name]) {
-    return Object.assign(output, { method: 'specificType', args: [namedTypes[name]], defaultValue: '' });
+    return Object.assign(output, namedTypes[name]);
   } if (type === 'int') {
     if (min === undefined || max === undefined) {
       // default to normal int
