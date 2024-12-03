@@ -10,11 +10,13 @@ const fsp = fs.promises;
 const path = require('node:path');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const SQLWorker = require('./SQLWorker');
-const SQLTypes = require('./SQLTypes');
 const { ErrorWithMetadata: Error } = require('./Errors');
+const mysqlDialect = require('./sql/dialects/MySQL');
 
 function Worker(worker) {
   SQLWorker.call(this, worker);
+
+  this.dialect = mysqlDialect;
 }
 
 util.inherits(Worker, SQLWorker);
@@ -95,7 +97,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
         if (col.column_type) {
           invalidColumns.push({ ...col, name, error: 'column_type is reserved for sql dialect' });
         }
-        const typeDetails = SQLTypes.default.getType(col.type) || {};
+        const typeDetails = this.dialect.getType(col.type) || {};
         try {
           return {
             ...SQLWorker.defaultStandardColumn, ...typeDetails, ...col, name,
