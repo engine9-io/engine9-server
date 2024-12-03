@@ -226,6 +226,7 @@ Worker.prototype.sync = async function ({
     host,
     username,
     password,
+    pathname,
   } = new URL(conn);
 
   let localDesc = null;
@@ -241,7 +242,7 @@ Worker.prototype.sync = async function ({
   }
   const conditions = [];
   let sql = `insert into ${table} (${localDesc.columns.map((d) => this.escapeColumn(d.name)).join()})
-      select ${localDesc.columns.map((d) => this.escapeColumn(d.name)).join()} from mysql(${this.escapeValue(host)}, ${this.escapeValue(this.accountId)}, ${this.escapeValue(table)}, ${this.escapeValue(username)}, ${this.escapeValue(password)})`;
+      select ${localDesc.columns.map((d) => this.escapeColumn(d.name)).join()} from mysql(${this.escapeValue(host)}, ${this.escapeValue(pathname?.slice(1) || this.accountId)}, ${this.escapeValue(table)}, ${this.escapeValue(username)}, ${this.escapeValue(password)})`;
   if (start || end) {
     const dateFields = [
       'modified_at',
