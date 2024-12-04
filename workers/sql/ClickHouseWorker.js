@@ -104,14 +104,16 @@ Worker.prototype.deduceColumnDefinition = function ({
       } else if (min >= -32768 && max <= 32767) {
         // 2bytes
         Object.assign(output, { method: 'specificType', args: ['Int16'] });
-      } else if (min >= -8388608 && max <= 8388607) {
+      } else if (min >= -2147483648 && max <= 2147483647) {
         Object.assign(output, { method: 'specificType', args: ['Int32'] });
-      } else if (min >= -2147483648 && max <= 2147483647) { Object.assign(output, { method: 'specificType', args: ['Int64'] }); }
+      } else {
+        Object.assign(output, { method: 'specificType', args: ['Int64'] });
+      }
     } else if (max <= 255) {
       Object.assign(output, { method: 'specificType', args: ['UInt8'] });
     } else if (max <= 65535) {
       Object.assign(output, { method: 'specificType', args: ['UInt16'] });
-    } else if (max <= 16777215) {
+    } else if (max <= 4294967295) {
       Object.assign(output, { method: 'specificType', args: ['UInt32'] });
     } else {
       Object.assign(output, { method: 'specificType', args: ['UInt64'] });
