@@ -128,6 +128,7 @@ const mysqlTypes = [
 function isInt(s) { return Number.isInteger(typeof s === 'number' ? s : parseFloat(s)); }
 
 module.exports = {
+  name: 'MySQL',
   getType(type) {
     return mysqlTypes.find((t) => t.type === type);
   },

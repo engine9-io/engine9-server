@@ -3,7 +3,11 @@ const mysql = require('mysql2');
 
 const types = [
   {
-    type: 'id', column_type: 'Int64', nullable: false, auto_increment: true, knex_method: 'bigIncrements',
+    type: 'id',
+    column_type: 'Int64',
+    nullable: false,
+    knex_method: 'specificType',
+    knex_args: (() => (['Int64'])),
   },
   {
     // person id is a very specific foreign id
@@ -11,11 +15,20 @@ const types = [
     // that way we never have to deal with null cases, and different platforms can rely on it having
     // a non-null value
     // Even though there's situations where it's not set, that value is then 0
-    type: 'person_id', column_type: 'Int64', nullable: false, default_value: 0, knex_method: 'Int64',
+    type: 'person_id',
+    column_type: 'Int64',
+    nullable: false,
+    default_value: 0,
+    knex_method: 'specificType',
+    knex_args: (() => (['Int64'])),
   },
   {
     // foreign ids can be nullable
-    type: 'foreign_id', column_type: 'Int64', nullable: true, knex_method: 'Int64',
+    type: 'foreign_id',
+    column_type: 'Int64',
+    nullable: true,
+    knex_method: 'specificType',
+    knex_args: (() => (['Int64'])),
   },
   { // A string identifier, similar to a string,
     // but can't be null, defaults to '', 64 chars to join with hashes
@@ -31,8 +44,9 @@ const types = [
 
     type: 'id_uuid',
     column_type: 'UUID',
+    default_value: '00000000-0000-0000-0000-000000000000',
     knex_method: 'specificType',
-    knex_args: (() => (['uuid'])),
+    knex_args: ['UUID'],
     nullable: false,
   },
   {
@@ -71,7 +85,7 @@ const types = [
     type: 'int',
     column_type: 'Int32',
     knex_method: 'specificType',
-    knex_args: (() => (['Int32'])),
+    knex_args: ['Int32'],
     nullable: false,
 
   },
@@ -91,13 +105,20 @@ const types = [
   {
     type: 'decimal', column_type: 'Decimal', knex_method: 'specificType', knex_args: (() => (['Decimal(19, 4)'])),
   },
-  { type: 'double', column_type: 'Float64', knex_method: 'double' },
+  {
+    type: 'double',
+    column_type: 'Float64',
+    knex_method: 'specificType',
+    knex_args: ['Float64'],
+
+  },
   {
     type: 'boolean',
     column_type: 'Boolean',
     // nullable: true, //don't set this, otherwise we can't look up type boolean
     //  Defaults to nullable anyhow
-    knex_method: 'boolean',
+    knex_method: 'specificType',
+    knex_args: ['Boolean'],
   },
   {
     type: 'text',
@@ -174,13 +195,15 @@ const types = [
   {
     type: 'foreign_uuid',
     column_type: 'UUID',
+    default_value: '00000000-0000-0000-0000-000000000000',
     knex_method: 'specificType',
-    knex_args: (() => (['UUID'])),
+    knex_args: ['UUID'],
     nullable: true,
   },
   {
     type: 'uuid',
     column_type: 'UUID',
+    default_value: '00000000-0000-0000-0000-000000000000',
     knex_method: 'specificType',
     knex_args: (() => (['UUID'])),
   },
@@ -188,6 +211,7 @@ const types = [
 function isInt(s) { return Number.isInteger(typeof s === 'number' ? s : parseFloat(s)); }
 
 module.exports = {
+  name: 'ClickHouse',
   getType(type) {
     return types.find((t) => t.type === type);
   },
@@ -209,7 +233,8 @@ module.exports = {
       args: typeof typeDef.knex_args === 'function' ? typeDef.knex_args(col) : (typeDef.knex_args || []),
       unsigned: typeDef.unsigned || false,
       nullable,
-      defaultValue: col.default_value !== undefined ? col.default_value : typeDef.knex_default,
+      defaultValue: typeDef.default_value !== undefined
+        ? typeDef.default_value : typeDef.knex_default,
       // raw values should always be defined strings in this file, not a function
       defaultRaw: typeDef.knex_default_raw,
     };

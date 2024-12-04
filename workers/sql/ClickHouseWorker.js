@@ -167,11 +167,16 @@ Worker.prototype.createTable = async function ({
       args, nullable, defaultValue,
     } = o;
     const type = args[0];
+    if (type === undefined) {
+      debug(o);
+      throw new Error(`Invalid definition for column ${c.name}`);
+    }
     let s = `${this.escapeColumn(c.name)} ${type}`;
 
     if (nullable) { // no nullables in ClickHouse!
       // sql+=` NULL`;
     }
+
     if (defaultValue !== undefined) {
       if (defaultValue === null) {
         if (type === 'String') {

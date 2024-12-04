@@ -256,7 +256,9 @@ Worker.prototype.describe = async function describe(opts) {
     if (defaultValue === 'NULL') defaultValue = null;
     if (defaultValue !== null) {
       const type = d.COLUMN_TYPE.toUpperCase();
-      if (type === 'TINYINT(1)') {
+      if (type === 'UUID') {
+        if (defaultValue.indexOf("'") === 0) defaultValue = defaultValue.slice(1, -1);
+      } else if (type === 'TINYINT(1)') {
         defaultValue = defaultValue === '1';
       } else if (type.indexOf('INT') === 0
       || type.indexOf('BIGINT') === 0) {
