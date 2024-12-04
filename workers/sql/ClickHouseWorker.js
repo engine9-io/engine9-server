@@ -1,3 +1,5 @@
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-await-in-loop */
 const util = require('node:util');
 
 const Knex = require('knex');
@@ -171,7 +173,7 @@ Worker.prototype.createTable = async function ({
   });
   let ENGINE = 'ENGINE=MergeTree()';
   if (pkey) {
-    ENGINE = 'ENGINE=ReplacingMergeTree()';
+    ENGINE = `ReplacingMergeTree(${pkey.columns.map((d) => this.escapeColumn(d)).join()})`;
   }
   const sql = `create table ${this.escapeColumn(name)} (${colSQL.join(',')})
       ${ENGINE}
@@ -302,6 +304,47 @@ Worker.prototype.sync = async function ({
 Worker.prototype.sync.metadata = {
   options: {
     table: {},
+    start: {},
+    end: {},
+  },
+};
+
+Worker.prototype.syncAll = async function ({
+  tables, filter, exclude,
+}) {
+  await this.ensureDatabase();
+  const source = new SQLWorker({ accountId: this.accountId });
+
+  const { tables: tableNames } = await source.tables({
+    type: 'table', tables, filter, exclude,
+  });
+  for (const table of tableNames) {
+    debug(`Syncing ${table}`);
+    await this.drop({ table });
+    await this.sync({ table });
+  }
+
+  const { tables: viewNames } = await source.tables({
+    type: 'view', tables, filter, exclude,
+  });
+  // Create intermediate views so they can be out of order
+  for (const table of viewNames) {
+    debug(`Pre-preprocessing view ${table}`);
+    const { columns } = await source.describe({ table });
+    await this.query(`drop view if exists ${table}`);
+    await this.query(`create view ${table} as select ${columns.map((c) => `1 as ${this.escapeField(c.name)}`)}`);
+  }
+  for (const table of viewNames) {
+    debug(`Preprocessing view ${table}`);
+    const { sql } = await source.getCreateView({ table });
+    await this.query(`drop view if exists ${table}`);
+    await this.query({ sql });
+  }
+  return { tableNames, viewNames };
+};
+Worker.prototype.syncAll.metadata = {
+  options: {
+    filter: {},
     start: {},
     end: {},
   },
