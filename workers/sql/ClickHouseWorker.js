@@ -172,7 +172,11 @@ Worker.prototype.createTable = async function ({
       // sql+=` NULL`;
     }
     if (defaultValue !== undefined) {
-      s += ` DEFAULT ${this.escapeValue(defaultValue)}`;
+      if (defaultValue === null) {
+        s += ' DEFAULT \'\'';// no nulls
+      } else {
+        s += ` DEFAULT ${this.escapeValue(defaultValue)}`;
+      }
     }
     debug(`${JSON.stringify(c)}->${s}`);
     return s;
