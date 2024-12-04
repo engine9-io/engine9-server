@@ -1302,8 +1302,9 @@ Worker.prototype.analyze = async function describe(opts) {
 
   const stream = await this.stream({
     sql: // try to get a good spread of values
-    `select * from ${this.escapeTable(table)} limit 25000
-      union select * from ${this.escapeTable(table)} ${orderBy} limit 25000`,
+    `(select * from ${this.escapeTable(table)} limit 25000)
+      union 
+      (select * from ${this.escapeTable(table)} ${orderBy} limit 25000)`,
   });
   return analyzeStream({ stream, fieldTypes: columns });
 };
