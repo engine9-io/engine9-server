@@ -7,5 +7,5 @@ if [ -z "${DEBUG}" ]; then
 export DEBUG=info:*,SQLWorker,UIWorker,WorkerRunner,SchemaWorker,-knex:query,-knex:client,-knex:bindings;
 fi
 #.e9_parameters are appended to 
-echo node --unhandled-rejections=strict $RUNNER_PATH `cat ./.e9_parameters`"$@"
-node --unhandled-rejections=strict $RUNNER_PATH `cat ./.e9_parameters`"$@"
+echo node --unhandled-rejections=strict $RUNNER_PATH `cat ./.e9_parameters` "$@"
+node --unhandled-rejections=strict $RUNNER_PATH `cat ./.e9_parameters` "$@"
