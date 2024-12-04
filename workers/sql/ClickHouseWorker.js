@@ -279,7 +279,7 @@ Worker.prototype.sync = async function ({
   if (!localDesc) {
     const analysis = await source.analyze({ table });
     if (analysis.records < 100) {
-      await this.createTable({ table, ...sourceDesc });
+      await this.createTable({ table, indexes, ...sourceDesc });
     } else {
       try {
         await this.createTableFromAnalysis({ table, analysis, indexes });
