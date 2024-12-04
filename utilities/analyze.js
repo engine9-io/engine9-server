@@ -44,25 +44,31 @@ module.exports = async function analyzeStream(options) {
 
         if (value === null || type === 'undefined') {
           r.empty += 1;
-        } else if (value instanceof Date || (type === 'string' && dateMatcher.test(value))) {
-          if (type === 'string') value = new Date(value);
-          if (r.type !== 'datetime' && value.getTime() % 100000 === 0) {
-            r.type = 'date';
-          } else {
-            r.type = 'datetime';
-          }
-        } else if (type === 'string' && uuidMatcher.test(value)) {
-          if (r.type !== 'string') r.type = 'uuid';
-        } else if (isNumber) {
-          r.isNumber = true;
-          if (r.type !== 'string' && r.type !== 'float') { // if we already have a float, we can't downscale
-            if (Number.isInteger(value)) {
-              r.type = 'int';
+        } else if (r.type !== 'string') { // once we go string we can't go back
+          if (value && (value instanceof Date || (type === 'string' && dateMatcher.test(value)))) {
+            if (type === 'string') value = new Date(value);
+            if (r.type !== 'datetime' && value.getTime() % 100000 === 0) {
+              r.type = 'date';
+            } else {
+              r.type = 'datetime';
+            }
+          } else if (type === 'string' && uuidMatcher.test(value)) {
+            r.type = 'uuid';
+          } else if (isNumber) {
+            r.isNumber = true;
+            if (r.type !== 'float') { // if we already have a float, we can't downscale
+              if (Number.isInteger(value)) {
+                r.type = 'int';
+              } else {
+                r.type = 'float';
+              }
             } else {
               r.type = 'float';
             }
           } else {
-            r.type = 'float';
+            r.type = 'string';
+            if (!r.min_length || value.length < r.min_length) r.min_length = value.length;
+            if (!r.max_length || value.length > r.max_length) r.max_length = value.length;
           }
         } else {
           r.type = 'string';

@@ -1300,7 +1300,11 @@ Worker.prototype.analyze = async function describe(opts) {
     orderBy = ` ORDER BY ${pkey.columns.map((c) => `${c} DESC`)}`;
   }
 
-  const stream = await this.stream({ sql: `select * from ${this.escapeTable(table)} ${orderBy} limit 50000` });
+  const stream = await this.stream({
+    sql: // try to get a good spread of values
+    `select * from ${this.escapeTable(table)} limit 25000
+      union select * from ${this.escapeTable(table)} ${orderBy} limit 25000`,
+  });
   return analyzeStream({ stream, fieldTypes: columns });
 };
 

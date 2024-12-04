@@ -13,6 +13,7 @@ const csv = require('csv');
 const es = require('event-stream');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const languageEncoding = require('detect-file-encoding-and-language');
+const analyzeStream = require('../utilities/analyze');
 
 const { bool } = require('../utilities');
 const BaseWorker = require('./BaseWorker');
@@ -340,6 +341,17 @@ Worker.prototype.getStream = async function ({
     });
     return { stream: packetStream };
   }
+};
+
+Worker.prototype.analyze = async function (opts) {
+  const { stream } = await this.getStream(opts);
+  return analyzeStream({ stream });
+};
+Worker.prototype.analyze.metadata = {
+  options: {
+    filename: {},
+
+  },
 };
 
 module.exports = Worker;
