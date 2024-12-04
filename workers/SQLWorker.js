@@ -605,6 +605,22 @@ Worker.prototype.getSQLName = function (n) {
   return n.trim().replace(/[^0-9a-zA-Z_-]/g, '_').toLowerCase();
 };
 
+Worker.prototype.getCreateView = async function (options) {
+  const { table } = options;
+  const worker = this;
+  const { data } = await worker.query({ sql: `show create view ${this.escapeTable(table)}` });
+  let sql = data[0]['Create View'];
+
+  if (!sql) throw new Error(`Could not find 'Create View' in ${Object.keys(data[0])}`);
+  sql = sql.replace(/ALGORITHM=UNDEFINED DEFINER=[^\s]* SQL SECURITY DEFINER /, '');
+
+  return { sql };
+};
+Worker.prototype.getCreateView.metadata = {
+  bot: true,
+  options: { table: {} },
+};
+
 Worker.prototype.createView = async function (options) {
   let sql = options.sql || await this.buildSqlFromEQLObject(options);
   if (bool(options.replace, false)) {
