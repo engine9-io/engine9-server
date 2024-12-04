@@ -174,15 +174,15 @@ const types = [
   {
     type: 'foreign_uuid',
     column_type: 'UUID',
-    knex_method: 'uuid',
-    knex_args: (() => (['uuid'])),
+    knex_method: 'specificType',
+    knex_args: (() => (['UUID'])),
     nullable: true,
   },
   {
     type: 'uuid',
     column_type: 'UUID',
-    knex_method: 'uuid',
-    knex_args: (() => (['uuid'])),
+    knex_method: 'specificType',
+    knex_args: (() => (['UUID'])),
   },
 ];
 function isInt(s) { return Number.isInteger(typeof s === 'number' ? s : parseFloat(s)); }
