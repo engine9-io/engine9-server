@@ -181,7 +181,13 @@ Worker.prototype.tables.metadata = {
   options: {},
 };
 
+const columnNameMatch = /^[a-zA-Z0-9_]+$/;
 Worker.prototype.escapeColumn = function (f) {
+  // Engine 9 follows a very restrictive column name standard, intended for cross-compatability
+  // Thus, escaping column names is also about validating they're following the rules
+
+  if (!f.match(columnNameMatch)) throw new Error(`Invalid field name: ${f}`);
+
   return this.dialect.escapeColumn(f);
 };
 Worker.prototype.escapeValue = function (t) {
@@ -194,13 +200,6 @@ Worker.prototype.addLimit = function (sql, limit, offset) {
 const tableNameMatch = /^[a-zA-Z0-9_]+$/;
 Worker.prototype.escapeTable = function escapeTable(t) {
   if (!t.match(tableNameMatch)) throw new Error(`Invalid table name: ${t}`);
-  return t;
-};
-// Engine 9 follows a very restrictive column name standard, intended for cross-compatability
-// Thus, escaping column names is mostly about validating they're following the rules
-const columnNameMatch = /^[a-zA-Z0-9_]+$/;
-Worker.prototype.escapeColumn = function escapeColumn(t) {
-  if (!t.match(columnNameMatch)) throw new Error(`Invalid field name: ${t}`);
   return t;
 };
 
