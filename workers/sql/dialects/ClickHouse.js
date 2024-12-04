@@ -24,8 +24,8 @@ const types = [
     length: 64,
     nullable: false,
     default_value: '',
-    knex_method: 'string',
-    knex_args: ((o) => ([o.length || 255])),
+    knex_method: 'specificType',
+    knex_args: ['String'],
   },
   { // A uuid identifier, similar to a string, but can't be null
 
@@ -36,7 +36,11 @@ const types = [
     nullable: false,
   },
   {
-    type: 'string', column_type: 'String', length: 255, knex_method: 'string', knex_args: ((o) => ([o.length || 255])),
+    type: 'string',
+    column_type: 'String',
+    length: 255,
+    knex_method: 'specificType',
+    knex_args: ['String'],
   },
   {
     type: 'hash',
@@ -44,8 +48,8 @@ const types = [
     length: 64,
     nullable: false,
     default_value: '',
-    knex_method: 'string',
-    knex_args: ((o) => ([o.length || 64])),
+    knex_method: 'specificType',
+    knex_args: ['String'],
   },
 
   {
@@ -96,10 +100,16 @@ const types = [
     knex_method: 'boolean',
   },
   {
-    type: 'text', column_type: 'String', knex_method: 'text',
+    type: 'text',
+    column_type: 'String',
+    knex_method: 'specificType',
+    knex_args: ['String'],
   },
   {
-    type: 'json', column_type: 'JSON', knex_method: 'json',
+    type: 'json',
+    column_type: 'JSON',
+    knex_method: 'specificType',
+    knex_args: ['JSON'],
   },
   {
     type: 'created_at',
@@ -120,8 +130,8 @@ const types = [
   {
     type: 'url',
     column_type: 'String',
-    length: 65535,
-    knex_method: 'text',
+    knex_method: 'specificType',
+    knex_args: ['String'],
   },
   { type: 'date', column_type: 'Date', knex_method: 'date' },
   { type: 'datetime', column_type: 'DateTime', knex_method: 'datetime' },
