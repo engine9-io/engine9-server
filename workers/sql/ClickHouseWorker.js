@@ -171,7 +171,7 @@ Worker.prototype.createTable = async function ({
   });
   let ENGINE = 'ENGINE=MergeTree()';
   if (pkey) {
-    ENGINE = `ENGINE=ReplacingMergeTree(${pkey.columns.map((d) => this.escapeColumn(d)).join()})`;
+    ENGINE = 'ENGINE=ReplacingMergeTree()';
   }
   const sql = `create table ${this.escapeColumn(name)} (${colSQL.join(',')})
       ${ENGINE}
