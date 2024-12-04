@@ -1,0 +1,3 @@
+#!/bin/bash
+#Sets a local account id for the session
+export ENGINE9_ACCOUNT_ID="$@"
