@@ -266,6 +266,9 @@ module.exports = {
 
     return Object.assign(input, typeDef);
   },
+  escapeColumn(value) {
+    return mysql.escapeId(value);
+  },
   escapeValue(value) {
     return mysql.escape(value);
   },
