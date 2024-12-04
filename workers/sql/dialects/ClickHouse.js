@@ -133,10 +133,32 @@ const types = [
     knex_method: 'specificType',
     knex_args: ['String'],
   },
-  { type: 'date', column_type: 'Date', knex_method: 'date' },
-  { type: 'datetime', column_type: 'DateTime', knex_method: 'datetime' },
-  { type: 'timestamp', column_type: 'DateTime', knex_method: 'timestamp' },
-  { type: 'time', column_type: 'Time', knex_method: 'time' },
+  {
+    type: 'date',
+    column_type: 'Date',
+    knex_method: 'specificType',
+    knex_args: ['Date'],
+
+  },
+  {
+    type: 'datetime',
+    column_type: 'DateTime',
+    knex_method: 'specificType',
+    knex_args: ['DateTime'],
+
+  },
+  {
+    type: 'timestamp',
+    column_type: 'DateTime',
+    knex_method: 'specificType',
+    knex_args: ['DateTime'],
+  },
+  {
+    type: 'time',
+    column_type: 'Time',
+    knex_method: 'specificType',
+    knex_args: ['Time'],
+  },
   {
     type: 'enum',
     column_type: 'ENUM',
