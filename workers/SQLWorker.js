@@ -1313,7 +1313,7 @@ Worker.prototype.analyze = async function describe(opts) {
   // we add an order by to get the
   // MAX of the primary keys, so we don't unintentionally just grab small numbers
   if (pkey) {
-    orderBy = ` ORDER BY ${pkey.columns.map((c) => `${c} DESC`)}`;
+    orderBy = ` ORDER BY ${pkey.columns.map((c) => `${this.escapeColumn(c)} DESC`)}`;
   }
 
   const stream = await this.stream({
