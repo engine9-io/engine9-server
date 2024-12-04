@@ -166,14 +166,19 @@ Worker.prototype.createTable = async function ({
     const {
       args, nullable, defaultValue,
     } = o;
-    let s = `${this.escapeColumn(c.name)} ${args[0]}`;
+    const type = args[0];
+    let s = `${this.escapeColumn(c.name)} ${type}`;
 
     if (nullable) { // no nullables in ClickHouse!
       // sql+=` NULL`;
     }
     if (defaultValue !== undefined) {
       if (defaultValue === null) {
-        s += ' DEFAULT \'\'';// no nulls
+        if (type === 'String') {
+          s += ' DEFAULT \'\'';// no nulls
+        } else {
+          s += ' DEFAULT 0';// no nulls
+        }
       } else {
         s += ` DEFAULT ${this.escapeValue(defaultValue)}`;
       }
