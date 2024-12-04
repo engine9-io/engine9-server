@@ -221,13 +221,15 @@ Worker.prototype.sync = async function ({
   const sourceDesc = await source.describe({ table });
   const indexes = await source.indexes({ table });
 
-  const conn = process.env.ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION
+  let conn = process.env.ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION
      || source.auth?.database_connection;
   if (!conn) {
     debug('Source keys=', Object.keys(source));
     debug('Source=', source);
     throw new Error('ENGINE9_CLICKHOUSE_SYNC_SOURCE_CONNECTION or source auth is a required environment variable to sync directly from a source');
   }
+  // temporarily pull from the replica
+  conn = conn.replace('warehouse.frakture.com', '10.211.2.169');
   debug('Connection string=', conn);
   const {
     host,
