@@ -174,6 +174,7 @@ Worker.prototype.createTable = async function ({
     if (defaultValue !== undefined) {
       s += ` DEFAULT ${this.escapeValue(defaultValue)}`;
     }
+    debug(`${JSON.stringify(c)}->${s}`);
     return s;
   });
   let ENGINE = 'ENGINE=MergeTree()';
