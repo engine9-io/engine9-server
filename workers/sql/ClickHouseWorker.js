@@ -278,7 +278,13 @@ Worker.prototype.sync = async function ({
   }
   if (!localDesc) {
     const analysis = await source.analyze({ table });
-    await this.createTableFromAnalysis({ table, analysis, indexes });
+    try {
+      await this.createTableFromAnalysis({ table, analysis, indexes });
+    } catch (e) {
+      debug('analysis=', analysis);
+      debug(`Error creating table ${table}`);
+      throw e;
+    }
     localDesc = await this.describe({ table });
   }
   const conditions = [];
