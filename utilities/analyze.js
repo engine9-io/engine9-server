@@ -78,8 +78,7 @@ module.exports = async function analyzeStream(options) {
     stream,
     analyzeTransform,
   );
-  analysis.fields = Object.entries(analysis.fields).map(([name, o]) => {
-    o.name = name;
+  analysis.fields = Object.entries(analysis.fields).map(([, o]) => {
     const entries = Object.entries(o.counters);
     o.distinct = entries.length;
     o.sample = entries.sort((a, b) => b[1] - a[1]).slice(0, 32).map((d) => d[0]);
