@@ -169,7 +169,7 @@ Worker.prototype.createTable = async function ({
   });
   const sql = `create table ${this.escapeColumn(name)} (${colSQL.join(',')})
       ENGINE=MergeTree()
-      ORDER BY ${pkey.columns.map((d) => this.escapeColumn(d)).join()}`;
+      ORDER BY (${pkey.columns.map((d) => this.escapeColumn(d)).join()})`;
   await knex.raw(sql);
   return { created: true, table: name };
 };
