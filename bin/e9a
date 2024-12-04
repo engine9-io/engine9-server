@@ -1,3 +1,3 @@
 #!/bin/bash
-#Sets a local account id for the session
-export ENGINE9_ACCOUNT_ID=$1;
+#Sets local parameters file, starting with the account id
+echo -a "$@" >  .e9_parameters

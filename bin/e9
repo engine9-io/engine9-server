@@ -6,5 +6,6 @@ RUNNER_PATH=$ENGINE9_SERVER_DIR/scheduler/WorkerRunner.js
 if [ -z "${DEBUG}" ]; then
 export DEBUG=info:*,SQLWorker,UIWorker,WorkerRunner,SchemaWorker,-knex:query,-knex:client,-knex:bindings;
 fi
+#.e9_parameters are appended to 
 
-node --unhandled-rejections=strict $RUNNER_PATH "$@"
+node --unhandled-rejections=strict $RUNNER_PATH `cat ./.e9_parameters` "$@"
