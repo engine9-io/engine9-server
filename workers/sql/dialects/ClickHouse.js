@@ -54,7 +54,6 @@ const types = [
     knex_method: 'specificType',
     knex_args: (() => (['Int8'])),
     nullable: false,
-
   },
   {
     type: 'smallint',
@@ -213,10 +212,10 @@ module.exports = {
       input.unsigned = true;
     }
     if (input.column_type.indexOf('Int8') === 0) {
-      input.column_type = 'tinyint';
+      input.column_type = 'Int8';
     }
     if (input.column_type.indexOf('Int64') === 0) {
-      input.column_type = 'bigint';
+      input.column_type = 'Int64';
     }
     if (input.column_type === 'LowCardinality(String)') {
       input.column_type = 'String';
