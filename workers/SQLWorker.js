@@ -1291,8 +1291,16 @@ Worker.prototype.buildSqlFromEQLObject.metadata = {
 Worker.prototype.analyze = async function describe(opts) {
   const { table } = opts;
   const { columns } = await this.describe({ table });
+  const indexes = await this.indexes({ table });
+  let orderBy = '';
+  const pkey = indexes.find((d) => d.primary);
+  // we add an order by to get the
+  // MAX of the primary keys, so we don't unintentionally just grab small numbers
+  if (pkey) {
+    orderBy = ` ORDER BY ${pkey.columns.map((c) => `${c} DESC`)}`;
+  }
 
-  const stream = await this.stream({ sql: `select * from ${this.escapeTable(table)} limit 10000` });
+  const stream = await this.stream({ sql: `select * from ${this.escapeTable(table)} ${orderBy} limit 50000` });
   return analyzeStream({ stream, fieldTypes: columns });
 };
 
