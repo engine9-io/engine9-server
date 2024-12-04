@@ -146,10 +146,11 @@ Worker.prototype.createTable = async function ({
 }) {
   if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
   // get the primary key, but that's it
-  const pkey = indexes?.find((d) => d.primary);
+  let pkey = indexes?.find((d) => d.primary);
+  if (!pkey) pkey = indexes?.find((d) => d.unique);
   if (!pkey) {
-    debug({ indexes });
-    throw new Error('Clickhouse requires a primary key, none found in indexes');
+    debug('indexes:', JSON.stringify(indexes));
+    throw new Error('Clickhouse requires a primary or unique key, none found in indexes');
   }
   const knex = await this.connect();
 
