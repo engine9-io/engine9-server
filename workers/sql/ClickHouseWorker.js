@@ -31,6 +31,29 @@ Worker.prototype.connect = async function connect() {
   return this.knex;
 };
 
+Worker.prototype.ensureDatabase = async function ensureDatabase() {
+  if (this.knex) return this.knex;
+  if (!this.accountId) throw new Error('No accountId specified');
+  if (!/^[a-z0-9_]+$/.test(this.accountId)) throw new Error(`Invalid accountId:${this.accountId}`);
+
+  const connString = process.env.ENGINE9_CLICKHOUSE_CONNECTION;
+  if (!connString) {
+    debug(Object.keys(process.env));
+    throw new Error('ENGINE9_CLICKHOUSE_CONNECTION is a required environment variable');
+  }
+  const dbKnex = new Knex({
+    client: 'mysql2', // use mysql protocol, as the only existing one has flaws with insert...select
+    connection: () => connString,
+  });
+
+  await dbKnex.raw(`create database if not exists ${this.accountId}`);
+  await dbKnex.destroy();
+  return { database: this.accountId };
+};
+Worker.prototype.ensureDatabase.metadata = {
+  options: {},
+};
+
 /*
   Try to determine a viable database structure from an analysis.  This needs to be more specific
   than the normal schema work as it must have specific column details based on ranges,
@@ -217,6 +240,7 @@ Worker.prototype.syncThroughPipe.metadata = {
 Worker.prototype.sync = async function ({
   table, start, end, dateField,
 }) {
+  await this.ensureDatabase();
   const source = new SQLWorker({ accountId: this.accountId });
   const sourceDesc = await source.describe({ table });
   const indexes = await source.indexes({ table });
