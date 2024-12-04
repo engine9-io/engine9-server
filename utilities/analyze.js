@@ -27,6 +27,7 @@ module.exports = async function analyzeStream(options) {
       Object.entries(d).forEach(([key, _value]) => {
         let value = _value;
         analysis.fields[key] = analysis.fields[key] || {
+          name: key,
           type: undefined,
           empty: 0,
           counters: {},
