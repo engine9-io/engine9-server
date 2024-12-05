@@ -71,6 +71,8 @@ const namedTypes = {
   refund_amount: { method: 'specificType', args: ['Decimal(19,2)'], defaultValue: 0 },
   transaction_bot_id: { method: 'specificType', args: ['LowCardinality(String)'], defaultValue: 0 },
   remote_transaction_id: { method: 'specificType', args: ['String'], defaultValue: 0 },
+  source_code: { method: 'specificType', args: ['String'], defaultValue: '' },
+  final_primary_source_code: { method: 'specificType', args: ['String'], defaultValue: '' },
 };
 Worker.prototype.deduceColumnDefinition = function ({
   name,
