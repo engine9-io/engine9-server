@@ -382,7 +382,7 @@ Worker.prototype.syncAll = async function ({
     debug(`Processing view ${table}`);
     const { sql } = await source.getCreateView({ table });
     const parts = sql.split(/\sFROM\s/ig);
-    const sqlClean = [].concat(parts[0]).concat(parts.slice(1).map((d) => d.replace(/[()]/g, ''))).join(' JOIN ');
+    const sqlClean = [].concat(parts[0]).concat(parts.slice(1).map((d) => d.replace(/[()]/g, ''))).join('\nFROM\n');
 
     await this.query(`drop view if exists ${table}`);
     await this.query({ sql: sqlClean });
