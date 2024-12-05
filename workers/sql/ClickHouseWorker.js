@@ -373,7 +373,7 @@ Worker.prototype.syncAll = async function ({
     try {
       const { columns } = await source.describe({ table });
       await this.query(`drop view if exists ${table}`);
-      await this.query(`create view ${table} as select ${columns.map((c) => `1 as ${this.escapeColumn(c.name)}`)}`);
+      await this.query(`create view ${table} as select ${columns.map((c) => `'1' as ${this.escapeColumn(c.name)}`)}`);
       views.success.push(table);
     } catch (e) {
       debug(e);
