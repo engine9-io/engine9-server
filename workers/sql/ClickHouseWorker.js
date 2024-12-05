@@ -293,6 +293,7 @@ Worker.prototype.sync = async function ({
     username,
     password,
     pathname,
+    includeData = true,
   } = new URL(conn);
 
   let localDesc = null;
@@ -316,6 +317,7 @@ Worker.prototype.sync = async function ({
     }
     localDesc = await this.describe({ table });
   }
+  if (!includeData) return { table, noData: true };
   const conditions = [];
   let sql = `insert into ${table} (${localDesc.columns.map((d) => this.escapeColumn(d.name)).join()})
       select ${localDesc.columns.map((d) => this.escapeColumn(d.name)).join()} from mysql(${this.escapeValue(host)}, ${this.escapeValue(pathname?.slice(1) || this.accountId)}, ${this.escapeValue(table)}, ${this.escapeValue(username)}, ${this.escapeValue(unescape(password))})`;
@@ -371,9 +373,11 @@ Worker.prototype.syncAll = async function ({
   for (const table of viewNames) {
     debug(`Pre-preprocessing view ${table}`);
     try {
+      // set up a temporary TABLE, which has all the correct types
+      // it's not easy to create a view with correct typing
       const { columns } = await source.describe({ table });
-      await this.query(`drop view if exists ${table}`);
-      await this.query(`create view ${table} as select ${columns.map((c) => `'1' as ${this.escapeColumn(c.name)}`)}`);
+      await this.drop({ table });
+      await this.createTable({ table, columns });
       views.success.push(table);
     } catch (e) {
       debug(e);
@@ -386,7 +390,7 @@ Worker.prototype.syncAll = async function ({
     const parts = sql.split(/\sFROM\s/ig);
     const sqlClean = [].concat(parts[0]).concat(parts.slice(1).map((d) => d.replace(/[()]/g, ''))).join('\nFROM\n');
 
-    await this.query(`drop view if exists ${table}`);
+    await this.drop({ table });
     await this.query({ sql: sqlClean });
   }
   return { tableNames, views };
