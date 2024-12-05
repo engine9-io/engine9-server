@@ -69,6 +69,8 @@ const namedTypes = {
   phone_hash_v1: { method: 'specificType', args: ['String'], defaultValue: '' },
   amount: { method: 'specificType', args: ['Decimal(19,2)'], defaultValue: 0 },
   refund_amount: { method: 'specificType', args: ['Decimal(19,2)'], defaultValue: 0 },
+  transaction_bot_id: { method: 'specificType', args: ['LowCardinality(String)'], defaultValue: 0 },
+  remote_transaction_id: { method: 'specificType', args: ['String'], defaultValue: 0 },
 };
 Worker.prototype.deduceColumnDefinition = function ({
   name,
@@ -379,8 +381,11 @@ Worker.prototype.syncAll = async function ({
   for (const table of views.success) {
     debug(`Processing view ${table}`);
     const { sql } = await source.getCreateView({ table });
+    const parts = sql.split(/\sJOIN\s/ig);
+    const sqlClean = [].concat(parts[0]).concat(parts.slice(1).map((d) => d.replace(/[()]/g, ''))).join(' JOIN ');
+
     await this.query(`drop view if exists ${table}`);
-    await this.query({ sql });
+    await this.query({ sql: sqlClean });
   }
   return { tableNames, views };
 };
