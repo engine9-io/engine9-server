@@ -122,6 +122,8 @@ Worker.prototype.deduceColumnDefinition = function ({
     }
   } else if (type === 'double') {
     Object.assign(output, { method: 'specificType', args: ['Decimal(19,4)'] });
+  } else if (type === 'decimal') {
+    Object.assign(output, { method: 'specificType', args: ['Decimal(19,2)'] });
   } else if (type === 'currency') {
     Object.assign(output, { method: 'specificType', args: ['Decimal(19,2)'] });
   } else if (type === 'date') {
