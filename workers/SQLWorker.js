@@ -1323,7 +1323,7 @@ Worker.prototype.analyze = async function describe(opts) {
       union 
       (select * from ${this.escapeTable(table)} ${orderBy} limit 25000)`,
   });
-  return analyzeStream({ stream, fieldTypes: columns });
+  return analyzeStream({ stream, fieldHints: columns });
 };
 
 Worker.prototype.analyze.metadata = {

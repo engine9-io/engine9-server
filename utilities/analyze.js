@@ -6,7 +6,7 @@ module.exports = async function analyzeStream(options) {
   const {
     stream,
     // hints of types of fields, useful when dealing with streams from databases
-    // columnsTypes = {},
+    fieldHints,
   } = options;
 
   const analysis = {
@@ -19,6 +19,12 @@ module.exports = async function analyzeStream(options) {
   }
   const dateMatcher = /^([+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([.,]\d+(?!:))?)?(\17[0-5]\d([.,]\d+)?)?([zZ]|([+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
   const uuidMatcher = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/;
+  let hints = null;
+  if (fieldHints.length > 0) {
+    hints = {};
+    fieldHints.forEach((d) => { hints[d.name] = d; });
+  }
+
   const analyzeTransform = new Transform({
     objectMode: true,
     transform(d, enc, cb) {
@@ -31,6 +37,7 @@ module.exports = async function analyzeStream(options) {
           type: undefined,
           empty: 0,
           counters: {},
+          hint: hints?.[key],
         };
         const r = analysis.fields[key];
         const type = typeof value;
@@ -56,16 +63,21 @@ module.exports = async function analyzeStream(options) {
             r.type = 'uuid';
           } else if (isNumber) {
             r.isNumber = true;
-            if (r.type !== 'float') { // if we already have a float, we can't downscale
-              if (Number.isInteger(value)) {
-                r.type = 'int';
-              } else {
-                r.type = 'float';
-              }
+            if (r.type === 'decimal') {
+              // r.type = 'decimal';
+            } else if (r.type === 'double') { // if we already have a double, we can't downscale
+              // r.type = 'double';
+            } else if (r.hint?.type === 'decimal') {
+              r.type = 'decimal';
+            } else if (r.hint?.type === 'double') {
+              r.type = 'double';
+            } else if (Number.isInteger(value)) {
+              r.type = 'int';
             } else {
-              r.type = 'float';
+              r.type = 'double';
             }
           } else {
+            // something has broken a rule and decayed to a string
             r.type = 'string';
             if (!r.min_length || value.length < r.min_length) r.min_length = value.length;
             if (!r.max_length || value.length > r.max_length) r.max_length = value.length;

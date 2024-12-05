@@ -120,7 +120,7 @@ Worker.prototype.deduceColumnDefinition = function ({
     } else {
       Object.assign(output, { method: 'specificType', args: ['UInt64'] });
     }
-  } else if (type === 'float') {
+  } else if (type === 'double') {
     Object.assign(output, { method: 'specificType', args: ['Decimal(19,4)'] });
   } else if (type === 'currency') {
     Object.assign(output, { method: 'specificType', args: ['Decimal(19,2)'] });
@@ -188,7 +188,6 @@ Worker.prototype.createTable = async function ({
         s += ` DEFAULT ${this.escapeValue(defaultValue)}`;
       }
     }
-    debug(`${JSON.stringify(c)}->${s}`);
     return s;
   });
   let ENGINE = 'ENGINE=MergeTree()';
