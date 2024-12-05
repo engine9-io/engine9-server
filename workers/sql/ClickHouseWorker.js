@@ -359,19 +359,30 @@ Worker.prototype.syncAll = async function ({
     type: 'view', tables, filter, exclude,
   });
   // Create intermediate views so they can be out of order
+  // but ignore missing ones
+  const views = {
+    success: [],
+    fail: [],
+  };
   for (const table of viewNames) {
     debug(`Pre-preprocessing view ${table}`);
-    const { columns } = await source.describe({ table });
-    await this.query(`drop view if exists ${table}`);
-    await this.query(`create view ${table} as select ${columns.map((c) => `1 as ${this.escapeColumn(c.name)}`)}`);
+    try {
+      const { columns } = await source.describe({ table });
+      await this.query(`drop view if exists ${table}`);
+      await this.query(`create view ${table} as select ${columns.map((c) => `1 as ${this.escapeColumn(c.name)}`)}`);
+      views.success.push(table);
+    } catch (e) {
+      debug(e);
+      views.fail.push(table);
+    }
   }
-  for (const table of viewNames) {
-    debug(`Preprocessing view ${table}`);
+  for (const table of views.success) {
+    debug(`Processing view ${table}`);
     const { sql } = await source.getCreateView({ table });
     await this.query(`drop view if exists ${table}`);
     await this.query({ sql });
   }
-  return { tableNames, viewNames };
+  return { tableNames, views };
 };
 Worker.prototype.syncAll.metadata = {
   options: {
