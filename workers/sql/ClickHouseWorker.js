@@ -363,7 +363,7 @@ Worker.prototype.syncAll = async function ({
     debug(`Pre-preprocessing view ${table}`);
     const { columns } = await source.describe({ table });
     await this.query(`drop view if exists ${table}`);
-    await this.query(`create view ${table} as select ${columns.map((c) => `1 as ${this.escapeField(c.name)}`)}`);
+    await this.query(`create view ${table} as select ${columns.map((c) => `1 as ${this.escapeColumn(c.name)}`)}`);
   }
   for (const table of viewNames) {
     debug(`Preprocessing view ${table}`);
