@@ -113,6 +113,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
       }
       table.indexes = (table.indexes || []).map((d) => ({
         columns: (typeof d.columns === 'string') ? d.columns.split(',').map((x) => x.trim()) : d.columns,
+        primary: d.primary || false,
         unique: d.unique || false,
       }));
       return table;

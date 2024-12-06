@@ -135,17 +135,20 @@ const types = [
   {
     type: 'created_at',
     column_type: 'DateTime',
-    default_value: 'current_timestamp()',
+
     nullable: false,
-    knex_method: 'timestamp',
-    knex_default_raw: 'current_timestamp()',
+    knex_method: 'specificType',
+    knex_args: ['DateTime'],
+    default_value: '1970-01-01 00:00:00',
+    // knex_default_raw: 'current_timestamp()',
   },
   {
     type: 'modified_at',
     column_type: 'DateTime',
-    default_value: 'current_timestamp() on update current_timestamp()',
+    default_value: '1970-01-01 00:00:00',
     nullable: false,
-    knex_method: 'timestamp',
+    knex_method: 'specificType',
+    knex_args: ['DateTime'],
     knex_default_raw: 'current_timestamp() on update current_timestamp()',
   },
   {
@@ -182,14 +185,9 @@ const types = [
   },
   {
     type: 'enum',
-    column_type: 'ENUM',
-    knex_method: 'enu',
-    knex_args: ((o) => {
-      if (!o.values || o.values.length === 0) throw new Error(`No values provided for enum type:${JSON.stringify(o)}`);
-
-      return [o.values];
-    }
-    ),
+    column_type: 'LowCardinality(String)',
+    knex_method: 'specificType',
+    knex_args: ['LowCardinality(String)'],
   },
   // foreign ids can be nullable
   {
@@ -253,7 +251,7 @@ module.exports = {
       return { ...types.find((t) => t.type === 'string'), ...input };
     }
 
-    if (input.column_type.indexOf('Enum') === 0) {
+    if (input.column_type.toLowerCase().indexOf('enum') === 0) {
       // example enum('','remote_person_id','email_hash_v1','phone_hash_v1')
       input.values = input.column_type.slice(5, -1).split(',').map((d) => d.slice(1, -1));
       input.column_type = 'enum';

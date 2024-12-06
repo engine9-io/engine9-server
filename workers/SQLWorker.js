@@ -19,6 +19,7 @@ const mysqlDialect = require('./sql/dialects/MySQL');
 
 const BaseWorker = require('./BaseWorker');
 const FileWorker = require('./FileWorker');
+const CommandLine = require('./sql/CommandLine');
 
 require('dotenv').config({ path: '.env' });
 
@@ -41,6 +42,8 @@ function Worker(worker) {
 }
 
 util.inherits(Worker, BaseWorker);
+// eslint-disable-next-line no-restricted-syntax,guard-for-in
+for (const i in CommandLine.prototype) { Worker.prototype[i] = CommandLine.prototype[i]; }
 Worker.metadata = {
   alias: 'sql',
 };
@@ -672,7 +675,13 @@ Worker.prototype.createTable = async function ({
     if (primaries.length > 0) table.primary(primaries);
     indexes.forEach((x) => {
       const indexName = getUUIDv7();
-      if (x.unique) {
+      if (x.primary) {
+        if (primaries.length > 0) {
+          throw new Error(`Should not specify both a primary key as a column (${primaries}) and in an index (${x})`);
+        } else {
+          table.primary(x.columns, indexName);
+        }
+      } else if (x.unique) {
         table.unique(x.columns, indexName);
       } else {
         table.index(x.columns, indexName);
@@ -726,7 +735,13 @@ Worker.prototype.alterTable = async function ({ table: name, columns = [], index
     const primaries = columns.filter((d) => d.primary_key).map((c) => c.name);
     if (primaries.length > 0) table.primary(primaries);
     indexes.forEach((x) => {
-      if (x.unique) {
+      if (x.primary) {
+        if (primaries.length > 0) {
+          throw new Error(`Should not specify both a primary key as a column (${primaries}) and in an index (${x})`);
+        } else {
+          table.primary(x.columns);
+        }
+      } else if (x.unique) {
         table.unique(x.columns);
       } else {
         table.index(x.columns);

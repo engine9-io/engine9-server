@@ -99,7 +99,8 @@ Worker.prototype.deduceColumnDefinition = function ({
   };
   if (namedTypes[name]) {
     return Object.assign(output, namedTypes[name]);
-  } if (type === 'int') {
+  }
+  if (type === 'int') {
     if (min === undefined || max === undefined) {
       // default to normal int
       output.method = 'int';
@@ -130,6 +131,8 @@ Worker.prototype.deduceColumnDefinition = function ({
     Object.assign(output, { method: 'specificType', args: ['Decimal(19,2)'] });
   } else if (type === 'currency') {
     Object.assign(output, { method: 'specificType', args: ['Decimal(19,2)'] });
+  } else if (type === 'uuid') {
+    Object.assign(output, { method: 'specificType', args: ['UUID'], defaultValue: '00000000-0000-0000-0000-000000000000' });
   } else if (type === 'date') {
     Object.assign(output, { method: 'specificType', args: ['Date'], defaultValue: '1970-01-01' });
   } else if (type === 'datetime') {
@@ -156,7 +159,7 @@ Worker.prototype.createTable = async function ({
   if (!pkey) pkey = indexes?.find((d) => d.unique);
   if (!pkey) {
     debug('indexes:', JSON.stringify(indexes));
-    throw new Error('Clickhouse requires a primary or unique key, none found in indexes');
+    throw new Error(`Error creating table ${name}, ClickHouse requires a primary or unique key, none were found in existing indexes`);
   }
   const knex = await this.connect();
 
@@ -174,8 +177,8 @@ Worker.prototype.createTable = async function ({
     } = o;
     const type = args[0];
     if (type === undefined) {
-      debug(o);
-      throw new Error(`Invalid definition for column ${c.name}`);
+      debug(c);
+      throw new Error(`Invalid definition for column ${c.name} on table ${name}`);
     }
     let s = `${this.escapeColumn(c.name)} ${type}`;
 
