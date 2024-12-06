@@ -373,7 +373,7 @@ Worker.prototype.appendEntryTypeId = function ({
       throw new Error('No entry_type specified');
     }
     const id = TIMELINE_ENTRY_TYPES[o.entry_type];
-    if (!id) throw new Error(`Invalid entry_type: ${o.entry_type}`);
+    if (id === undefined) throw new Error(`Invalid entry_type: ${o.entry_type}`);
     o.entry_type_id = id;
   });
 };

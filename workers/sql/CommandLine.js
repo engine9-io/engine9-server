@@ -3,7 +3,7 @@ const util = require('node:util');
 const { bool } = require('../../utilities');
 
 function Worker() {}
-/*
+
 const desc = /^(?:desc|describe) ([a-z0-9_.]*)$/i;
 const fields = /^(?:fields) ([a-z0-9_.]*)$/i;
 const showTables = /show tables like '(.*)'$/i;
@@ -21,7 +21,6 @@ const showStatus = /^show engine innodb status/i;
 const week = /week\(([a-z0-9_.-]*)\)/ig;
 const month = /month\(([a-z0-9_.-]*)\)/ig;
 const year = /year\(([a-z0-9_.-]*)\)/ig;
-*/
 
 Worker.prototype.cli = async function (options) {
   const worker = this;
@@ -79,8 +78,9 @@ Worker.prototype.cli = async function (options) {
           });
           output(`\n${d.length} records`);
         }
-        function cb(e, d, endFunc) {
+        function cb(e, _d, endFunc) {
           const end = Date.now();
+          const d = _d?.data || _d;
 
           if (e) {
             output(cmd);
@@ -129,7 +129,7 @@ Worker.prototype.cli = async function (options) {
         if (!dumb) {
           if (cmd === 'show databases') {
             tableFormat = 'raw';
-            return worker.showDatabases({}, cb);
+            return cb(null, await worker.databases({}));
           }
           if (cmd === 'show triggers') return worker.showTriggers({}, cb);
           if (cmd.toLowerCase() === 'drop temp tables') return worker.dropTempTables({}, cb);
@@ -141,9 +141,8 @@ Worker.prototype.cli = async function (options) {
             return cb(null, (o.tables || o).map((table) => ({ table })));
           }
 
-          /*
-          let m;
-          if (m = cmd.match(showTables)) {
+          let m = cmd.match(showTables);
+          if (m) {
             tableFormat = 'raw';
             const filter = m[1].replace(/%/g, '.+');
             return worker.showTables({ filter }, (e, o) => {
@@ -151,77 +150,87 @@ Worker.prototype.cli = async function (options) {
               return cb(null, (o.tables || o).map((table) => ({ table })));
             });
           }
-
-          if (m = cmd.match(showViews)) {
+          m = cmd.match(showViews);
+          if (m) {
             const filter = m[1].replace(/%/g, '');
             return worker.showTables({ type: 'view', filter }, (e, o) => {
               if (e) return cb(e);
               return cb(null, (o.tables || o).map((table) => ({ table })));
             });
           }
-
-          if (m = cmd.match(showStatus)) {
+          m = cmd.match(showStatus);
+          if (m) {
             tableFormat = true;
           }
-
-          if (m = cmd.match(showIndexes)) {
+          m = cmd.match(showIndexes);
+          if (m) {
             tableFormat = 'table';
             return worker.getIndexes({ table: m[1] }, cb);
           }
-          if (m = cmd.match(showProcessList)) {
+          m = cmd.match(showProcessList);
+          if (m) {
             tableFormat = true;
             return worker.showProcessList({ filter: m[1].trim() }, cb);
           }
-          if (m = cmd.match(getTableSizes)) {
+          m = cmd.match(getTableSizes);
+          if (m) {
             tableFormat = true;
-            return worker.getTableSizes({ filter: m[2].trim() },
-            (e, { tables, size_in_MB } = {}) =>
-              cb(e, tables, () => output(`Total:${size_in_MB}MB`)));
+            return worker.getTableSizes(
+              { filter: m[2].trim() },
+              (e, { tables, sizeInMB } = {}) => cb(e, tables, () => output(`Total:${sizeInMB}MB`)),
+            );
           }
-
-          if (m = cmd.match(showTransactions)) {
+          m = cmd.match(showTransactions);
+          if (m) {
             tableFormat = true;
             return worker.showTransactions({ filter: m[1].trim() }, cb);
           }
-          if (m = cmd.match(dropTable)) {
+          m = cmd.match(dropTable);
+          if (m) {
             tableFormat = true;
             return worker.dropTable({ table: m[1].trim() }, cb);
           }
-          if (m = cmd.match(kill)) {
+          m = cmd.match(kill);
+          if (m) {
             if (worker.account_id === 'system') {
               output(`System kill ${m[1]}`);
               return worker.runQuery(`call mysql.rds_kill(${m[1].trim()})`, cb);
             }
           }
-          if (m = cmd.match(killall)) {
+          m = cmd.match(killall);
+          if (m) {
             return worker.killAll({ filter: m[1].trim() }, cb);
           }
-          if (m = cmd.match(desc)) {
+          m = cmd.match(desc);
+          if (m) {
             return worker.describe({ table: m[1] }, (e, d) => {
               if (e) return cb(e);
               tableFormat = 'table';
               return cb(null, d.fields);
             });
           }
-          if (m = cmd.match(fields)) {
+          m = cmd.match(fields);
+          if (m) {
             return worker.describe({ table: m[1] }, (e, d) => {
               if (e) return cb(e);
               tableFormat = 'raw';
-              return cb(null, d.fields.map((d) => ({ name: d.name })));
+              return cb(null, d.fields.map((x) => ({ name: x.name })));
             });
           }
-          if (m = cmd.match(showCreateView)) {
+          m = cmd.match(showCreateView);
+          if (m) {
             return worker.getCreateView({ table: m[1] }, (e, o) => {
-              worker.tidy(o, (e, tidy) => {
-                if (e) {
-                  output('Failed to tidy view', e);
+              worker.tidy(o, (err, tidy) => {
+                if (err) {
+                  output('Failed to tidy view', err);
                   return cb(null, { sql: o.sql });
                 }
                 return cb(null, { sql: tidy.tidy });
               });
             });
           }
-          if (m = cmd.match(showCreateTable)) {
+          m = cmd.match(showCreateTable);
+          if (m) {
             return worker.getNativeCreateTable({ table: m[1] }, cb);
           }
           cmd = cmd.replace(week, (x, p1) => worker.getWeekFunction(p1));
@@ -230,10 +239,13 @@ Worker.prototype.cli = async function (options) {
 
           // a bit buggy, but need more details
           cmd = worker.appendLimit(cmd);
-          */
         }
-        const { data } = await worker.query({ sql: cmd, silent: true });
-        return cb(null, data);
+        try {
+          const { data } = await worker.query({ sql: cmd, silent: true });
+          return cb(null, data);
+        } catch (e) {
+          return cb(e);
+        }
       },
     });
   });

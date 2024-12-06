@@ -52,48 +52,6 @@ Worker.prototype.getInputStorageDB = async function ({ inputId, datePrefix }) {
   return { filename: sqliteFile, db };
 };
 
-Worker.prototype.load = async function (options) {
-  const worker = this;
-  const { pluginId } = options;
-  if (!pluginId) throw new Error('load requires a pluginId');
-  const fileWorker = new FileWorker(this);
-  const batcher = this.getBatchTransform({ batchSize: 300 }).transform;
-  const outputFiles = {};
-  await pipeline(
-    (await fileWorker.fileToObjectStream(options)).stream,
-    batcher,
-    new Transform({
-      objectMode: true,
-      async transform(batch, encoding, cb) {
-        // eslint-disable-next-line no-underscore-dangle
-        if (batch[0]?._is_placeholder) {
-          return cb(null);
-        }
-        await worker.appendInputId({ pluginId, batch });
-        await worker.appendEntryTypeId({ batch });
-        await worker.appendSourceCodeId({ batch });
-        await worker.appendPersonId({ batch });
-        await worker.appendEntryId({ pluginId, batch });
-
-        const output = await worker.upsertTimelineInputFile({ batch });
-        // const { recordCounts }
-        debug(output);
-        Object.entries(output).forEach(([k, r]) => {
-          outputFiles[k] = (outputFiles[k] || 0) + r;
-        });
-        return cb();
-      },
-    }),
-  );
-  return outputFiles;
-};
-
-Worker.prototype.load.metadata = {
-  options: {
-    filename: {},
-  },
-};
-
 Worker.prototype.upsertTimelineInputFile = async function ({ batch }) {
   const timelineFiles = {};
   // Split the
@@ -156,6 +114,47 @@ Worker.prototype.upsertTimelineInputFile = async function ({ batch }) {
     }
   }
   return output;
+};
+Worker.prototype.load = async function (options) {
+  const worker = this;
+  const { pluginId } = options;
+  if (!pluginId) throw new Error('load requires a pluginId');
+  const fileWorker = new FileWorker(this);
+  const batcher = this.getBatchTransform({ batchSize: 300 }).transform;
+  const outputFiles = {};
+  await pipeline(
+    (await fileWorker.fileToObjectStream(options)).stream,
+    batcher,
+    new Transform({
+      objectMode: true,
+      async transform(batch, encoding, cb) {
+        // eslint-disable-next-line no-underscore-dangle
+        if (batch[0]?._is_placeholder) {
+          return cb(null);
+        }
+        await worker.appendInputId({ pluginId, batch });
+        await worker.appendEntryTypeId({ batch });
+        await worker.appendSourceCodeId({ batch });
+        await worker.appendPersonId({ batch });
+        await worker.appendEntryId({ pluginId, batch });
+
+        const output = await worker.upsertTimelineInputFile({ batch });
+        // const { recordCounts }
+        debug(output);
+        Object.entries(output).forEach(([k, r]) => {
+          outputFiles[k] = (outputFiles[k] || 0) + r;
+        });
+        return cb();
+      },
+    }),
+  );
+  return outputFiles;
+};
+
+Worker.prototype.load.metadata = {
+  options: {
+    filename: {},
+  },
 };
 
 module.exports = Worker;

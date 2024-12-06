@@ -83,6 +83,13 @@ Worker.prototype.ok.metadata = {
   options: {},
 };
 
+Worker.prototype.databases = async function f() {
+  return this.query('show databases');
+};
+Worker.prototype.databases.metadata = {
+  options: {},
+};
+
 // This is engine dependent
 Worker.prototype.parseQueryResults = function ({ results }) {
   let data; let records; let modified; let columns;
@@ -486,6 +493,43 @@ Worker.prototype.updateOne = async function ({
   const knex = await this.connect();
   await knex.table(table).where({ id }).update(data);
   return { id };
+};
+
+Worker.prototype.appendLimit = function (_query, optLimit, _offset) {
+  let offset = _offset;
+  let query = _query.trim();
+  let limit = null;
+  // extract existing limits from the query
+  let a = query.match(/limit\s*([0-9]*)\s*,\s*([0-9])*/i);
+  if (a) {
+    query = query.replace(/limit\s*[0-9,\s]*/i, '');
+    [, offset, limit] = a;
+  } else {
+    a = query.match(/limit\s*([0-9]*)\s*offset\s*([0-9])*/i) || query.match(/limit\s*([0-9]*)/i);
+    if (a) {
+      query = query.replace(/limit\s*[0-9,\s]*/i, '');
+      [, limit, offset] = a;
+    } else {
+      // sqlserver format
+      a = query.match(/select\s*top\s*([0-9])\s/i);
+      if (a) {
+        query = query.replace(/select\s*top\s*([0-9]*)\s/i, 'select ');
+        [, limit] = a;
+      }
+    }
+  }
+
+  // If there wasn't one ANYWHERE, just return the query as is
+  if (limit == null && (optLimit === undefined)) {
+    return query;
+  }
+
+  // if the limit is specified -- could be 0, use that
+  if (optLimit !== undefined) limit = optLimit;
+
+  // otherwise use what was in the query
+  query = this.addLimit(query, limit, offset);
+  return query;
 };
 
 Worker.prototype.stringToType = function (_v, _t, length, nullable, nullAsString) {
