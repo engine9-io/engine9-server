@@ -1,16 +1,13 @@
 const { execFile } = require('node:child_process');
 
 const express = require('express');
-const debug = require('debug')('packet-server');
+const debug = require('debug')('packet-api');
 const JSON5 = require('json5');
 
 const router = express.Router({ mergeParams: true });
 
 router.get('/', async (req, res) => {
-  let { accountId } = req.user || {};
-
-  // REMOVE ME
-  if (!accountId) accountId = 'authentic_azdems';
+  const { accountId } = req.user || {};
 
   let { path } = req.query;
   const { file } = req.query;

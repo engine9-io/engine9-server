@@ -48,11 +48,9 @@ try {
 
 const ui = require('./object/ui.console.config');
 const { addUserToRequest } = require('./object/permissions');
-const packetServer = require('./packet-server/index');
+const packetServer = require('./packet-api/index');
 
-app.use(cors());
 app.use(compression());
-app.use(bodyParser.json());
 
 app.get('/ok', (req, res) => { res.json({ ok: true }); });
 app.get('/error', () => {
@@ -102,11 +100,11 @@ function initSocketIO(httpServer) {
   });
 }
 
-if (process.env.API_PORT) port = parseInt(process.env.API_PORT, 10);
-if (process.env.SSL_CERT_PATH) {
+if (process.env.ENGINE9_API_PORT) port = parseInt(process.env.ENGINE9_API_PORT, 10);
+if (process.env.ENGINE9_SSL_CERT_PATH) {
   const httpServer = https.createServer({
-    key: fs.readFileSync(`${process.env.SSL_CERT_PATH}/key.pem`),
-    cert: fs.readFileSync(`${process.env.SSL_CERT_PATH}/cert.pem`),
+    key: fs.readFileSync(`${process.env.ENGINE9_SSL_CERT_PATH}/key.pem`),
+    cert: fs.readFileSync(`${process.env.ENGINE9_SSL_CERT_PATH}/cert.pem`),
   }, app).listen(port, (e) => {
     if (e) throw e;
     // eslint-disable-next-line no-console
