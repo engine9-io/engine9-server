@@ -2,7 +2,7 @@
 const { fakerEN_US: faker } = require('@faker-js/faker');
 const fs = require('node:fs');
 const { stringify } = require('csv');
-const debug = require('debug')('generate_fake_data');
+const debug = require('debug')('generate_sample_data');
 const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { getTempFilename } = require('@engine9/packet-tools');

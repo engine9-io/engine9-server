@@ -11,7 +11,7 @@ const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const InputWorker = require('../../workers/InputWorker');
 require('../test_db_schema');
-const { createSampleActionFile } = require('../sample_data/generate_fake_data');
+const { createSampleActionFile } = require('../sample_data/generate_sample_data');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'engine9';

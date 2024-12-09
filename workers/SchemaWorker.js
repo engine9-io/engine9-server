@@ -114,7 +114,7 @@ Worker.prototype.standardize = async function ({ schema: _schema }) {
       table.indexes = (table.indexes || []).map((d) => ({
         columns: (typeof d.columns === 'string') ? d.columns.split(',').map((x) => x.trim()) : d.columns,
         primary: d.primary || false,
-        unique: d.unique || false,
+        unique: d.unique || d.primary || false,
       }));
       return table;
     });
@@ -175,8 +175,13 @@ Worker.prototype.diff = async function (opts) {
           // Ignore these attributes
           if (['type', 'description', 'knex_args', 'values'].indexOf(k) >= 0) return out;
           // enum lengths are not really standardized
-
           if (c.type === 'enum' && k === 'length') return out;
+          if (k === 'default_value') {
+            // databases coerce undefined to NULL default values, this accounts for that
+            if (dbColumn[k] === null && c[k] === undefined) {
+              return out;
+            }
+          }
           if (c[k] !== dbColumn[k]) {
             // debug(c.name, k, c[k], '!=', dbColumn[k]);
             out[k] = { schema: c[k], db: dbColumn[k] };

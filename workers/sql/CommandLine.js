@@ -139,18 +139,14 @@ Worker.prototype.cli = async function (options) {
           if (m) {
             tableFormat = 'raw';
             const filter = m[1].replace(/%/g, '.+');
-            return worker.showTables({ filter }, (e, o) => {
-              if (e) return cb(e);
-              return cb(null, (o.tables || o).map((table) => ({ table })));
-            });
+            const o = await worker.tables({ filter });
+            return cb(null, (o.tables || o).map((table) => ({ table })));
           }
           m = cmd.match(showViews);
           if (m) {
             const filter = m[1].replace(/%/g, '');
-            return worker.showTables({ type: 'view', filter }, (e, o) => {
-              if (e) return cb(e);
-              return cb(null, (o.tables || o).map((table) => ({ table })));
-            });
+            const o = await worker.tables({ type: 'view', filter });
+            return cb(null, (o.tables || o).map((table) => ({ table })));
           }
           m = cmd.match(showStatus);
           if (m) {
@@ -164,7 +160,7 @@ Worker.prototype.cli = async function (options) {
           m = cmd.match(showProcessList);
           if (m) {
             tableFormat = true;
-            return worker.showProcessList({ filter: m[1].trim() }, cb);
+            return cb(null, await worker.showProcessList({ filter: m[1].trim() }));
           }
           m = cmd.match(getTableSizes);
           if (m) {
@@ -177,18 +173,18 @@ Worker.prototype.cli = async function (options) {
           m = cmd.match(showTransactions);
           if (m) {
             tableFormat = true;
-            return worker.showTransactions({ filter: m[1].trim() }, cb);
+            return cb(null, await worker.showTransactions({ filter: m[1].trim() }));
           }
           m = cmd.match(dropTable);
           if (m) {
             tableFormat = true;
-            return worker.dropTable({ table: m[1].trim() }, cb);
+            return cb(null, await worker.drop({ table: m[1].trim() }));
           }
           m = cmd.match(kill);
           if (m) {
             if (worker.account_id === 'system') {
               output(`System kill ${m[1]}`);
-              return worker.runQuery(`call mysql.rds_kill(${m[1].trim()})`, cb);
+              return cb(null, await worker.query(`call mysql.rds_kill(${m[1].trim()})`));
             }
           }
           m = cmd.match(killall);

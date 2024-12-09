@@ -53,7 +53,7 @@ Worker.defaultStandardColumn = {
   type: '',
   length: null,
   nullable: true,
-  default_value: null,
+  default_value: undefined, // null would actually means something here
   auto_increment: false,
 };
 
@@ -263,8 +263,12 @@ Worker.prototype.describe = async function describe(opts) {
     const extra = d.EXTRA;
     const onUpdate = 'on update current_timestamp()';
     if (extra.toLowerCase().indexOf(onUpdate) >= 0) defaultValue = (`${defaultValue || ''} ${onUpdate}`).trim();
-    if (defaultValue === 'NULL') defaultValue = null;
-    if (defaultValue !== null) {
+    if (defaultValue === 'NULL') {
+      defaultValue = null;
+    } else if (defaultValue === null) {
+      // in our world this is undefined
+      defaultValue = undefined;
+    } else {
       const type = d.COLUMN_TYPE.toUpperCase();
       if (type === 'UUID') {
         if (defaultValue.indexOf("'") === 0) defaultValue = defaultValue.slice(1, -1);
@@ -691,6 +695,7 @@ Worker.prototype.createTable = async function ({
       return true;
     });
     if (noTypes.length > 0) throw new Error(`Error creating table ${name}: No type for columns: ${noTypes.map((d) => JSON.stringify(d)).join()}`);
+    const autoIncrements = [];
 
     columns.forEach((c) => {
       let o = c;
@@ -698,6 +703,10 @@ Worker.prototype.createTable = async function ({
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       } = o;
+
+      if (method === 'increments' || method === 'bigIncrements') {
+        autoIncrements.push(o);
+      }
 
       const m = table[method].apply(table, [c.name, ...args]);
       if (unsigned) m.unsigned();
@@ -712,16 +721,26 @@ Worker.prototype.createTable = async function ({
         if (allowedRaw.indexOf(defaultRaw) < 0) throw new Error(`createTable: Invalid knex raw value:'${defaultRaw}'`);
         m.defaultTo(knex.raw(defaultRaw));
       } else if (defaultValue !== undefined) {
+        if (defaultValue === null && !nullable) {
+          throw new Error(`Error with column definition for ${c.name}, the default is null, but the column isn't nullable.  Use undefined for default processing`);
+        }
         m.defaultTo(defaultValue);
       }
     });
+
     const primaries = columns.filter((d) => d.primary_key).map((c) => c.name);
-    if (primaries.length > 0) table.primary(primaries);
+
+    if (primaries.length > 0) {
+      table.primary(primaries);
+    }
     indexes.forEach((x) => {
       const indexName = getUUIDv7();
       if (x.primary) {
         if (primaries.length > 0) {
           throw new Error(`Should not specify both a primary key as a column (${primaries}) and in an index (${x})`);
+        } else if (autoIncrements.length > 0) {
+          // do nothing - this is a knex weirdness
+          // that clobbers the auto_increments if the primary key is reset
         } else {
           table.primary(x.columns, indexName);
         }
@@ -731,6 +750,7 @@ Worker.prototype.createTable = async function ({
         table.index(x.columns, indexName);
       }
     });
+
     if (timestamps) table.timestamps();
   });
   return { created: true, table: name };
