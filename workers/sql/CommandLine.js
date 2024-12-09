@@ -1,11 +1,14 @@
-const repl = require('repl');
+const repl = require('node:repl');
+const process = require('node:process');
 const util = require('node:util');
+const debug = require('debug')('CommandLine');
 const { bool } = require('../../utilities');
 
 function Worker() {}
 
 const desc = /^(?:desc|describe) ([a-z0-9_.]*)$/i;
 const fields = /^(?:fields) ([a-z0-9_.]*)$/i;
+const columns = /^(?:columns) ([a-z0-9_.]*)$/i;
 const showTables = /show tables like '(.*)'$/i;
 const showViews = /show views like '(.*)'$/i;
 const showIndexes = /show indexes from ([a-z0-9_.]*)$/i;
@@ -28,17 +31,6 @@ Worker.prototype.cli = async function (options) {
 
   const dumb = bool(options.dumb, false);
 
-  /*
-  let history = '';
-  try {
-    history = await fsp.readFile('.e9_cli_history');
-  } catch (e) {
-    debug('.e9_cli_history');
-  }
-
-   history = (history || '').split('\n');
-  */
-
   let lastEnd = null;
   let lastCounter = null;
   function output(...args) {
@@ -47,7 +39,9 @@ Worker.prototype.cli = async function (options) {
   }
 
   return new Promise(() => {
-    repl.start({
+    const history = `${process.cwd()}/.e9_cli_history`;
+    debug(`Using history file:${history}`);
+    const replServer = repl.start({
       prompt: (`${worker.accountId} ${info.user ? `${info.user}@` : ''}${info.database}> `),
       async eval(_cmd, context, filename, callback) {
         let cmd = _cmd;
@@ -203,31 +197,28 @@ Worker.prototype.cli = async function (options) {
           }
           m = cmd.match(desc);
           if (m) {
-            return worker.describe({ table: m[1] }, (e, d) => {
-              if (e) return cb(e);
-              tableFormat = 'table';
-              return cb(null, d.fields);
-            });
+            const d = await worker.describe({ table: m[1] });
+            tableFormat = 'raw';
+            return cb(null, d.columns);
           }
-          m = cmd.match(fields);
+          m = cmd.match(fields) || cmd.match(columns);
           if (m) {
-            return worker.describe({ table: m[1] }, (e, d) => {
-              if (e) return cb(e);
-              tableFormat = 'raw';
-              return cb(null, d.fields.map((x) => ({ name: x.name })));
-            });
+            const d = await worker.describe({ table: m[1] });
+            tableFormat = 'raw';
+            return cb(null, d.columns.map((x) => ({ name: x.name })));
           }
           m = cmd.match(showCreateView);
           if (m) {
-            return worker.getCreateView({ table: m[1] }, (e, o) => {
-              worker.tidy(o, (err, tidy) => {
-                if (err) {
-                  output('Failed to tidy view', err);
-                  return cb(null, { sql: o.sql });
-                }
-                return cb(null, { sql: tidy.tidy });
-              });
-            });
+            const d = await worker.getCreateView({ table: m[1] });
+            let tidy = null;
+            try {
+              tidy = await worker.tidy(d);
+            } catch (err) {
+              output('Failed to tidy view', err);
+              return cb(null, { sql: d.sql });
+            }
+
+            return cb(null, { sql: tidy.tidy });
           }
           m = cmd.match(showCreateTable);
           if (m) {
@@ -247,6 +238,9 @@ Worker.prototype.cli = async function (options) {
           return cb(e);
         }
       },
+    });
+    replServer.setupHistory(history, (e) => {
+      if (e) throw e;
     });
   });
 };

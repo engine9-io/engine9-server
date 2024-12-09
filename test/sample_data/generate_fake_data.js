@@ -40,7 +40,7 @@ function pick(a) {
 }
 const postfix = '.csv';
 
-async function createPersonFile() {
+async function createSamplePersonFile() {
   const userArray = faker.helpers.multiple(createRandomPerson, {
     count,
   });
@@ -54,7 +54,7 @@ async function createPersonFile() {
   return filename;
 }
 
-async function createTransactionFile() {
+async function createSampleTransactionFile() {
   const transactionArray = [];
 
   const userArray = faker.helpers.multiple(createRandomPerson, {
@@ -87,7 +87,7 @@ async function createTransactionFile() {
   return filename;
 }
 
-async function createActionFile() {
+async function createSampleActionFile() {
   const actionArray = [];
   const userArray = faker.helpers.multiple(createRandomPerson, {
     count,
@@ -123,10 +123,10 @@ async function createActionFile() {
 
 if (require.main === module) {
   debug(`Creating ${count} fake people`);
-  createPersonFile();
+  createSamplePersonFile();
 }
 module.exports = {
-  createPersonFile,
-  createTransactionFile,
-  createActionFile,
+  createSamplePersonFile,
+  createSampleTransactionFile,
+  createSampleActionFile,
 };

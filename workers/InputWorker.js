@@ -8,6 +8,7 @@ const debug = require('debug')('InputWorker');
 const SQLiteWorker = require('./sql/SQLiteWorker');
 const PersonWorker = require('./PersonWorker');
 const FileWorker = require('./FileWorker');
+const { bool } = require('../utilities');
 
 function Worker(worker) {
   PersonWorker.call(this, worker);
@@ -115,15 +116,28 @@ Worker.prototype.upsertTimelineInputFile = async function ({ batch }) {
   }
   return output;
 };
+/*
+  Loads a file from an input to the database
+*/
+Worker.prototype.loadToTimeline = async function (options) {
+  const { inputId, datePrefix } = options;
+  const { db } = await this.getInputStorageDB({ inputId, datePrefix });
+  // const sqlWorker = new SQLWorker({ accountId: this.accountId });
+  const { stream } = db.stream('select * from timeline');
+  return this.insertFromStream({ upsert: true, stream });
+};
+
 Worker.prototype.load = async function (options) {
   const worker = this;
-  const { pluginId } = options;
+
+  const { pluginId, filename } = options;
   if (!pluginId) throw new Error('load requires a pluginId');
+  const loadTimeline = bool(options.loadTimeline, false);
   const fileWorker = new FileWorker(this);
   const batcher = this.getBatchTransform({ batchSize: 300 }).transform;
   const outputFiles = {};
   await pipeline(
-    (await fileWorker.fileToObjectStream(options)).stream,
+    (await fileWorker.fileToObjectStream({ filename })).stream,
     batcher,
     new Transform({
       objectMode: true,
@@ -139,7 +153,7 @@ Worker.prototype.load = async function (options) {
         await worker.appendEntryId({ pluginId, batch });
 
         const output = await worker.upsertTimelineInputFile({ batch });
-        // const { recordCounts }
+        if (loadTimeline) await this.insertFromStream({ table: 'timeline', upsert: true, stream: batch });
         debug(output);
         Object.entries(output).forEach(([k, r]) => {
           outputFiles[k] = (outputFiles[k] || 0) + r;
@@ -148,12 +162,16 @@ Worker.prototype.load = async function (options) {
       },
     }),
   );
+
   return outputFiles;
 };
 
 Worker.prototype.load.metadata = {
   options: {
     filename: {},
+    loadDatabase: {
+      description: 'Whether to load the database as well as the file, default false',
+    },
   },
 };
 

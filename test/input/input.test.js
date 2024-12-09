@@ -11,7 +11,7 @@ const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const InputWorker = require('../../workers/InputWorker');
 require('../test_db_schema');
-const { createActionFile } = require('../sample_data/generate_fake_data');
+const { createSampleActionFile } = require('../sample_data/generate_fake_data');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'engine9';
@@ -91,8 +91,15 @@ describe('Insert File of people with options', async () => {
   });
 
   it('Should be able to append identifiers to a file, and write a sqlite database', async () => {
-    const filename = await createActionFile();
+    const filename = await createSampleActionFile();
     const output = await inputWorker.load({ pluginId: 'testing', filename });
+    debug('Input', filename);
+    debug('Output filename', output);
+  });
+
+  it('Should be able to append identifiers to a file, write a sqlite database, and load to the timeline', async () => {
+    const filename = await createSampleActionFile();
+    const output = await inputWorker.load({ pluginId: 'testing', filename, loadTimeline: true });
     debug('Input', filename);
     debug('Output filename', output);
   });
