@@ -5,7 +5,7 @@ const { pipeline } = require('node:stream/promises');
 const { v7: uuidv7 } = require('uuid');
 const { Transform } = require('node:stream');
 
-const debug = require('debug')('PersonWorker');
+// const debug = require('debug')('PersonWorker');
 const info = require('debug')('info:PersonWorker');
 const debugPerformance = require('debug')('Performance');
 const SQLWorker = require('./SQLWorker');
@@ -179,7 +179,7 @@ Worker.prototype.appendPersonId = async function ({ batch }) {
     performance.mark('end-assign-ids-blocking');
     return batch;
   }
-  debug('Items with no ids:', JSON.stringify(itemsWithNoExistingIds));
+  // debug('Items with no ids:', JSON.stringify(itemsWithNoExistingIds));
 
   await this.assignIdsBlocking({ batch: itemsWithNoExistingIds });
   performance.mark('end-assign-ids-blocking');

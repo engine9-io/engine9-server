@@ -66,7 +66,7 @@ async function createSampleTransactionFile() {
     const transCount = Math.random() * 4;
     for (let i = 0; i < transCount; i += 1) {
       transactionArray.push({
-        remote_id: faker.uuid,
+        remote_entry_id: faker.uuid,
         entry_date: faker.date.past().toISOString(),
         entry_type: 'TRANSACTION',
         remote_input_id: faker.uuid,
@@ -87,22 +87,23 @@ async function createSampleTransactionFile() {
   return filename;
 }
 
-async function createSampleActionFile() {
+async function createSampleActionFile(opts) {
   const actionArray = [];
+  const { users = 10, ts, remote_input_id: rid } = opts || {};
   const userArray = faker.helpers.multiple(createRandomPerson, {
-    count,
+    count: users,
   });
   userArray.forEach((user) => {
     if (Math.random() > 0.3) return null;
     const { email } = user;
-    const transCount = Math.random() * 4;
+    const transCount = Math.random() * 3;
     for (let i = 0; i < transCount; i += 1) {
       const formId = Math.floor(Math.random() * formNames.length);
       actionArray.push({
-        remote_id: faker.string.uuid(),
-        ts: faker.date.past().toISOString(),
+        remote_entry_id: faker.string.uuid(),
+        ts: ts || faker.date.past().toISOString(),
         entry_type: 'FORM_SUBMIT',
-        remote_input_id: `form_${formId}`,
+        remote_input_id: rid || `form_${formId}`,
         remote_input_name: formNames[formId],
         email,
         source_code: pick(sourceCodes),

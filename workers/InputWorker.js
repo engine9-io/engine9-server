@@ -5,6 +5,7 @@ const path = require('node:path');
 const { Transform } = require('node:stream');
 const { mkdirp } = require('mkdirp');
 const debug = require('debug')('InputWorker');
+const SQLWorker = require('./SQLWorker');
 const SQLiteWorker = require('./sql/SQLiteWorker');
 const PersonWorker = require('./PersonWorker');
 const FileWorker = require('./FileWorker');
@@ -20,23 +21,28 @@ util.inherits(Worker, PersonWorker);
   An input storage db gets or creates an input storage file,
   currently a SQLite database with a timestamp
 */
-Worker.prototype.getInputStorageDB = async function ({ inputId, datePrefix }) {
-  const store = process.env.ENGINE9_TIMELINE_STORE;
-  if (!store) throw new Error('No ENGINE9_TIMELINE_STORE configured');
+const store = process.env.ENGINE9_STORED_INPUT_PATH;
+if (!store) throw new Error('No ENGINE9_STORED_INPUT_PATH configured');
+Worker.prototype.getStoredInputDB = async function ({ inputId, datePrefix }) {
   const dir = [store, datePrefix, inputId].join(path.sep);
+  this.storedInputCache = this.storedInputCache || {};
   await (mkdirp(dir));
   const sqliteFile = `${dir + path.sep}timeline.sqlite`;
+  let output = this.storedInputCache[sqliteFile];
+  if (output) return output;
   const exists = await fs.stat(sqliteFile).then(() => true).catch(() => false);
   const db = new SQLiteWorker({ accountId: this.accountId, sqliteFile });
   if (exists) {
-    return { filename: sqliteFile, db };
+    output = { filename: sqliteFile, db };
+    this.storedInputCache[sqliteFile] = output;
+    return output;
   }
 
   await db.query('BEGIN;');
   await db.query(`create table timeline(
           id text not null primary key,
           ts integer not null,
-          input_id text not null,
+          ${/* input_id text not null, */''}
           entry_type_id smallint not null,
           person_id bigint not null,
           source_code_id bigint not null,
@@ -50,10 +56,17 @@ Worker.prototype.getInputStorageDB = async function ({ inputId, datePrefix }) {
         )`);
   await db.query('COMMIT;');
 
-  return { filename: sqliteFile, db };
+  output = { filename: sqliteFile, db };
+  this.storedInputCache[sqliteFile] = output;
+  return output;
+};
+Worker.prototype.destroy = async function () {
+  Object.entries(this.storedInputCache || {}).forEach(([, { db }]) => {
+    db.destroy();
+  });
 };
 
-Worker.prototype.upsertTimelineInputFile = async function ({ batch }) {
+Worker.prototype.upsertStoredInputFile = async function ({ batch }) {
   const timelineFiles = {};
   // Split the
   // eslint-disable-next-line no-restricted-syntax
@@ -63,7 +76,7 @@ Worker.prototype.upsertTimelineInputFile = async function ({ batch }) {
     let info = timelineFiles[`${datePrefix}:${inputId}`];
     if (!info) {
       // eslint-disable-next-line no-await-in-loop
-      const { filename, db } = await this.getInputStorageDB({ inputId, datePrefix });
+      const { filename, db } = await this.getStoredInputDB({ inputId, datePrefix });
       info = {
         filename, records: 0, db, array: [],
       };
@@ -88,7 +101,8 @@ Worker.prototype.upsertTimelineInputFile = async function ({ batch }) {
     const { db, array, filename } = timelineObj;
     try {
       // eslint-disable-next-line no-await-in-loop
-      const results = await db.upsertArray({ table: 'timeline', array });
+      await db.upsertArray({ table: 'timeline', array });
+      // we don't need to use the results for anything
       const detailArray = array.map((d) => {
         const details = {};
         let include = false;
@@ -100,18 +114,19 @@ Worker.prototype.upsertTimelineInputFile = async function ({ batch }) {
         });
         return include ? { id: d.id, details } : false;
       }).filter(Boolean);
-      let details = null;
       if (detailArray.length > 0) {
         // eslint-disable-next-line no-await-in-loop
-        details = await db.upsertArray({ table: 'timeline_detail', array: detailArray });
+        await db.upsertArray({ table: 'timeline_detail', array: detailArray });
+        // we don't need to use the results for anything
       }
 
-      output[dbKey] = { timeline: results, details };
+      output[dbKey] = { filename, records: array.length };
     } catch (e) {
       debug(`Error for key ${dbKey} in filename ${filename}`);
       throw e;
     } finally {
-      db.destroy();
+      // we could reuse this
+      // db.destroy();
     }
   }
   return output;
@@ -121,10 +136,12 @@ Worker.prototype.upsertTimelineInputFile = async function ({ batch }) {
 */
 Worker.prototype.loadToTimeline = async function (options) {
   const { inputId, datePrefix } = options;
-  const { db } = await this.getInputStorageDB({ inputId, datePrefix });
+  const { db } = await this.getStoredInputDB({ inputId, datePrefix });
   // const sqlWorker = new SQLWorker({ accountId: this.accountId });
   const { stream } = db.stream('select * from timeline');
-  return this.insertFromStream({ upsert: true, stream });
+  if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
+
+  return this.sqlWorker.insertFromStream({ upsert: true, stream });
 };
 
 Worker.prototype.load = async function (options) {
@@ -136,6 +153,8 @@ Worker.prototype.load = async function (options) {
   const fileWorker = new FileWorker(this);
   const batcher = this.getBatchTransform({ batchSize: 300 }).transform;
   const outputFiles = {};
+  let inputRecords = 0;
+  let batches = 0;
   await pipeline(
     (await fileWorker.fileToObjectStream({ filename })).stream,
     batcher,
@@ -146,24 +165,30 @@ Worker.prototype.load = async function (options) {
         if (batch[0]?._is_placeholder) {
           return cb(null);
         }
+        batches += 1;
+        inputRecords += batch.length;
+        if (batches % 10 === 0) debug(`Processed ${batches} batches, ${inputRecords} records`);
         await worker.appendInputId({ pluginId, batch });
         await worker.appendEntryTypeId({ batch });
         await worker.appendSourceCodeId({ batch });
         await worker.appendPersonId({ batch });
         await worker.appendEntryId({ pluginId, batch });
 
-        const output = await worker.upsertTimelineInputFile({ batch });
-        if (loadTimeline) await this.insertFromStream({ table: 'timeline', upsert: true, stream: batch });
-        debug(output);
+        const output = await worker.upsertStoredInputFile({ batch });
+        if (loadTimeline) {
+          await worker.insertFromStream({ table: 'timeline', upsert: true, stream: batch });
+        }
+
         Object.entries(output).forEach(([k, r]) => {
-          outputFiles[k] = (outputFiles[k] || 0) + r;
+          outputFiles[k] = outputFiles[k] || { filename: r.filename, records: 0 };
+          outputFiles[k].records += (r.records || 0);
         });
         return cb();
       },
     }),
   );
 
-  return outputFiles;
+  return { inputRecords, outputFiles };
 };
 
 Worker.prototype.load.metadata = {

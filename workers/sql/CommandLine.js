@@ -182,7 +182,7 @@ Worker.prototype.cli = async function (options) {
           }
           m = cmd.match(kill);
           if (m) {
-            if (worker.account_id === 'system') {
+            if (worker.accountId === 'system') {
               output(`System kill ${m[1]}`);
               return cb(null, await worker.query(`call mysql.rds_kill(${m[1].trim()})`));
             }

@@ -11,7 +11,7 @@ const Knex = require('knex');
 
 const ReportWorker = require('../../workers/ReportWorker');
 const SegmentWorker = require('../../workers/SegmentWorker');
-const { ObjectError } = require('../../utilities');
+const { ObjectError, uuidRegex } = require('../../utilities');
 
 const reports = require('./reports');
 
@@ -121,7 +121,7 @@ function makeArray(s) {
   if (Array.isArray(obj)) return obj;
   return [obj];
 }
-const uuidMatch = /^[0-9,a-f]{8}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{12}$/;
+
 async function getData(options, databaseWorker) {
   const { table, limit = 100, offset = 0 } = options;
   if (!table) throw new ObjectError({ status: 422, message: 'No table provided' });
@@ -157,7 +157,7 @@ async function getData(options, databaseWorker) {
   if (eqlObject.columns.length === 0)eqlObject.columns = ['*'];
   if (options.id) {
     let id = parseInt(options.id, 10);
-    if (uuidMatch.test(options.id)) id = `'${options.id}'`;
+    if (uuidRegex.test(options.id)) id = `'${options.id}'`;
     else if (Number.isNaN(id)) throw new Error('Invalid id');
     eqlObject.conditions = (eqlObject.conditions || []).concat({ eql: `id=${id}` });
     eqlObject.limit = 0;
@@ -231,7 +231,7 @@ async function getData(options, databaseWorker) {
     inc.foreign_id_field = inc.foreign_id_field || `${table}_id`;
     inc.conditions.push({
       eql: `${inc.foreign_id_field} in (${allIds.map((id) => {
-        if (uuidMatch.test(id)) return `'${options.id}'`;
+        if (uuidRegex.test(id)) return `'${options.id}'`;
         if (Number.isNaN(id)) throw new Error('Invalid id');
         return `${id}`;
       }).join(',')})`,

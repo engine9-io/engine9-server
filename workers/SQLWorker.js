@@ -57,6 +57,13 @@ Worker.defaultStandardColumn = {
   auto_increment: false,
 };
 
+Worker.prototype.info = function () {
+  return {
+    driver: 'mysql',
+    dialect: this.dialect,
+  };
+};
+
 Worker.prototype.connect = async function connect() {
   if (this.knex) return this.knex;
   const { accountId } = this;
@@ -119,12 +126,13 @@ Worker.prototype.query = async function (options) {
   if (!opts.sql) throw new Error('No sql provided');
   try {
     const knex = await this.connect();
-    debug('Running:', `${opts.sql.slice(0, 300)}...`);
+    this.debugCounter = (this.debugCounter || 0) + 1;
+    if (this.debugCounter < 10) debug(`Running:${this.debugCounter}`, `${opts.sql.slice(0, 300)}...`);
     const results = await knex.raw(opts.sql, opts.values || []);
 
     return this.parseQueryResults({ sql: opts.sql, results });
   } catch (e) {
-    info('Error running query:', options, e);
+    info('Error running query:', this.info(), options, e);
     throw e;
   }
 };
@@ -248,7 +256,7 @@ Worker.prototype.describe = async function describe(opts) {
   const { table, raw } = opts;
   if (!table) throw new Error(`No table provided to describe with opts ${Object.keys(opts)}`);
   if (table === 'dual') return { database: 'dual', columns: [] };// special handling for function calls
-  debug(`Describing ${table}`, { accountId: this.accountId });
+  debugMore(`Describing ${table}`, { accountId: this.accountId });
   const sql = `select database() as DB,COLUMN_NAME,COLUMN_TYPE,DATA_TYPE,IS_NULLABLE,COLUMN_DEFAULT,CHARACTER_MAXIMUM_LENGTH,EXTRA FROM information_schema.columns WHERE  table_schema = Database() AND table_name = '${this.escapeTable(table)}' order by ORDINAL_POSITION`;
   const r = await this.query(sql);
   const cols = r.data;
@@ -305,7 +313,7 @@ Worker.prototype.describe = async function describe(opts) {
       throw e;
     }
   });
-  debug(`Finished describing ${table}`);
+  debugMore(`Finished describing ${table}`);
   return results;
 };
 
@@ -403,10 +411,14 @@ Worker.prototype.loadTableFromQuery.metadata = {
   },
 };
 
-Worker.prototype.createTableFromAnalysis = async function ({ table, analysis, indexes }) {
+Worker.prototype.createTableFromAnalysis = async function ({
+  table, analysis, indexes, primary,
+}) {
   if (!analysis) throw new Error('analysis is required');
   const columns = analysis.fields.map((f) => this.deduceColumnDefinition(f));
-  return this.createTable({ table, columns, indexes });
+  return this.createTable({
+    table, columns, indexes, primary,
+  });
 };
 
 Worker.prototype.createTableFromAnalysis.metadata = {
@@ -417,7 +429,7 @@ Worker.prototype.createAndLoadTable = async function (options) {
   const stream = await fworker.getStream(options);
   const analysis = await analyzeStream(stream);
   const table = options.table || `temp_${new Date().toISOString().replace(/[^0-9]/g, '_')}`.slice(0, -1);
-  await this.createTableFromAnalysis({ table, analysis });
+  await this.createTableFromAnalysis({ table, analysis, primary: options.primary });
   const stream2 = await fworker.getStream(options);
 
   return this.insertFromStream({ table, stream: stream2.stream });
@@ -857,7 +869,7 @@ Worker.prototype.insertFromStream = async function (options) {
   const worker = this;
   const desc = await this.describe(options);
   const knex = await this.connect();
-  debug('Connected, starting insertFromStream');
+  debugMore('Connected, starting insertFromStream');
   return new Promise((resolve, reject) => {
     const table = this.escapeTable(options.table);
     let { stream } = options;
@@ -866,7 +878,7 @@ Worker.prototype.insertFromStream = async function (options) {
       return;
     }
     if (Array.isArray(stream)) {
-      debug(`Stream is an array, reading as an array of length ${stream.length}`);
+      debugMore(`Stream is an array, reading as an array of length ${stream.length}`);
       stream = Readable.from(stream);// Create a Readable stream from the array
     }
 
@@ -881,7 +893,7 @@ Worker.prototype.insertFromStream = async function (options) {
 
     let columns = null;
     let rows = [];
-    let sqlCounter = 0;
+    this.sqlCounter = this.sqlCounter || 0;
     function getIncludedObjectColumns(o) {
       return desc.columns.filter((f) => {
         // set the database appropriate name as well
@@ -897,12 +909,12 @@ Worker.prototype.insertFromStream = async function (options) {
     const toSQL = through2.obj({}, function (o, enc, cb) {
       if (!o) return cb();
 
-      sqlCounter += 1;
+      this.sqlCounter += 1;
 
       if (Array.isArray(o)) {
         throw new Error('You should not pass an array into insertFromStream');
       }
-      o.account_id = o.account_id || worker.account_id;
+      o.account_id = o.account_id || worker.accountId;
 
       // Support default values
       Object.keys(defaults).forEach((i) => {
@@ -913,12 +925,12 @@ Worker.prototype.insertFromStream = async function (options) {
         o[worker.getSQLName(k)] = o[k];
         o[k.trim()] = o[k];// Sometimes leading blanks are an issue
       });
-      if (sqlCounter === 1) {
-        debug('Insert from stream to table', table, desc.columns.map((d) => d.name)?.join(','), { upsert });
+      if (this.sqlCounter === 1) {
+        debug('Beginning insert from stream to table', table, 'with columns ', desc.columns.map((d) => d.name)?.join(','), { upsert });
       }
       if (columns == null) {
         const includedObjectColumns = getIncludedObjectColumns(o);
-        debug(`Running insertFromStream with columns ${includedObjectColumns.map((d) => `${d.name}(nullable:${d.nullable})`).join(',')}`, 'sample object:', o);
+        debugMore(`Running insertFromStream with columns ${includedObjectColumns.map((d) => `${d.name}(nullable:${d.nullable})`).join(',')}`, 'sample object:', o);
         if (includedObjectColumns.length === 0) {
           const msg = `insertFromStream to table ${table}: No columns found in object with keys: ${Object.keys(o).map((d) => `${d} unicode:${JSON.stringify(toCharCodes(d))}`)} that matches table description with columns:${desc.columns.map((d) => `${d.name} unicode:${JSON.stringify(toCharCodes(d.name))}`).join()}`;
           debug(JSON.stringify(desc));
@@ -1044,6 +1056,7 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
   const knex = await this.connect();
   if (!desc.columns?.length) {
     debug(desc);
+    debug('Exising tables:', await this.tables());
     throw new Error(`Error describing ${table}, no columns`);
   }
 

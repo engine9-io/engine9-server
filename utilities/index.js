@@ -286,6 +286,7 @@ function deepMerge(a, b, _stack) {
 
   return clone;
 }
+const uuidRegex = /^[0-9,a-f]{8}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{4}-[0-9,a-f]{12}$/;
 
 module.exports = {
   bool,
@@ -300,4 +301,5 @@ module.exports = {
   generateUniqueKey,
   ObjectError,
   deepMerge,
+  uuidRegex,
 };

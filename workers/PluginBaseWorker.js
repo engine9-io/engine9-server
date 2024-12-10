@@ -11,6 +11,7 @@ const PacketTools = require('@engine9/packet-tools');
 const { LRUCache } = require('lru-cache');
 const { TIMELINE_ENTRY_TYPES } = require('@engine9/packet-tools');
 const SchemaWorker = require('./SchemaWorker');
+const { uuidRegex } = require('../utilities');
 
 function Worker(worker) {
   SchemaWorker.call(this, worker);
@@ -283,7 +284,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
     .from(table)
     .where(inputField, 'in', Array.from(valuesToLookup))
     .andWhere(additionalWhere);
-  debug('loading ids for', itemsWithNoIds, Array.from(valuesToLookup), existingIds);
+  // debug('loading ids for', itemsWithNoIds, Array.from(valuesToLookup), existingIds);
 
   // Populate the cache
   existingIds.forEach((r) => this.itemCaches[type].set(r.lookup, r.id));
@@ -393,6 +394,11 @@ Worker.prototype.appendEntryId = async function ({
   const req = ['input_id', 'ts', 'entry_type_id', 'person_id'];
   batch.forEach((b) => {
     if (b.id) return;
+    if (b.remote_entry_id) {
+      if (!uuidRegex.test(b.remote_entry_id)) throw new Error('Invalid remote_entry_id, it must be a UUID');
+      b.id = b.remote_entry_id;
+      return;
+    }
     const missing = req.filter((d) => !b[d]);
     if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
     // get a temp ID

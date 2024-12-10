@@ -151,15 +151,18 @@ Worker.prototype.deduceColumnDefinition = function ({
 };
 
 Worker.prototype.createTable = async function ({
-  table: name, columns, indexes = [],
+  table: name, columns, indexes = [], primary,
 }) {
   if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
   // get the primary key, but that's it
-  let pkey = indexes?.find((d) => d.primary);
+  let pkey = primary;
+  if (pkey) pkey = { columns: [primary] };
+  if (!primary)pkey = indexes?.find((d) => d.primary);
   if (!pkey) pkey = indexes?.find((d) => d.unique);
   if (!pkey) {
     debug('indexes:', JSON.stringify(indexes));
-    throw new Error(`Error creating table ${name}, ClickHouse requires a primary or unique key, none were found in existing indexes`);
+    debug('columns', columns.map((d) => d.name).join());
+    throw new Error(`Error creating table ${name}, ClickHouse requires a primary or unique key, none were found in existing indexes or in a primary option`);
   }
   const knex = await this.connect();
 
@@ -404,6 +407,41 @@ Worker.prototype.syncAll.metadata = {
     start: {},
     end: {},
   },
+};
+
+Worker.prototype.sizes = async function () {
+  return this.query(`select parts.*,
+       columns.compress_size,
+       columns.uncompress_size,
+       columns.compress_ratio,
+       columns.compress_percent
+from (
+         select database,table,
+                formatReadableSize(sum(data_uncompressed_bytes))          AS uncompress_size,
+                formatReadableSize(sum(data_compressed_bytes))            AS compress_size,
+                round(sum(data_compressed_bytes) / sum(data_uncompressed_bytes), 3) AS  compress_ratio,
+                round((100 - (sum(data_compressed_bytes) * 100) / sum(data_uncompressed_bytes)), 3) AS compress_percent
+
+             from system.columns
+             group by database,table
+         ) columns
+         right join (
+    select database,
+            table,
+           sum(rows)                                            as rows,
+           max(modification_time)                               as latest_modification,
+           formatReadableSize(sum(bytes))                       as disk_size,
+           formatReadableSize(sum(primary_key_bytes_in_memory)) as primary_keys_size,
+           any(engine)                                          as engine,
+           sum(bytes)                                           as bytes_size
+    from system.parts
+    where active and database=${this.escapeValue(this.accountId)}
+    group by database, table
+    ) parts on columns.database=parts.database and columns.table = parts.table
+order by parts.bytes_size desc`);
+};
+Worker.prototype.sizes.metadata = {
+  options: {},
 };
 
 module.exports = Worker;

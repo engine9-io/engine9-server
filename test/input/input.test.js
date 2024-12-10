@@ -9,6 +9,7 @@ const debug = require('debug')('test-framework');
 // const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
+const SQLLiteWorker = require('../../workers/sql/SQLiteWorker');
 const InputWorker = require('../../workers/InputWorker');
 require('../test_db_schema');
 const { createSampleActionFile } = require('../sample_data/generate_sample_data');
@@ -26,12 +27,13 @@ describe('Insert File of people with options', async () => {
 
   after(async () => {
     await knex.destroy();
+    await inputWorker.destroy();
   });
 
   it('Should be able to add standard identifiers to an array', async () => {
     const batch = [
       {
-        remote_id: '5bbbc3a9-ee40-41b8-b243-1176007346fb',
+        remote_entry_id: '5bbbc3a9-ee40-41b8-b243-1176007346fb',
         ts: '2024-04-27T18:12:36.191Z',
         entry_type: 'FORM_SUBMIT',
         remote_input_id: 'form_0',
@@ -42,7 +44,7 @@ describe('Insert File of people with options', async () => {
         action_content: 'Cui optio tamen.',
       },
       {
-        remote_id: '7a23d9fc-5f53-4c30-89ca-07a79d7af682',
+        remote_entry_id: '7a23d9fc-5f53-4c30-89ca-07a79d7af682',
         ts: '2024-08-15T00:37:30.391Z',
         entry_type: 'FORM_SUBMIT',
         remote_input_id: 'form_2',
@@ -80,19 +82,26 @@ describe('Insert File of people with options', async () => {
       assert.ok(o.person_id > 0, `No valid person information for ${o.email}`);
     });
 
+    // Delete then re-assign the remote_entry_id, and check it matches the ts
+    batch.forEach((o) => { delete o.remote_entry_id; });
     await inputWorker.appendEntryId({ pluginId, batch });
     debug(batch);
     batch.forEach((o) => {
       assert.ok(o.id?.length > 0, `Not a valid entry.id: ${o.id}`);
       const ts = new Date(o.ts).getTime();
       const entryts = getUUIDTimestamp(o.id).getTime();
-      assert.ok(ts === entryts, 'Timestamps for entry_id (a v7 uuid) and ts don\'t match');
+      assert.ok(ts === entryts, 'Timestamps for entry.id (a v7 uuid) and ts don\'t match');
     });
+  });
+
+  it('Should be able to open multiple databases, and toggle writing between them', async () => {
+
   });
 
   it('Should be able to append identifiers to a file, and write a sqlite database', async () => {
     const filename = await createSampleActionFile();
     const output = await inputWorker.load({ pluginId: 'testing', filename });
+
     debug('Input', filename);
     debug('Output filename', output);
   });
@@ -103,4 +112,43 @@ describe('Insert File of people with options', async () => {
     debug('Input', filename);
     debug('Output filename', output);
   });
+
+  it('Should be able to append identifiers to a file, write a sqlite database TWICE, and be deduped', async () => {
+    // make sure we use a fresh input
+    const rid = `Testing Input ${new Date().toISOString()}`;
+    const filename = await createSampleActionFile(
+      { ts: new Date().toISOString(), remote_input_id: rid },
+    );
+    const storedInputInfo = await inputWorker.load({ pluginId: 'testing', filename });
+
+    const sqliteFile = Object.values(storedInputInfo.outputFiles || [])?.[0]?.filename;
+
+    const sqlite = new SQLLiteWorker({ accountId, sqliteFile });
+    const { data: initial } = await sqlite.query('select count(*) as records from timeline');
+    debug('Initial count', initial);
+    await inputWorker.load({ pluginId: 'testing', filename });
+
+    const { data: deduped } = await sqlite.query('select count(*) as records from timeline');
+    debug('Subsequent count', deduped);
+    assert(initial[0]?.records === deduped[0]?.records, 'Records were not deduplicated');
+
+    const filename2 = await createSampleActionFile(
+      { ts: new Date().toISOString(), remote_input_id: rid },
+    );
+    await inputWorker.load({ pluginId: 'testing', filename: filename2 });
+    const { data: expanded } = await sqlite.query('select count(*) as records from timeline');
+    assert(expanded[0]?.records > deduped[0]?.records, 'Records were overly deduplicated, there should be more of them');
+    sqlite.destroy();
+  });
+
+  /*
+  it(`Scale test -- Should be able to append identifiers to a file,
+    write a sqlite database, and load to the timeline for a lot of people`, async () => {
+    const filename = await createSampleActionFile({ users: 1000000 });
+    debug('Input', filename);
+    const output = await inputWorker.load({ pluginId: 'testing', filename, loadTimeline: true });
+
+    debug('Output filename', output);
+  });
+  */
 });

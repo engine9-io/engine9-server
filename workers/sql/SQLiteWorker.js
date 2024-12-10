@@ -1,18 +1,34 @@
 const util = require('node:util');
 
 const Knex = require('knex');
+const debug = require('debug')('debug info');
 const SQLWorker = require('../SQLWorker');
 
 function Worker(worker) {
   SQLWorker.call(this, worker);
   this.sqliteFile = worker.sqliteFile;
+  if (!this.sqliteFile) {
+    debug('Warning, sqliteFile should be specified in a constructor');
+  }
 }
 
 util.inherits(Worker, SQLWorker);
 
-Worker.prototype.connect = async function connect() {
+Worker.prototype.info = function () {
+  return {
+    driver: 'better-sqlite3',
+    dialect: this.dialect,
+    filename: this.sqliteFile,
+  };
+};
+
+Worker.prototype.connect = async function connect(options = {}) {
   if (this.knex) return this.knex;
-  if (!this.sqliteFile) throw new Error('database filename must be specified');
+  this.driver = 'better-sqlite3';
+  this.sqliteFile = options.filename || this.sqliteFile;
+  if (!this.sqliteFile) {
+    throw new Error('database filename must be specified');
+  }
 
   const authConfig = {
     client: 'better-sqlite3',
@@ -52,6 +68,9 @@ Worker.prototype.parseQueryResults = function ({ results }) {
 
 Worker.prototype.describe = async function describe({ table }) {
   const desc = await this.query(`PRAGMA table_info(${table})`);
+  if (desc.data.length === 0) {
+    throw new Error(`Could not find table ${table} in file ${this.sqliteFile}`);
+  }
 
   return {
     columns: desc.data.map((d) => ({
@@ -67,5 +86,15 @@ Worker.prototype.describe = async function describe({ table }) {
 
 Worker.prototype.onDuplicate = function () { return 'on conflict do update set'; };
 Worker.prototype.onDuplicateFieldValue = function (f) { return `excluded.${f}`; };
+
+Worker.prototype.sizes = async function (options) {
+  await this.connect(options);
+  return this.query('select name,sum("pgsize") from dbstat group by name');
+};
+Worker.prototype.sizes.metadata = {
+  options: {
+    filename: {},
+  },
+};
 
 module.exports = Worker;
