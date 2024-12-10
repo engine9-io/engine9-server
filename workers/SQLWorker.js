@@ -1424,4 +1424,14 @@ Worker.prototype.analyze.metadata = {
   },
 };
 
+Worker.prototype.getNativeCreateTable = async function (options) {
+  const o = await this.query(`show create table ${this.escapeTable(options.table)}`);
+  return { sql: o[0]['Create Table'] };
+};
+Worker.prototype.getNativeCreateTable.metadata = {
+  options: {
+    table: { required: true },
+  },
+};
+
 module.exports = Worker;
