@@ -194,8 +194,11 @@ Worker.prototype.load = async function (options) {
 Worker.prototype.load.metadata = {
   options: {
     filename: {},
-    loadDatabase: {
+    loadTimeline: {
       description: 'Whether to load the database as well as the file, default false',
+    },
+    entryType: {
+      description: 'Default entry type if not specified in the file',
     },
   },
 };

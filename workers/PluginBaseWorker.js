@@ -373,7 +373,7 @@ Worker.prototype.appendEntryTypeId = function ({
   batch.forEach((o) => {
     const etype = o.entry_type || defaultEntryType;
     if (!etype) {
-      throw new Error('No entry_type specified');
+      throw new Error(`No entry_type specified, default=${defaultEntryType}`);
     }
     const id = TIMELINE_ENTRY_TYPES[etype];
     if (id === undefined) throw new Error(`Invalid entry_type: ${etype}`);
