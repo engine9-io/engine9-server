@@ -1434,4 +1434,22 @@ Worker.prototype.getNativeCreateTable.metadata = {
   },
 };
 
+Worker.prototype.showProcessList = async function (options) {
+  let { data: d } = await this.query('show full processlist');
+
+  d = d.filter((x) => x.Command !== 'Sleep').sort((a, b) => (parseInt(a.Time, 10) < parseInt(b.Time, 10) ? -1 : 1));
+
+  d.forEach((r) => {
+    r.Info = (r.Info || '').replace(/\n/g, ' ').replace(/\t/g, ' ').replace(/\\'/g, "'").replace(/[\s]{2,100}/g, ' ');
+  });
+  if (options.filter) {
+    d = d.filter((s) => s.Info.indexOf(options.filter) >= 0);
+  }
+  return d;
+};
+
+Worker.prototype.showProcessList.metadata = {
+  options: { filter: {} },
+};
+
 module.exports = Worker;
