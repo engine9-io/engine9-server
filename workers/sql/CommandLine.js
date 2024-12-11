@@ -119,115 +119,114 @@ Worker.prototype.cli = async function (options) {
           if (typeof endFunc === 'function') endFunc();
           callback();
         }
-
-        if (!dumb) {
-          if (cmd === 'show databases') {
-            tableFormat = 'raw';
-            return cb(null, await worker.databases({}));
-          }
-          if (cmd === 'show triggers') return worker.showTriggers({}, cb);
-          if (cmd.toLowerCase() === 'drop temp tables') return worker.dropTempTables({}, cb);
-          if (cmd.toLowerCase() === 'drop old temp tables') return worker.dropOldTempTables({}, cb);
-
-          if (cmd === 'show tables') {
-            tableFormat = 'raw';
-            const o = await worker.tables({});
-            return cb(null, (o.tables || o).map((table) => ({ table })));
-          }
-
-          let m = cmd.match(showTables);
-          if (m) {
-            tableFormat = 'raw';
-            const filter = m[1].replace(/%/g, '.+');
-            const o = await worker.tables({ filter });
-            return cb(null, (o.tables || o).map((table) => ({ table })));
-          }
-          m = cmd.match(showViews);
-          if (m) {
-            const filter = m[1].replace(/%/g, '');
-            const o = await worker.tables({ type: 'view', filter });
-            return cb(null, (o.tables || o).map((table) => ({ table })));
-          }
-          m = cmd.match(showStatus);
-          if (m) {
-            tableFormat = true;
-          }
-          m = cmd.match(showIndexes);
-          if (m) {
-            tableFormat = 'table';
-            return worker.getIndexes({ table: m[1] }, cb);
-          }
-          m = cmd.match(showProcessList);
-          if (m) {
-            tableFormat = true;
-            return cb(null, await worker.showProcessList({ filter: m[1].trim() }));
-          }
-          m = cmd.match(getTableSizes);
-          if (m) {
-            tableFormat = true;
-            return worker.getTableSizes(
-              { filter: m[2].trim() },
-              (e, { tables, sizeInMB } = {}) => cb(e, tables, () => output(`Total:${sizeInMB}MB`)),
-            );
-          }
-          m = cmd.match(showTransactions);
-          if (m) {
-            tableFormat = true;
-            return cb(null, await worker.showTransactions({ filter: m[1].trim() }));
-          }
-          m = cmd.match(dropTable);
-          if (m) {
-            tableFormat = true;
-            return cb(null, await worker.drop({ table: m[1].trim() }));
-          }
-          m = cmd.match(kill);
-          if (m) {
-            if (worker.accountId === 'system') {
-              output(`System kill ${m[1]}`);
-              return cb(null, await worker.query(`call mysql.rds_kill(${m[1].trim()})`));
-            }
-          }
-          m = cmd.match(killall);
-          if (m) {
-            return worker.killAll({ filter: m[1].trim() }, cb);
-          }
-          m = cmd.match(desc);
-          if (m) {
-            const d = await worker.describe({ table: m[1] });
-            tableFormat = 'raw';
-            return cb(null, d.columns);
-          }
-          m = cmd.match(fields) || cmd.match(columns);
-          if (m) {
-            const d = await worker.describe({ table: m[1] });
-            tableFormat = 'raw';
-            return cb(null, d.columns.map((x) => ({ name: x.name })));
-          }
-          m = cmd.match(showCreateView);
-          if (m) {
-            const d = await worker.getCreateView({ table: m[1] });
-            let tidy = null;
-            try {
-              tidy = await worker.tidy(d);
-            } catch (err) {
-              output('Failed to tidy view', err);
-              return cb(null, { sql: d.sql });
-            }
-
-            return cb(null, { sql: tidy.tidy });
-          }
-          m = cmd.match(showCreateTable);
-          if (m) {
-            return worker.getNativeCreateTable({ table: m[1] }, cb);
-          }
-          cmd = cmd.replace(week, (x, p1) => worker.getWeekFunction(p1));
-          cmd = cmd.replace(month, (x, p1) => worker.getMonthFunction(p1));
-          cmd = cmd.replace(year, (x, p1) => worker.getYearFunction(p1));
-
-          // a bit buggy, but need more details
-          cmd = worker.appendLimit(cmd);
-        }
         try {
+          if (!dumb) {
+            if (cmd === 'show databases') {
+              tableFormat = 'raw';
+              return cb(null, await worker.databases({}));
+            }
+            if (cmd === 'show triggers') return worker.showTriggers({}, cb);
+            if (cmd.toLowerCase() === 'drop temp tables') return worker.dropTempTables({}, cb);
+            if (cmd.toLowerCase() === 'drop old temp tables') return worker.dropOldTempTables({}, cb);
+
+            if (cmd === 'show tables') {
+              tableFormat = 'raw';
+              const o = await worker.tables({});
+              return cb(null, (o.tables || o).map((table) => ({ table })));
+            }
+
+            let m = cmd.match(showTables);
+            if (m) {
+              tableFormat = 'raw';
+              const filter = m[1].replace(/%/g, '.+');
+              const o = await worker.tables({ filter });
+              return cb(null, (o.tables || o).map((table) => ({ table })));
+            }
+            m = cmd.match(showViews);
+            if (m) {
+              const filter = m[1].replace(/%/g, '');
+              const o = await worker.tables({ type: 'view', filter });
+              return cb(null, (o.tables || o).map((table) => ({ table })));
+            }
+            m = cmd.match(showStatus);
+            if (m) {
+              tableFormat = true;
+            }
+            m = cmd.match(showIndexes);
+            if (m) {
+              tableFormat = 'table';
+              return worker.getIndexes({ table: m[1] }, cb);
+            }
+            m = cmd.match(showProcessList);
+            if (m) {
+              tableFormat = true;
+              return cb(null, await worker.showProcessList({ filter: m[1].trim() }));
+            }
+            m = cmd.match(getTableSizes);
+            if (m) {
+              tableFormat = true;
+              return worker.getTableSizes(
+                { filter: m[2].trim() },
+                (e, { tables, sizeInMB } = {}) => cb(e, tables, () => output(`Total:${sizeInMB}MB`)),
+              );
+            }
+            m = cmd.match(showTransactions);
+            if (m) {
+              tableFormat = true;
+              return cb(null, await worker.showTransactions({ filter: m[1].trim() }));
+            }
+            m = cmd.match(dropTable);
+            if (m) {
+              tableFormat = true;
+              return cb(null, await worker.drop({ table: m[1].trim() }));
+            }
+            m = cmd.match(kill);
+            if (m) {
+              if (worker.accountId === 'system') {
+                output(`System kill ${m[1]}`);
+                return cb(null, await worker.query(`call mysql.rds_kill(${m[1].trim()})`));
+              }
+            }
+            m = cmd.match(killall);
+            if (m) {
+              return worker.killAll({ filter: m[1].trim() }, cb);
+            }
+            m = cmd.match(desc);
+            if (m) {
+              const d = await worker.describe({ table: m[1] });
+              tableFormat = 'raw';
+              return cb(null, d.columns);
+            }
+            m = cmd.match(fields) || cmd.match(columns);
+            if (m) {
+              const d = await worker.describe({ table: m[1] });
+              tableFormat = 'raw';
+              return cb(null, d.columns.map((x) => ({ name: x.name })));
+            }
+            m = cmd.match(showCreateView);
+            if (m) {
+              const d = await worker.getCreateView({ table: m[1] });
+              let tidy = null;
+              try {
+                tidy = await worker.tidy(d);
+              } catch (err) {
+                output('Failed to tidy view', err);
+                return cb(null, { sql: d.sql });
+              }
+
+              return cb(null, { sql: tidy.tidy });
+            }
+            m = cmd.match(showCreateTable);
+            if (m) {
+              return worker.getNativeCreateTable({ table: m[1] }, cb);
+            }
+            cmd = cmd.replace(week, (x, p1) => worker.getWeekFunction(p1));
+            cmd = cmd.replace(month, (x, p1) => worker.getMonthFunction(p1));
+            cmd = cmd.replace(year, (x, p1) => worker.getYearFunction(p1));
+
+            // a bit buggy, but need more details
+            cmd = worker.appendLimit(cmd);
+          }
           const { data } = await worker.query({ sql: cmd, silent: true });
           return cb(null, data);
         } catch (e) {
