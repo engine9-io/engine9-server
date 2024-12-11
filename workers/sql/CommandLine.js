@@ -125,9 +125,9 @@ Worker.prototype.cli = async function (options) {
               tableFormat = 'raw';
               return cb(null, await worker.databases({}));
             }
-            if (cmd === 'show triggers') return worker.showTriggers({}, cb);
-            if (cmd.toLowerCase() === 'drop temp tables') return worker.dropTempTables({}, cb);
-            if (cmd.toLowerCase() === 'drop old temp tables') return worker.dropOldTempTables({}, cb);
+            if (cmd === 'show triggers') return cb(null, await worker.showTriggers({}));
+            if (cmd.toLowerCase() === 'drop temp tables') return cb(null, await worker.dropTempTables({}));
+            if (cmd.toLowerCase() === 'drop old temp tables') return cb(null, await worker.dropOldTempTables({}));
 
             if (cmd === 'show tables') {
               tableFormat = 'raw';
@@ -155,7 +155,7 @@ Worker.prototype.cli = async function (options) {
             m = cmd.match(showIndexes);
             if (m) {
               tableFormat = 'table';
-              return worker.getIndexes({ table: m[1] }, cb);
+              return cb(null, await worker.indexes({ table: m[1] }, cb));
             }
             m = cmd.match(showProcessList);
             if (m) {
@@ -165,10 +165,10 @@ Worker.prototype.cli = async function (options) {
             m = cmd.match(getTableSizes);
             if (m) {
               tableFormat = true;
-              return worker.getTableSizes(
+              return cb(null, await worker.sizes(
                 { filter: m[2].trim() },
                 (e, { tables, sizeInMB } = {}) => cb(e, tables, () => output(`Total:${sizeInMB}MB`)),
-              );
+              ));
             }
             m = cmd.match(showTransactions);
             if (m) {
@@ -189,7 +189,7 @@ Worker.prototype.cli = async function (options) {
             }
             m = cmd.match(killall);
             if (m) {
-              return worker.killAll({ filter: m[1].trim() }, cb);
+              return cb(null, await worker.killAll({ filter: m[1].trim() }, cb));
             }
             m = cmd.match(desc);
             if (m) {
@@ -218,7 +218,7 @@ Worker.prototype.cli = async function (options) {
             }
             m = cmd.match(showCreateTable);
             if (m) {
-              return worker.getNativeCreateTable({ table: m[1] }, cb);
+              return cb(null, await worker.getNativeCreateTable({ table: m[1] }));
             }
             cmd = cmd.replace(week, (x, p1) => worker.getWeekFunction(p1));
             cmd = cmd.replace(month, (x, p1) => worker.getMonthFunction(p1));
