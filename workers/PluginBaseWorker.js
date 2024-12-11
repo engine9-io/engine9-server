@@ -368,13 +368,15 @@ Worker.prototype.appendInputId = async function ({
 
 Worker.prototype.appendEntryTypeId = function ({
   batch,
+  defaultEntryType,
 }) {
   batch.forEach((o) => {
-    if (!o.entry_type) {
+    const etype = o.entry_type || defaultEntryType;
+    if (!etype) {
       throw new Error('No entry_type specified');
     }
-    const id = TIMELINE_ENTRY_TYPES[o.entry_type];
-    if (id === undefined) throw new Error(`Invalid entry_type: ${o.entry_type}`);
+    const id = TIMELINE_ENTRY_TYPES[etype];
+    if (id === undefined) throw new Error(`Invalid entry_type: ${etype}`);
     o.entry_type_id = id;
   });
 };

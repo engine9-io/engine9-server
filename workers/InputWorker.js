@@ -147,7 +147,7 @@ Worker.prototype.loadToTimeline = async function (options) {
 Worker.prototype.load = async function (options) {
   const worker = this;
 
-  const { pluginId, filename } = options;
+  const { pluginId, entryType, filename } = options;
   if (!pluginId) throw new Error('load requires a pluginId');
   const loadTimeline = bool(options.loadTimeline, false);
   const fileWorker = new FileWorker(this);
@@ -169,7 +169,7 @@ Worker.prototype.load = async function (options) {
         inputRecords += batch.length;
         if (batches % 10 === 0) debug(`Processed ${batches} batches, ${inputRecords} records`);
         await worker.appendInputId({ pluginId, batch });
-        await worker.appendEntryTypeId({ batch });
+        await worker.appendEntryTypeId({ batch, defaultEntryType: entryType });
         await worker.appendSourceCodeId({ batch });
         await worker.appendPersonId({ batch });
         await worker.appendEntryId({ pluginId, batch });
