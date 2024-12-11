@@ -24,7 +24,7 @@ util.inherits(Worker, PersonWorker);
 const store = process.env.ENGINE9_STORED_INPUT_PATH;
 if (!store) throw new Error('No ENGINE9_STORED_INPUT_PATH configured');
 Worker.prototype.getStoredInputDB = async function ({ inputId, datePrefix }) {
-  const dir = [store, datePrefix, inputId].join(path.sep);
+  const dir = [store, this.accountId, datePrefix, inputId].join(path.sep);
   this.storedInputCache = this.storedInputCache || {};
   await (mkdirp(dir));
   const sqliteFile = `${dir + path.sep}timeline.sqlite`;
