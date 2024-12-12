@@ -132,7 +132,7 @@ Worker.prototype.query = async function (options) {
 
     return this.parseQueryResults({ sql: opts.sql, results });
   } catch (e) {
-    info('Error running query:', this.info(), options, e);
+    info('Error running query:', this.accountId, this.info(), options, e);
     throw e;
   }
 };
