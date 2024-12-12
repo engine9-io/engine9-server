@@ -204,7 +204,7 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
   };
 };
 
-Worker.prototype.upsertBatch = async function ({ batch: _batch }) {
+Worker.prototype.upsertPersonBatch = async function ({ batch: _batch }) {
   const batch = _batch;
   if (!batch) throw new Error('upsert requires a batch');
   const pipelineConfig = await this.getDefaultPipelineConfig();

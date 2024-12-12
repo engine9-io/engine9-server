@@ -66,7 +66,7 @@ async function createSampleTransactionFile() {
     const transCount = Math.random() * 4;
     for (let i = 0; i < transCount; i += 1) {
       transactionArray.push({
-        remote_entry_id: faker.uuid,
+        remote_entry_uuid: faker.uuid,
         entry_date: faker.date.past().toISOString(),
         entry_type: 'TRANSACTION',
         remote_input_id: faker.uuid,
@@ -100,7 +100,7 @@ async function createSampleActionFile(opts) {
     for (let i = 0; i < transCount; i += 1) {
       const formId = Math.floor(Math.random() * formNames.length);
       actionArray.push({
-        remote_entry_id: faker.string.uuid(),
+        remote_entry_uuid: faker.string.uuid(),
         ts: ts || faker.date.past().toISOString(),
         entry_type: 'FORM_SUBMIT',
         remote_input_id: rid || `form_${formId}`,

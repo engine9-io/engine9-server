@@ -33,7 +33,7 @@ describe('Insert File of people with options', async () => {
   it('Should be able to add standard identifiers to an array', async () => {
     const batch = [
       {
-        remote_entry_id: '5bbbc3a9-ee40-41b8-b243-1176007346fb',
+        remote_entry_uuid: '5bbbc3a9-ee40-41b8-b243-1176007346fb',
         ts: '2024-04-27T18:12:36.191Z',
         entry_type: 'FORM_SUBMIT',
         remote_input_id: 'form_0',
@@ -44,7 +44,7 @@ describe('Insert File of people with options', async () => {
         action_content: 'Cui optio tamen.',
       },
       {
-        remote_entry_id: '7a23d9fc-5f53-4c30-89ca-07a79d7af682',
+        remote_entry_uuid: '7a23d9fc-5f53-4c30-89ca-07a79d7af682',
         ts: '2024-08-15T00:37:30.391Z',
         entry_type: 'FORM_SUBMIT',
         remote_input_id: 'form_2',
@@ -76,14 +76,14 @@ describe('Insert File of people with options', async () => {
       assert.ok(o.source_code_id > 0, `No valid source code for ${o.source_code}`);
     });
 
-    await inputWorker.appendPersonId({ batch });
+    await inputWorker.upsertPersonBatch({ batch });
     batch.forEach((o) => {
       debug(`${o.email}->${o.person_id}`);
       assert.ok(o.person_id > 0, `No valid person information for ${o.email}`);
     });
 
-    // Delete then re-assign the remote_entry_id, and check it matches the ts
-    batch.forEach((o) => { delete o.remote_entry_id; });
+    // Delete then re-assign the remote_entry_uuid, and check it matches the ts
+    batch.forEach((o) => { delete o.remote_entry_uuid; });
     await inputWorker.appendEntryId({ pluginId, batch });
     debug(batch);
     batch.forEach((o) => {

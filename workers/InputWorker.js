@@ -147,8 +147,9 @@ Worker.prototype.loadToTimeline = async function (options) {
 Worker.prototype.load = async function (options) {
   const worker = this;
 
-  const { pluginId, entryType, filename } = options;
+  const { pluginId, defaultEntryType, filename } = options;
   if (!pluginId) throw new Error('load requires a pluginId');
+  const remoteInputId = filename.split(path.sep).pop();
   const loadTimeline = bool(options.loadTimeline, false);
   const fileWorker = new FileWorker(this);
   const batcher = this.getBatchTransform({ batchSize: 300 }).transform;
@@ -168,10 +169,10 @@ Worker.prototype.load = async function (options) {
         batches += 1;
         inputRecords += batch.length;
         if (batches % 10 === 0) debug(`Processed ${batches} batches, ${inputRecords} records`);
-        await worker.appendInputId({ pluginId, batch });
-        await worker.appendEntryTypeId({ batch, defaultEntryType: entryType });
+        await worker.appendInputId({ pluginId, remoteInputId, batch });
+        await worker.appendEntryTypeId({ batch, defaultEntryType });
         await worker.appendSourceCodeId({ batch });
-        await worker.appendPersonId({ batch });
+        await worker.upsertPersonBatch({ batch });
         await worker.appendEntryId({ pluginId, batch });
 
         const output = await worker.upsertStoredInputFile({ batch });
@@ -197,7 +198,7 @@ Worker.prototype.load.metadata = {
     loadTimeline: {
       description: 'Whether to load the database as well as the file, default false',
     },
-    entryType: {
+    defaultEntryType: {
       description: 'Default entry type if not specified in the file',
     },
   },

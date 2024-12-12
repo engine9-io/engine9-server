@@ -15,6 +15,7 @@ const { uuidRegex } = require('../utilities');
 
 function Worker(worker) {
   SchemaWorker.call(this, worker);
+  this.debugCounter = 0;
 }
 
 util.inherits(Worker, SchemaWorker);
@@ -257,6 +258,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   batch,
   table,
   inputField,
+  defaultInputFieldValue,
   outputField,
   additionalWhere = {},
   idColumn = 'id',
@@ -264,8 +266,14 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
 }) {
   const type = table;
   let itemsWithNoIds = batch.filter((o) => {
-    o[outputField] = o[outputField] || 0;// ensure the field exists, even if it doesn't have a value
-    return o[inputField] && !o[outputField];// returns if there is no value and it's not blank
+    if (o[outputField]) return false;//
+    // ensure the field exists, even if it doesn't have a value
+    o[outputField] = 0;
+    if (!o[inputField] && defaultInputFieldValue) {
+      o[inputField] = defaultInputFieldValue;
+    }
+    return true;
+    // returns if there is no value and it's not blank
   });
   if (itemsWithNoIds.length === 0) return batch;
   this.itemCaches = this.itemCaches || {};
@@ -327,7 +335,10 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
 
   itemsWithNoIds = itemsWithNoIds.filter((o) => {
     const id = this.itemCaches[type].get(o[inputField]);
-    debug('Assigning Id', id, ' for ', inputField);
+    if (this.debugCounter < 5) {
+      this.debugCounter += 1;
+      debug('Assigning Id', id, 'for', inputField, o[inputField]);
+    }
     o[outputField] = id;
     if (!o[outputField]) return true;
     return false;
@@ -353,6 +364,7 @@ Worker.prototype.appendSourceCodeId = async function ({
 
 Worker.prototype.appendInputId = async function ({
   pluginId,
+  remoteInputId,
   batch,
 }) {
   if (!pluginId) throw new Error('pluginId is required to appendInputId');
@@ -360,6 +372,7 @@ Worker.prototype.appendInputId = async function ({
     batch,
     table: 'input',
     inputField: 'remote_input_id',
+    defaultInputFieldValue: remoteInputId,
     additionalWhere: { plugin_id: pluginId },
     outputField: 'input_id',
     idColumn: 'id',
@@ -373,11 +386,12 @@ Worker.prototype.appendEntryTypeId = function ({
   batch.forEach((o) => {
     const etype = o.entry_type || defaultEntryType;
     if (!etype) {
-      throw new Error(`No entry_type specified, default=${defaultEntryType}`);
+      throw new Error('No entry_type specified, specify a defaultEntryType');
     }
     const id = TIMELINE_ENTRY_TYPES[etype];
     if (id === undefined) throw new Error(`Invalid entry_type: ${etype}`);
     o.entry_type_id = id;
+    if (!o.ts && etype === 'SOURCE_CODE_OVERRIDE') o.ts = '1970-01-01';// this specific type gets a default date
   });
 };
 
@@ -396,17 +410,24 @@ Worker.prototype.appendEntryId = async function ({
   const req = ['input_id', 'ts', 'entry_type_id', 'person_id'];
   batch.forEach((b) => {
     if (b.id) return;
-    if (b.remote_entry_id) {
-      if (!uuidRegex.test(b.remote_entry_id)) throw new Error('Invalid remote_entry_id, it must be a UUID');
-      b.id = b.remote_entry_id;
+    /*
+      Outside systems CAN specify a unique UUID as remote_entry_uuid,
+      which will be used for updates, etc.
+      If not, it will be generated using whatever info we have
+    */
+    if (b.remote_entry_uuid) {
+      if (!uuidRegex.test(b.remote_entry_uuid)) throw new Error('Invalid remote_entry_uuid, it must be a UUID');
+      b.id = b.remote_entry_uuid;
       return;
     }
-    const missing = req.filter((d) => !b[d]);
+    const missing = req.filter((d) => b[d] === undefined);// 0 could be an entry type value
     if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
+    const idString = `${b.ts}-${b.person_id}-${b.entry_type_id}-${b.source_code_id}`;
     // get a temp ID
-    const uuid = uuidv5(`${b.ts}-${b.person_id}-${b.entry_type_id}-${b.source_code_id}`, b.input_id);
+    const uuid = uuidv5(idString, b.input_id);
     // Change out the ts to match the v7 sorting.
-    // Because outside entry ids may not match this standard, uuid sorting isn't guaranteed
+    // But because outside specified remote_entry_uuid
+    // may not match this standard, uuid sorting isn't guaranteed
     b.id = getUUIDv7(b.ts, uuid);
   });
 };

@@ -36,9 +36,9 @@ describe('Deploy schemas,upsert people,test segments', async () => {
   it('Should be able to upsert and deduplicate people and email addresses', async () => {
     const length = 500;
     const batch = [...new Array(500)].map((x, i) => ({ email: `test${i % (length / 2)}@test.com` }));
-    await personWorker.upsertBatch({ batch: JSON.parse(JSON.stringify(batch)) });
-    await personWorker.upsertBatch({ batch: JSON.parse(JSON.stringify(batch)) });
-    await personWorker.upsertBatch({ batch: JSON.parse(JSON.stringify(batch)) });
+    await personWorker.upsertPersonBatch({ batch: JSON.parse(JSON.stringify(batch)) });
+    await personWorker.upsertPersonBatch({ batch: JSON.parse(JSON.stringify(batch)) });
+    await personWorker.upsertPersonBatch({ batch: JSON.parse(JSON.stringify(batch)) });
     const { data } = await schemaWorker.query('select count(*) as records from person_email');
     assert.deepEqual(data[0].records, length / 2, 'Does not match');
     debug('Finished up');
