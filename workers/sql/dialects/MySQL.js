@@ -192,6 +192,9 @@ module.exports = {
     if (input.column_type.indexOf('bigint') === 0) {
       input.column_type = 'bigint';
     }
+    if (input.column_type === 'char(36)') { // so, some systems don't supporter uuid, so treat char(36) as the same
+      input.column_type = 'uuid';
+    }
     if (input.column_type.indexOf('int') === 0
       || input.column_type.indexOf('smallint') === 0 // smallint isn't small enough to matter significantly
     ) {
