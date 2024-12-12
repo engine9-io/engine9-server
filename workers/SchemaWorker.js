@@ -225,41 +225,46 @@ Worker.prototype.deploy = async function (opts) {
   if (tables.length === 0) return { no_changes: true };
   const { prefix = '' } = opts;
   debug(`Deploying ${tables.length} tables, including`, JSON.stringify(tables[0], null, 4));
-  const output = await Promise.all(
-    tables.map(async (tableDefinition) => {
-      const {
-        name: table, type, differences, columns = [], indexes = [],
-      } = tableDefinition;
-      if (!table) {
-        debug(tableDefinition);
-        throw new Error('Invalid definition of table, no name');
-      }
-      const diffs = Array.isArray(differences) ? differences : [differences];
-      const diffResults = await Promise.all(
-        diffs.map(async (difference) => {
-          if (difference === 'missing') {
-            if (type === 'view') {
-              return this.createView(tableDefinition);
-            }
-            debug(`Creating table ${prefix}${table}`);
-            return this.createTable({ table: prefix + table, columns, indexes });
+  async function processTable(tableDefinition) {
+    const {
+      name: table, type, differences, columns = [], indexes = [],
+    } = tableDefinition;
+    if (!table) {
+      debug(tableDefinition);
+      throw new Error('Invalid definition of table, no name');
+    }
+    const diffs = Array.isArray(differences) ? differences : [differences];
+    const diffResults = await Promise.all(
+      diffs.map(async (difference) => {
+        if (difference === 'missing') {
+          if (type === 'view') {
+            return this.createView(tableDefinition);
           }
-          // Okay, it's not missing
-          if (columns.length > 0 || indexes.length > 0) {
-            const databaseType = await this.tableType({ table: prefix + table });
-            if (databaseType === 'view') return { name: table, difference, did_nothing_because_view: true };
-            debug(`Altering table ${prefix}${table} with difference ${difference}`);
-            return this.alterTable({ table: prefix + table, columns, indexes });
-          }
+          debug(`Creating table ${prefix}${table}`);
+          return this.createTable({ table: prefix + table, columns, indexes });
+        }
+        // Okay, it's not missing
+        if (columns.length > 0 || indexes.length > 0) {
+          const databaseType = await this.tableType({ table: prefix + table });
+          if (databaseType === 'view') return { name: table, difference, did_nothing_because_view: true };
+          debug(`Altering table ${prefix}${table} with difference ${difference}`);
+          return this.alterTable({ table: prefix + table, columns, indexes });
+        }
 
-          return { table, difference, did_nothing: true };
-        }),
-      );
-      return diffResults;
-    }),
+        return { table, difference, did_nothing: true };
+      }),
+    );
+    return diffResults;
+  }
+
+  const output = await Promise.all(
+    tables.filter((d) => d.type !== 'view').map(processTable),
+  );
+  const views = await Promise.all(
+    tables.filter((d) => d.type === 'view').map(processTable),
   );
 
-  return { tables: output };
+  return { tables: output.concat(views) };
 };
 Worker.prototype.deploy.metadata = {
   options: {
