@@ -221,6 +221,7 @@ Worker.prototype.diff.metadata = {
 };
 
 Worker.prototype.deploy = async function (opts) {
+  const worker = this;
   const { tables } = await this.diff(opts);
   if (tables.length === 0) return { no_changes: true };
   const { prefix = '' } = opts;
@@ -238,17 +239,17 @@ Worker.prototype.deploy = async function (opts) {
       diffs.map(async (difference) => {
         if (difference === 'missing') {
           if (type === 'view') {
-            return this.createView(tableDefinition);
+            return worker.createView(tableDefinition);
           }
           debug(`Creating table ${prefix}${table}`);
-          return this.createTable({ table: prefix + table, columns, indexes });
+          return worker.createTable({ table: prefix + table, columns, indexes });
         }
         // Okay, it's not missing
         if (columns.length > 0 || indexes.length > 0) {
-          const databaseType = await this.tableType({ table: prefix + table });
+          const databaseType = await worker.tableType({ table: prefix + table });
           if (databaseType === 'view') return { name: table, difference, did_nothing_because_view: true };
           debug(`Altering table ${prefix}${table} with difference ${difference}`);
-          return this.alterTable({ table: prefix + table, columns, indexes });
+          return worker.alterTable({ table: prefix + table, columns, indexes });
         }
 
         return { table, difference, did_nothing: true };
