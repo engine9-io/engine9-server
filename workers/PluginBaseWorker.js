@@ -93,7 +93,7 @@ Worker.prototype.compileTransform = async function ({ transform, path }) {
   }
   let p = path;
   if (path.indexOf('engine9-interfaces/') === 0) p = `../../${path}`;
-  debug(`Requiring ${p} from directory ${process.cwd()}`);
+  // debug(`Requiring ${p} from directory ${process.cwd()}`);
 
   // eslint-disable-next-line import/no-dynamic-require,global-require
   const f = require(p);
@@ -269,11 +269,14 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
     if (o[outputField]) return false;//
     // ensure the field exists, even if it doesn't have a value
     o[outputField] = 0;
-    if (!o[inputField] && defaultInputFieldValue) {
-      o[inputField] = defaultInputFieldValue;
+    if (!o[inputField]) { // if there's not an input field, check for defaults
+      if (defaultInputFieldValue) {
+        o[inputField] = defaultInputFieldValue;
+        return true;
+      }
+      return false; // no input field, no default, nothing to lookup
     }
-    return true;
-    // returns if there is no value and it's not blank
+    return true; // there's an input value to lookup
   });
   if (itemsWithNoIds.length === 0) return batch;
   this.itemCaches = this.itemCaches || {};
@@ -384,6 +387,7 @@ Worker.prototype.appendEntryTypeId = function ({
   defaultEntryType,
 }) {
   batch.forEach((o) => {
+    if (o.entry_type_id !== undefined) return;
     const etype = o.entry_type || defaultEntryType;
     if (!etype) {
       throw new Error('No entry_type specified, specify a defaultEntryType');

@@ -6,7 +6,7 @@ const { v7: uuidv7 } = require('uuid');
 const { Transform } = require('node:stream');
 
 // const debug = require('debug')('PersonWorker');
-const info = require('debug')('info:PersonWorker');
+// const info = require('debug')('info:PersonWorker');
 const debugPerformance = require('debug')('Performance');
 const SQLWorker = require('./SQLWorker');
 const FileWorker = require('./FileWorker');
@@ -127,7 +127,7 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
             person_id: item.person_id,
             // source_input_id is the connection this record first came from.  It
             // should be provided by the source stream, or null
-            source_input_id: id.source_input_id || null,
+            source_input_id: item.input_id || null,
             id_type: id.type,
             id_value: id.value,
           };
@@ -189,6 +189,7 @@ Worker.prototype.appendPersonId = async function ({ batch }) {
 Worker.prototype.getDefaultPipelineConfig = async function () {
   return {
     transforms: [
+      { path: 'engine9-interfaces/person_remote/transforms/inbound/extract_identifiers.js', options: { } },
       { path: 'engine9-interfaces/person_email/transforms/inbound/extract_identifiers.js', options: { dedupe_with_email: true } },
       {
         path: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js',
@@ -204,13 +205,14 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
   };
 };
 
-Worker.prototype.upsertPersonBatch = async function ({ batch: _batch }) {
-  const batch = _batch;
+Worker.prototype.upsertPersonBatch = async function ({ batch }) {
   if (!batch) throw new Error('upsert requires a batch');
-  const pipelineConfig = await this.getDefaultPipelineConfig();
-  const compiledPipeline = await this.compilePipeline(pipelineConfig);
-  info(`Executing pipeline with batch of size ${batch.length}`);
-  const summary = await this.executeCompiledPipeline({ pipeline: compiledPipeline, batch });
+  if (!this.compiledPipeline) {
+    const pipelineConfig = await this.getDefaultPipelineConfig();
+    this.compiledPipeline = await this.compilePipeline(pipelineConfig);
+  }
+  // info(`Executing pipeline with batch of size ${batch.length}`);
+  const summary = await this.executeCompiledPipeline({ pipeline: this.compiledPipeline, batch });
 
   return summary;
 };

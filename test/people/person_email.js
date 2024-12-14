@@ -11,7 +11,7 @@ const PersonWorker = require('../../workers/PersonWorker');
 require('../test_db_schema');
 
 describe('Insert File of people with options', async () => {
-  const accountId = 'engine9';
+  const accountId = 'test';
   const runner = new WorkerRunner();
   const env = runner.getWorkerEnvironment({ accountId });
   debug('Using env:', env);

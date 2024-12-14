@@ -29,55 +29,28 @@ describe('Insert File of people with options', async () => {
   it('Should be able to upsert and deduplicate people and phone status, and produce an audit output', async () => {
     const stream = [
       {
-        remote_phone_id: '123425385-16822018411',
         remote_person_id: '123425385',
         date_created: '2024-11-15 20:18:22',
         last_modified: '2024-11-15 20:18:22',
-        do_not_call: null,
-        phone: '15555676789',
-        primary: null,
-        phone_type: 'Cell',
-        preference_order: null,
-        sms_status: 'Unsubscribed',
-        sms_deliverability_score: 100,
-        call_status: 'Subscribed',
       },
       {
-        remote_phone_id: '123425388-13179562126',
         remote_person_id: '123425388',
         date_created: '2024-11-15 20:18:22',
         last_modified: '2024-11-15 20:18:22',
-        do_not_call: null,
-        phone: '15555676789',
-        primary: null,
-        phone_type: 'Cell',
-        preference_order: null,
-        sms_status: 'Subscribed',
-        sms_deliverability_score: 80,
-        call_status: 'Subscribed',
       },
       {
-        remote_phone_id: '123425390-19173341590',
         remote_person_id: '123425390',
         date_created: '2024-11-15 20:18:22',
         last_modified: '2024-11-15 20:18:22',
-        do_not_call: null,
-        phone: '15558889999',
-        primary: null,
-        phone_type: 'Cell',
-        preference_order: null,
-        sms_status: 'Subscribed',
-        sms_deliverability_score: 80,
-        call_status: 'Subscribed',
       },
     ];
 
+    await sqlWorker.query('delete p from person_identifier pi join person p on (pi.person_id=p.id) where id_value in (\'123425385\',\'123425388\',\'123425390\')');
+    await sqlWorker.query('delete from person_identifier where id_value in (\'123425385\',\'123425388\',\'123425390\')');
+    const { data } = await sqlWorker.query("select count(*) as records from person_identifier where id_value in ('123425385','123425388','123425390')");
+    assert(data?.[0]?.records === 0, 'Should have deleted sample records');
     await personWorker.upsert({ stream });
-    const { data } = await sqlWorker.query('select * from person_phone');
-    const matchingPhones = data.filter((d) => d.phone === '15555676789').length;
-    assert.equal(matchingPhones, 1, `Did not deduplicate on phone, there are ${matchingPhones} matching phones`);
-    assert(data[0].phone_hash_v1.length > 0, 'Did not hash the phone');
-    const missingPersons = data.filter((d) => !d.person_id);
-    assert.ok(missingPersons.length === 0, 'There are phone entries without a person_id');
+    const { data: data2 } = await sqlWorker.query("select count(*) as records from person_identifier where id_value in ('123425385','123425388','123425390')");
+    assert(data2?.[0]?.records === 3, 'Should have created sample records');
   });
 });

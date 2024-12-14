@@ -1,3 +1,4 @@
+const { performance } = require('node:perf_hooks');
 const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
 const fs = require('node:fs').promises;
@@ -10,6 +11,16 @@ const SQLiteWorker = require('./sql/SQLiteWorker');
 const PersonWorker = require('./PersonWorker');
 const FileWorker = require('./FileWorker');
 const { bool } = require('../utilities');
+
+/*
+const perfObserver = new PerformanceObserver((items) => {
+  items.getEntries().forEach((entry) => {
+    debugPerformance('%o', entry);
+  });
+});
+
+perfObserver.observe({ entryTypes: ['measure'], buffer: true });
+*/
 
 function Worker(worker) {
   PersonWorker.call(this, worker);
@@ -143,6 +154,11 @@ Worker.prototype.loadToTimeline = async function (options) {
 
   return this.sqlWorker.insertFromStream({ upsert: true, stream });
 };
+Worker.prototype.markPerformance = function (name) {
+  this.performanceNames = this.performanceNames || {};
+  this.performanceNames[name] = true;
+  performance.mark(name);
+};
 
 Worker.prototype.load = async function (options) {
   const worker = this;
@@ -169,14 +185,20 @@ Worker.prototype.load = async function (options) {
         batches += 1;
         inputRecords += batch.length;
         if (batches % 10 === 0) debug(`Processed ${batches} batches, ${inputRecords} records`);
+        worker.markPerformance('start-append-id');
         await worker.appendInputId({ pluginId, remoteInputId, batch });
+        worker.markPerformance('start-entry-type-id');
         await worker.appendEntryTypeId({ batch, defaultEntryType });
+        worker.markPerformance('start-source-code-id');
         await worker.appendSourceCodeId({ batch });
+        worker.markPerformance('start-upsert-person');
         await worker.upsertPersonBatch({ batch });
+        worker.markPerformance('start-append-entry');
         await worker.appendEntryId({ pluginId, batch });
-
+        worker.markPerformance('start-upsert-stored-input');
         const output = await worker.upsertStoredInputFile({ batch });
         if (loadTimeline) {
+          worker.markPerformance('start-load_timeline');
           await worker.insertFromStream({ table: 'timeline', upsert: true, stream: batch });
         }
 
@@ -184,10 +206,17 @@ Worker.prototype.load = async function (options) {
           outputFiles[k] = outputFiles[k] || { filename: r.filename, records: 0 };
           outputFiles[k].records += (r.records || 0);
         });
+        worker.markPerformance('end-all');
         return cb();
       },
     }),
   );
+  const keys = Object.keys(this.performanceNames || {});
+  for (let i = 0; i < keys.length - 1; i += 1) {
+    const k = keys[i];
+    // eslint-disable-next-line no-await-in-loop
+    await performance.measure(`${k} -> ${keys[i + 1]}`, k, keys[i + 1]);
+  }
 
   return { inputRecords, outputFiles };
 };

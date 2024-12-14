@@ -991,7 +991,7 @@ Worker.prototype.insertFromStream = async function (options) {
           throw new Error(`Error with column ${def.name}: ${e}`);
         }
 
-        return knex.raw('?', [v]);
+        return knex.raw('?', [v]).toString().replace(/\?/g, '\\u003F');
       });
       rows.push(`(${values.join(',')})`);
       counter += 1;
@@ -1087,8 +1087,8 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
         info('First record used for included columns:', array[0]);
         throw new Error(`Error mapping string to value:  Column '${def.name}', type='${def.column_type}': ${e}, attempted val=${val}, object=${JSON.stringify(o)}`);
       }
-
-      return knex.raw('?', [v]);
+      const s = knex.raw('?', [v]).toString();
+      return s.replace(/\?/g, '\\u003F');
     });
 
     return `(${values.join(',')})`;
