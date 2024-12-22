@@ -592,6 +592,15 @@ WorkerRunner.prototype.runAccount = function runAccount(accountId, callback) {
             const response = await (workerInstance[method.name](options));
             if (response === undefined || response === null) throw new Error('No return value from method -- be sure to return something');
             if (response.modify) return cb(null, null, response.modify);
+            /* Performance metrics if specified */
+            if (workerInstance.performanceNames) {
+              const keys = Object.keys(workerInstance.performanceNames || {});
+              for (let i = 0; i < keys.length - 1; i += 1) {
+                const k = keys[i];
+                // eslint-disable-next-line no-await-in-loop
+                await performance.measure(`${k} -> ${keys[i + 1]}`, k, keys[i + 1]);
+              }
+            }
             return cb(null, response);
           } catch (e) {
             return cb(e);

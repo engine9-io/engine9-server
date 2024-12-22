@@ -9,9 +9,10 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 // knex starts up it's own debugger,
 const Knex = require('knex');
 
+const { uuidRegex } = require('@engine9/packet-tools');
 const ReportWorker = require('../../workers/ReportWorker');
 const SegmentWorker = require('../../workers/SegmentWorker');
-const { ObjectError, uuidRegex } = require('../../utilities');
+const { ObjectError } = require('../../utilities');
 
 const reports = require('./reports');
 

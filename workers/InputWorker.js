@@ -1,26 +1,22 @@
-const { performance } = require('node:perf_hooks');
+/* eslint-disable camelcase */
+
 const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
-const fs = require('node:fs').promises;
+const fs = require('node:fs');
+
+const fsp = fs.promises;
 const path = require('node:path');
 const { Transform } = require('node:stream');
+const zlib = require('node:zlib');
+const csv = require('csv');
 const { mkdirp } = require('mkdirp');
 const debug = require('debug')('InputWorker');
+const SQLite3 = require('better-sqlite3');
+const { parse: parseUUID } = require('uuid');
 const SQLWorker = require('./SQLWorker');
 const SQLiteWorker = require('./sql/SQLiteWorker');
 const PersonWorker = require('./PersonWorker');
 const FileWorker = require('./FileWorker');
-const { bool } = require('../utilities');
-
-/*
-const perfObserver = new PerformanceObserver((items) => {
-  items.getEntries().forEach((entry) => {
-    debugPerformance('%o', entry);
-  });
-});
-
-perfObserver.observe({ entryTypes: ['measure'], buffer: true });
-*/
 
 function Worker(worker) {
   PersonWorker.call(this, worker);
@@ -34,144 +30,234 @@ util.inherits(Worker, PersonWorker);
 */
 const store = process.env.ENGINE9_STORED_INPUT_PATH;
 if (!store) throw new Error('No ENGINE9_STORED_INPUT_PATH configured');
-Worker.prototype.getStoredInputDB = async function ({ inputId, datePrefix }) {
-  const dir = [store, this.accountId, datePrefix, inputId].join(path.sep);
+Worker.prototype.getStoredInputDB = async function ({
+  sqliteFile,
+  inputId,
+  includeEmailDomain = false,
+}) {
+  if (!sqliteFile && !inputId) throw new Error('getStoredInputDB requires a sqliteFile or inputId');
+  let dbpath = sqliteFile;
   this.storedInputCache = this.storedInputCache || {};
-  await (mkdirp(dir));
-  const sqliteFile = `${dir + path.sep}timeline.sqlite`;
-  let output = this.storedInputCache[sqliteFile];
+  if (!dbpath) {
+    const dir = [store, this.accountId, inputId.slice(0, 4), inputId].join(path.sep);
+    await (mkdirp(dir));
+    dbpath = `${dir + path.sep}input.db`;
+  }
+
+  let output = this.storedInputCache[dbpath];
   if (output) return output;
-  const exists = await fs.stat(sqliteFile).then(() => true).catch(() => false);
-  const db = new SQLiteWorker({ accountId: this.accountId, sqliteFile });
+  const exists = await fsp.stat(dbpath).then(() => true).catch(() => false);
+  const db = new SQLite3(dbpath);
   if (exists) {
-    output = { filename: sqliteFile, db };
-    this.storedInputCache[sqliteFile] = output;
+    output = { sqliteFile: dbpath, db };
+    this.storedInputCache[dbpath] = output;
     return output;
   }
 
-  await db.query('BEGIN;');
-  await db.query(`create table timeline(
-          id text not null primary key,
+  db.prepare(`create table timeline(
+          id blob PRIMARY KEY,
           ts integer not null,
-          ${/* input_id text not null, */''}
           entry_type_id smallint not null,
           person_id bigint not null,
-          source_code_id bigint not null,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )`);
-  await db.query('CREATE INDEX timeline_ts ON timeline (ts)');
-  await db.query('CREATE INDEX timeline_person_id ON timeline (person_id)');
-  await db.query(`create table timeline_detail(
-          id text not null primary key,
-          details jsonb not null      
-        )`);
-  await db.query('COMMIT;');
-
-  output = { filename: sqliteFile, db };
-  this.storedInputCache[sqliteFile] = output;
+          source_code_id bigint not null
+          ${includeEmailDomain ? ',email_domain text' : ''}
+        )`).run();
+  db.prepare('PRAGMA synchronous = OFF');
+  output = { sqliteFile: dbpath, db };
+  this.storedInputCache[dbpath] = output;
   return output;
 };
+
 Worker.prototype.destroy = async function () {
   Object.entries(this.storedInputCache || {}).forEach(([, { db }]) => {
-    db.destroy();
+    db.close();
   });
 };
 
-Worker.prototype.upsertStoredInputFile = async function ({ batch }) {
-  const timelineFiles = {};
-  // Split the
-  // eslint-disable-next-line no-restricted-syntax
-  for (const o of batch) {
-    const { ts, input_id: inputId } = o;
-    const datePrefix = new Date(ts).getFullYear();// use the date prefix for the id
-    let info = timelineFiles[`${datePrefix}:${inputId}`];
-    if (!info) {
-      // eslint-disable-next-line no-await-in-loop
-      const { filename, db } = await this.getStoredInputDB({ inputId, datePrefix });
-      info = {
-        filename, records: 0, db, array: [],
-      };
-      timelineFiles[`${datePrefix}:${inputId}`] = info;
-    }
-    info.array.push(o);
+function chunkArray(arr, size) {
+  const chunkedArray = [];
+  for (let i = 0; i < arr.length; i += size) {
+    const c = arr.slice(i, i + size);
+    chunkedArray.push(c);
   }
-  const output = { };
-  const ignoreFields = {
-    id: 1,
-    ts: 1,
-    input_id: 1,
-    entry_type_id: 1,
-    entry_type: 1,
-    person_id: 1,
-    source_code: 1,
-    source_code_id: 1,
-  };
+  return chunkedArray;
+}
 
-  // eslint-disable-next-line no-restricted-syntax
-  for (const [dbKey, timelineObj] of Object.entries(timelineFiles)) {
-    const { db, array, filename } = timelineObj;
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      await db.upsertArray({ table: 'timeline', array });
-      // we don't need to use the results for anything
-      const detailArray = array.map((d) => {
-        const details = {};
-        let include = false;
-        Object.entries(d).forEach(([k, v]) => {
-          if (!ignoreFields[k]) {
-            details[k] = v;
-            include = true;
-          }
-        });
-        return include ? { id: d.id, details } : false;
-      }).filter(Boolean);
-      if (detailArray.length > 0) {
-        // eslint-disable-next-line no-await-in-loop
-        await db.upsertArray({ table: 'timeline_detail', array: detailArray });
-        // we don't need to use the results for anything
+Worker.prototype.loadBatchToInputDB = async function ({
+  sqliteFile: sqliteFileOpt,
+  inputId,
+  batch,
+}) {
+  const includeEmailDomain = !!batch?.[0]?.email_domain;
+  const { sqliteFile, db } = await this.getStoredInputDB({
+    sqliteFile: sqliteFileOpt,
+    inputId,
+    includeEmailDomain,
+  });
+
+  const output = { sqliteFile, records: 0 };
+
+  const chunkSize = 100;
+  try {
+    db.prepare('BEGIN TRANSACTION').run();
+    const stmt = db.prepare(`insert into timeline (id,ts,entry_type_id,person_id,source_code_id,email_domain)
+    values ${new Array(chunkSize).fill('(?,?,?,?,?,?)').join(',')}
+    on conflict do nothing`);
+    const parsedVals = batch.map((a) => ([
+      parseUUID(a.id),
+      new Date(a.ts).getTime(),
+      parseInt(a.entry_type_id, 10),
+      parseInt(a.person_id, 10),
+      parseInt(a.source_code_id, 10),
+      a.email_domain,
+    ]));
+    let remainder = null;
+    chunkArray(parsedVals, chunkSize).forEach((chunk) => {
+      if (chunk.length === chunkSize) {
+        stmt.run(...chunk);
+        output.records += chunk.length;
+      } else {
+        remainder = chunk;
       }
-
-      output[dbKey] = { filename, records: array.length };
-    } catch (e) {
-      debug(`Error for key ${dbKey} in filename ${filename}`);
-      throw e;
-    } finally {
-      // we could reuse this
-      // db.destroy();
+    });
+    if (remainder) {
+      const rstmt = db.prepare(`insert into timeline (id,ts,entry_type_id,person_id,source_code_id,email_domain)
+    values ${new Array(remainder.length).fill('(?,?,?,?,?,?)').join(',')}
+    on conflict do nothing`);
+      rstmt.run(...remainder);
+      output.records += remainder.length;
     }
+    db.prepare('END TRANSACTION').run();
+  } catch (e) {
+    debug('Error for db file {sqliteFile}');
+    throw e;
+  } finally {
+    // we could reuse this
+    // db.destroy();
   }
+
   return output;
 };
+
 /*
-  Loads a file from an input to the database
+  Add ids to an input file -- presumed to already be split by inputs
 */
-Worker.prototype.loadToTimeline = async function (options) {
-  const { inputId, datePrefix } = options;
-  const { db } = await this.getStoredInputDB({ inputId, datePrefix });
-  // const sqlWorker = new SQLWorker({ accountId: this.accountId });
-  const { stream } = db.stream('select * from timeline');
-  if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
-
-  return this.sqlWorker.insertFromStream({ upsert: true, stream });
-};
-Worker.prototype.markPerformance = function (name) {
-  this.performanceNames = this.performanceNames || {};
-  this.performanceNames[name] = true;
-  performance.mark(name);
-};
-
-Worker.prototype.load = async function (options) {
+Worker.prototype.id = async function (options) {
   const worker = this;
 
-  const { pluginId, defaultEntryType, filename } = options;
-  if (!pluginId) throw new Error('load requires a pluginId');
-  const remoteInputId = filename.split(path.sep).pop();
-  const loadTimeline = bool(options.loadTimeline, false);
+  const {
+    inputId, defaultEntryType, filename,
+  } = options;
+  if (!inputId) throw new Error('id requires an inputId');
+  const processId = `.${new Date().getTime()}.processing`;
+
+  const fileWorker = new FileWorker(this);
+
+  const idStream = csv.stringify({ header: true });
+  const idFileStream = fs.createWriteStream(`${filename}.with_ids.csv.gz${processId}`);
+  idStream
+    .pipe(zlib.createGzip())
+    .pipe(idFileStream);
+
+  /*
+  //this is for a separate stream of detail data, but that may just be extraneous
+  const detailStream = csv.stringify({ header: true });
+  const detailFileStream = fs.createWriteStream(`${filename}.details.csv.gz${processId}`);
+  detailStream.pipe(zlib.createGzip()).pipe(detailFileStream);
+  */
+
+  const batcher = this.getBatchTransform({ batchSize: 500 }).transform;
+  let records = 0;
+  let batches = 0;
+  await pipeline(
+    (await fileWorker.fileToObjectStream({ filename })).stream,
+    batcher,
+    new Transform({
+      objectMode: true,
+      async transform(batch, encoding, cb) {
+        // eslint-disable-next-line no-underscore-dangle
+        if (batch[0]?._is_placeholder) {
+          return cb(null);
+        }
+        const initialItem = { ...batch[0] };
+
+        batches += 1;
+        records += batch.length;
+        if (batches % 10 === 0) debug(`Processed ${batches} batches, ${records} records`);
+        worker.markPerformance('start-entry-type-id');
+        await worker.appendEntryTypeId({ batch, defaultEntryType });
+        worker.markPerformance('start-source-code-id');
+        await worker.appendSourceCodeId({ batch });
+        worker.markPerformance('start-upsert-person');
+        batch.forEach((b) => { b.source_input_id = b.source_input_id || inputId; });
+        await worker.upsertPersonBatch({ batch });
+        worker.markPerformance('start-append-entry');
+        await worker.appendEntryId({ inputId, batch });
+        worker.markPerformance('end-batch');
+        batch.forEach((b) => {
+          const {
+            id, ts, entry_type_id, person_id, source_code_id,
+          } = b;
+          delete b.identifiers;
+          delete b.source_input_id;// we already know these
+          delete b.input_id;
+          // eslint-disable-next-line prefer-destructuring
+          if (b.email) b.email_domain = b.email.split('@').slice(-1)[0];
+          if (initialItem.email_hash_v1 === undefined) delete b.email_hash_v1;
+          if (initialItem.phone_hash_v1 === undefined) delete b.phone_hash_v1;
+
+          const withId = {
+            id, ts, entry_type_id, person_id, source_code_id, ...b,
+          };
+          idStream.write(withId);
+        });
+
+        return cb();
+      },
+    }),
+  );
+  await idStream.end();
+
+  await new Promise((resolve) => { idFileStream.on('finish', resolve); });
+
+  await fsp.rename(`${filename}.with_ids.csv.gz${processId}`, `${filename}.with_ids.csv.gz`);
+
+  return { records, ids: `${filename}.with_ids.csv.gz`, details: `${filename}.details.csv.gz` };
+};
+
+Worker.prototype.id.metadata = {
+  options: {
+    filename: {},
+    loadTimeline: {
+      description: 'Whether to load the database as well as the file, default false',
+    },
+    defaultEntryType: {
+      description: 'Default entry type if not specified in the file',
+    },
+  },
+};
+
+/*
+  Load data to an inputDB
+*/
+Worker.prototype.loadInputDB = async function (options) {
+  const worker = this;
+
+  const {
+    filename,
+  } = options;
+  let { sqliteFile } = options;
+
   const fileWorker = new FileWorker(this);
   const batcher = this.getBatchTransform({ batchSize: 300 }).transform;
-  const outputFiles = {};
+
   let inputRecords = 0;
+
   let batches = 0;
+  if (!sqliteFile) {
+    sqliteFile = filename.split(path.sep).slice(0, -1).concat('input.db').join(path.sep);
+  }
+  const output = { sqliteFile, records: 0 };
   await pipeline(
     (await fileWorker.fileToObjectStream({ filename })).stream,
     batcher,
@@ -185,51 +271,40 @@ Worker.prototype.load = async function (options) {
         batches += 1;
         inputRecords += batch.length;
         if (batches % 10 === 0) debug(`Processed ${batches} batches, ${inputRecords} records`);
-        worker.markPerformance('start-append-id');
-        await worker.appendInputId({ pluginId, remoteInputId, batch });
-        worker.markPerformance('start-entry-type-id');
-        await worker.appendEntryTypeId({ batch, defaultEntryType });
-        worker.markPerformance('start-source-code-id');
-        await worker.appendSourceCodeId({ batch });
-        worker.markPerformance('start-upsert-person');
-        await worker.upsertPersonBatch({ batch });
-        worker.markPerformance('start-append-entry');
-        await worker.appendEntryId({ pluginId, batch });
-        worker.markPerformance('start-upsert-stored-input');
-        const output = await worker.upsertStoredInputFile({ batch });
-        if (loadTimeline) {
-          worker.markPerformance('start-load_timeline');
-          await worker.insertFromStream({ table: 'timeline', upsert: true, stream: batch });
-        }
 
-        Object.entries(output).forEach(([k, r]) => {
-          outputFiles[k] = outputFiles[k] || { filename: r.filename, records: 0 };
-          outputFiles[k].records += (r.records || 0);
-        });
-        worker.markPerformance('end-all');
+        const { records } = await worker.loadBatchToInputDB({ sqliteFile, batch });
+        output.records += records;
+
+        worker.markPerformance('end-batch');
         return cb();
       },
     }),
   );
-  const keys = Object.keys(this.performanceNames || {});
-  for (let i = 0; i < keys.length - 1; i += 1) {
-    const k = keys[i];
-    // eslint-disable-next-line no-await-in-loop
-    await performance.measure(`${k} -> ${keys[i + 1]}`, k, keys[i + 1]);
-  }
 
-  return { inputRecords, outputFiles };
+  return output;
 };
 
-Worker.prototype.load.metadata = {
+Worker.prototype.loadInputDB.metadata = {
   options: {
-    filename: {},
-    loadTimeline: {
-      description: 'Whether to load the database as well as the file, default false',
-    },
-    defaultEntryType: {
-      description: 'Default entry type if not specified in the file',
-    },
+    filename: { required: true },
+    sqliteFile: { },
+  },
+};
+/*
+  Loads a file from an inputDB to the database
+*/
+Worker.prototype.loadInputDBToTimeline = async function (options) {
+  const { sqliteFile, inputId } = options;
+  const sqlWorker = new SQLiteWorker({ accountId: this.accountId, sqliteFile });
+  if (!this.sqlWorker) this.sqlWorker = new SQLWorker(this);
+  const stream = await sqlWorker.stream({ sql: `select *,${sqlWorker.escapeValue(inputId)} as input_id from timeline limit 1000` });
+
+  return this.sqlWorker.insertFromStream({ table: 'timeline', upsert: true, stream });
+};
+Worker.prototype.loadInputDBToTimeline.metadata = {
+  options: {
+    sqliteFile: { required: true },
+    inputId: { required: true },
   },
 };
 

@@ -1,6 +1,7 @@
 const { Transform } = require('node:stream');
 
 const { pipeline } = require('node:stream/promises');
+const { uuidRegex } = require('@engine9/packet-tools');
 
 module.exports = async function analyzeStream(options) {
   const {
@@ -18,7 +19,6 @@ module.exports = async function analyzeStream(options) {
     return !isNaN(str) && !isNaN(parseFloat(str));
   }
   const dateMatcher = /^([+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([.,]\d+(?!:))?)?(\17[0-5]\d([.,]\d+)?)?([zZ]|([+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
-  const uuidMatcher = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/;
   let hints = null;
   if (fieldHints?.length > 0) {
     hints = {};
@@ -59,7 +59,7 @@ module.exports = async function analyzeStream(options) {
             } else {
               r.type = 'datetime';
             }
-          } else if (type === 'string' && uuidMatcher.test(value)) {
+          } else if (type === 'string' && uuidRegex.test(value)) {
             r.type = 'uuid';
           } else if (isNumber) {
             r.isNumber = true;

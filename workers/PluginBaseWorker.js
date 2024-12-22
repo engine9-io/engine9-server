@@ -9,9 +9,8 @@ const { v5: uuidv5 } = require('uuid');
 
 const PacketTools = require('@engine9/packet-tools');
 const { LRUCache } = require('lru-cache');
-const { TIMELINE_ENTRY_TYPES } = require('@engine9/packet-tools');
+const { TIMELINE_ENTRY_TYPES, uuidRegex } = require('@engine9/packet-tools');
 const SchemaWorker = require('./SchemaWorker');
-const { uuidRegex } = require('../utilities');
 
 function Worker(worker) {
   SchemaWorker.call(this, worker);
@@ -124,7 +123,7 @@ Worker.prototype.compilePipeline = async function (_pipeline) {
   return { transforms };
 };
 
-Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) {
+Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch, sourceInputId }) {
   // pipeline level bindings
   pipeline.bindings = pipeline.bindings || {};
   // New streams that are started during a pipeline,
@@ -149,7 +148,7 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch }) 
         })}`);
       }
       const cleanPath = path.replace(/^[a-zA-Z/_-]*/, '_');
-      const transformArguments = { batch, options };
+      const transformArguments = { batch, options, sourceInputId };
       const bindingNames = Object.keys(bindings);
       /*
       Bindings are the heart of getting data into and out of a transform.  Bindings allow for
@@ -409,9 +408,10 @@ Worker.prototype.appendEntryTypeId = function ({
   ts+
 */
 Worker.prototype.appendEntryId = async function ({
+  inputId,
   batch,
 }) {
-  const req = ['input_id', 'ts', 'entry_type_id', 'person_id'];
+  const req = ['ts', 'entry_type_id', 'person_id'];
   batch.forEach((b) => {
     if (b.id) return;
     /*
@@ -427,8 +427,10 @@ Worker.prototype.appendEntryId = async function ({
     const missing = req.filter((d) => b[d] === undefined);// 0 could be an entry type value
     if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
     const idString = `${b.ts}-${b.person_id}-${b.entry_type_id}-${b.source_code_id}`;
+    const inId = b.input_id || inputId;
+    if (!inId) throw new Error('Error appending entry id, no input_id in the file, and no default inputId');
     // get a temp ID
-    const uuid = uuidv5(idString, b.input_id);
+    const uuid = uuidv5(idString, inId);
     // Change out the ts to match the v7 sorting.
     // But because outside specified remote_entry_uuid
     // may not match this standard, uuid sorting isn't guaranteed

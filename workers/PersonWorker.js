@@ -126,8 +126,9 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
           personIdentifersToInsert[id.value] = {
             person_id: item.person_id,
             // source_input_id is the connection this record first came from.  It
-            // should be provided by the source stream, or null
-            source_input_id: item.input_id || null,
+            // should be provided by the source stream, and will error if it's null.
+            // If there truly is no input, provide a 0 uuid
+            source_input_id: item.source_input_id,
             id_type: id.type,
             id_value: id.value,
           };
@@ -145,7 +146,7 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   return batch;
 };
 
-Worker.prototype.appendPersonId = async function ({ batch }) {
+Worker.prototype.appendPersonId = async function ({ batch, sourceInputId }) {
   const itemsWithNoIds = batch.filter((o) => !o.person_id);
   if (itemsWithNoIds.length === 0) return batch;
   const allIdentifiers = itemsWithNoIds.reduce((a, b) => a.concat(b.identifiers || []), []);
@@ -181,7 +182,7 @@ Worker.prototype.appendPersonId = async function ({ batch }) {
   }
   // debug('Items with no ids:', JSON.stringify(itemsWithNoExistingIds));
 
-  await this.assignIdsBlocking({ batch: itemsWithNoExistingIds });
+  await this.assignIdsBlocking({ batch: itemsWithNoExistingIds, sourceInputId });
   performance.mark('end-assign-ids-blocking');
   return batch;
 };

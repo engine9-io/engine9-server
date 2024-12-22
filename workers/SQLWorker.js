@@ -78,7 +78,7 @@ Worker.prototype.connect = async function connect() {
     client: 'mysql2',
     connection: s,
   };
-  debug('***** new Knex instance');
+  debug(`***** new Knex instance for account ${accountId}`);
   this.knex = Knex(authConfig);
   return this.knex;
 };
@@ -364,6 +364,7 @@ Worker.prototype.tableType.metadata = {
 };
 
 Worker.prototype.stream = async function ({ sql }) {
+  if (!sql) throw new Error('stream required a sql parameter');
   const knex = await this.connect();
   return knex.raw(sql).stream();
 };

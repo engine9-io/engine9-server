@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const util = require('node:util');
+const { performance } = require('node:perf_hooks');
 const { mkdirp } = require('mkdirp');
 
 const { Transform } = require('node:stream');
@@ -66,13 +67,13 @@ Worker.prototype.getJSONStringifyTransform = function () {
   };
 };
 
-Worker.prototype.getBatchTransform = function ({ size = 100 }) {
+Worker.prototype.getBatchTransform = function ({ batchSize = 100 }) {
   return {
     transform: new Transform({
       objectMode: true,
       transform(chunk, encoding, cb) {
         this.buffer = (this.buffer || []).concat(chunk);
-        if (this.buffer.length >= size) {
+        if (this.buffer.length >= batchSize) {
           this.push(this.buffer);
           this.buffer = [];
         }
@@ -80,6 +81,17 @@ Worker.prototype.getBatchTransform = function ({ size = 100 }) {
       },
       flush(cb) {
         if (this.buffer.length > 0) this.push(this.buffer);
+        cb();
+      },
+    }),
+  };
+};
+Worker.prototype.getDebatchTransform = function () {
+  return {
+    transform: new Transform({
+      objectMode: true,
+      transform(chunk, encoding, cb) {
+        chunk.forEach((c) => this.push(c));
         cb();
       },
     }),
@@ -149,6 +161,12 @@ Worker.prototype.getFilename.metadata = {
 // Clean up database pools
 Worker.prototype.destroy = function () {
   if (typeof this.knex?.destroy === 'function') this.knex.destroy();
+};
+
+Worker.prototype.markPerformance = function (name) {
+  this.performanceNames = this.performanceNames || {};
+  this.performanceNames[name] = true;
+  performance.mark(name);
 };
 
 module.exports = Worker;
