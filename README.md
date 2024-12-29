@@ -26,6 +26,13 @@ The resulting directory will be known as ENGINE9_SERVER_DIR, e.g.
 
 ENGINE9_SERVER_DIR=/home/engine9-user/engine9/engine9-server
 
+### NPM install
+Change to the ENGINE9_SERVER_DIR, and run
+
+`npm install`
+
+to install all supporting libraries.
+
 ### Configuration Files
 #### .env
 The .env file contains global system settings for all accounts. To deploy, copy `$ENGINE9_SERVER_DIR/.env.template` to `$ENGINE9_SERVER_DIR/.env`
