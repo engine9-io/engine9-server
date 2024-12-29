@@ -84,7 +84,8 @@ Worker.prototype.connect = async function connect() {
 };
 Worker.prototype.ok = async function f() {
   const knex = await this.connect();
-  return knex.raw('select 1');
+  const [[data]] = await knex.raw('select 1 as ok');
+  return data;
 };
 Worker.prototype.ok.metadata = {
   options: {},
