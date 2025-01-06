@@ -24,10 +24,16 @@ Clone the server code:
 
 The resulting directory will be known as ENGINE9_SERVER_DIR, e.g.
 
-ENGINE9_SERVER_DIR=/home/engine9-user/engine9/engine9-server
+You can set this as an environment variable for use with the command line tools, for example adding the following to your .zprofile (in recent Mac OS versions)
+
+`export ENGINE9_SERVER_DIR=/home/engine9-user/engine9/engine9-server
+PATH=$ENGINE9_SERVER_DIR/bin:$PATH`
+
+and restarting your terminal.  This will also add the /bin directory for the engine9 command line tools.
+
 
 ### NPM install
-Change to the ENGINE9_SERVER_DIR, and run
+Change to the $ENGINE9_SERVER_DIR, and run
 
 `npm install`
 
@@ -64,18 +70,20 @@ Ensure the current user can access the above directories
 `sudo chown -R $USER /etc/engine9 /var/log/engine9`
 
 
-### CLI
+### Command line interface -- aka CLI
 Much of the deployment and testing for Engine9 can be accomplished with the `e9` command line tool.
 
 To use it, make sure the path:
 
 `$ENGINE9_SERVER_DIR/bin`
 
-is in your path.
+is in your path. See above for an example.
 
 The syntax for e9 is :
 
 `e9 <worker-match> <method-match> <--options>`
+
+where `worker-match` is a string matcher for the name of the worker, and `method-match` is the method name.
 
 To test that it works, try:
 
@@ -84,6 +92,8 @@ To test that it works, try:
 which should return some logging, then:
 
 `{ foo: 'bar', last_run: 2024-12-29T16:20:22.760Z }`
+
+The EchoWorker is a testing worker that merely returns what you pass it, and is useful to validate your environment is working as expected.
 
 
 ### Database

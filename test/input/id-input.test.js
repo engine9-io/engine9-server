@@ -94,19 +94,15 @@ describe('Insert File of people with options', async () => {
     });
   });
 
-  it('Should be able to open multiple databases, and toggle writing between them', async () => {
-
-  });
-
-  it('Should be able to append identifiers to a file, and write a sqlite database', async () => {
+  it('Should be able to append identifiers to a file', async () => {
     const filename = await createSampleActionFile();
-    const output = await inputWorker.load({ pluginId: 'testing', filename });
+    const output = await inputWorker.id({ pluginId: 'testing', filename });
 
     debug('Input', filename);
     debug('Output filename', output);
   });
 
-  it('Should be able to append identifiers to a file, write a sqlite database, and load to the timeline', async () => {
+  it('Should be able to append identifiers to a file, and load to the timeline', async () => {
     const filename = await createSampleActionFile();
     const output = await inputWorker.load({ pluginId: 'testing', filename, loadTimeline: true });
     debug('Input', filename);

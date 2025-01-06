@@ -453,4 +453,54 @@ Worker.prototype.sortEntries = async function ({
   });
 };
 
+Worker.prototype.getPlugin = async function ({
+  id,
+  path,
+  name,
+  unique = false, // indicates it should be unique
+}) {
+  let query = { sql: 'select * from plugin where path=?', values: [path] };
+  if (id) query = { sql: 'select * from plugin where id=?', values: [id] };
+
+  const { data: plugins } = await this.query(query);
+  if (unique && plugins.length > 1) throw new Error('Error in plugin table, there are more than one plugins configured with @engine9-interfaces/plugin');
+  let plugin = plugins[0] || {};
+  if (plugins.length === 0) {
+    plugin = {
+      id: getUUIDv7(),
+      path,
+      name: name || path,
+    };
+    await this.insertFromStream({ table: 'plugin', stream: [plugin] });
+  }
+  const { data: settings } = await this.query({ sql: 'select * from setting where plugin_id=?', values: [plugin.id] });
+  plugin.settings = settings.reduce((s, r) => {
+    s[r.name] = r.value;
+    return s;
+  }, {});
+  return plugin;
+};
+
+Worker.prototype.setSetting = async function ({ pluginId, name, value }) {
+  await this.insertFromStream({ table: 'setting', upsert: true, stream: [{ plugin_id: pluginId, name, value }] });
+};
+
+/* finds the next available table prefix */
+Worker.prototype.getNextTablePrefixCounter = async function () {
+  const plugin = await this.getPlugin({
+    path: '@engine9-interfaces/plugin',
+    name: 'Core Plugin',
+    unique: true,
+  });
+
+  let value = parseInt(plugin.settings?.table_prefix_counter || 2729, 10);// start with aaa
+  value += 1;
+  await this.setSetting({ pluginId: plugin.id, name: 'table_prefix_counter', value });
+  return value.toString(16);
+};
+
+Worker.prototype.getNextTablePrefixCounter.metadata = {
+  options: {},
+};
+
 module.exports = Worker;

@@ -25,7 +25,7 @@ function Worker(worker) {
 util.inherits(Worker, PersonWorker);
 
 /*
-  An input storage db gets or creates an input storage file,
+  An input storage db gets or creates an input storage DB file,
   currently a SQLite database with a timestamp
 */
 const store = process.env.ENGINE9_STORED_INPUT_PATH;

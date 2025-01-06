@@ -15,13 +15,13 @@ async function deploy(opts) {
   const schemaWorker = new SchemaWorker(opts);
 
   const schemas = [
-    { schema: './engine9-interfaces/person' },
-    { schema: './engine9-interfaces/person_email' },
-    { schema: './engine9-interfaces/person_phone' },
-    { schema: './engine9-interfaces/person_address' },
-    { schema: './engine9-interfaces/plugin' },
-    { schema: './engine9-interfaces/timeline' },
-    { schema: './engine9-interfaces/source_code' },
+    { schema: '@engine9-interfaces/person' },
+    { schema: '@engine9-interfaces/person_email' },
+    { schema: '@engine9-interfaces/person_phone' },
+    { schema: '@engine9-interfaces/person_address' },
+    { schema: '@engine9-interfaces/plugin' },
+    { schema: '@engine9-interfaces/timeline' },
+    { schema: '@engine9-interfaces/source_code' },
   ];
   debug('Deploying schemas');
   await Promise.all(schemas.map((s) => schemaWorker.deploy(s)));
