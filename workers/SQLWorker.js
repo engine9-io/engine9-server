@@ -703,6 +703,8 @@ Worker.prototype.createTable = async function ({
 }) {
   if (!columns || columns.length === 0) throw new Error('columns are required to createTable');
   const knex = await this.connect();
+  const [[{ version }]] = await knex.raw('select version() as version');
+
   await knex.schema.createTable(name, (table) => {
     const noTypes = columns.filter((c) => {
       if (c.type || c.isKnexDefinition) return false;
@@ -713,7 +715,7 @@ Worker.prototype.createTable = async function ({
 
     columns.forEach((c) => {
       let o = c;
-      if (!o.isKnexDefinition) o = this.dialect.standardToKnex(c);
+      if (!o.isKnexDefinition) o = this.dialect.standardToKnex(c, version);
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       } = o;
@@ -778,6 +780,7 @@ Worker.prototype.createTable.metadata = {
 
 Worker.prototype.alterTable = async function ({ table: name, columns = [], indexes = [] }) {
   const knex = await this.connect();
+  const [[{ version }]] = await knex.raw('select version() as version');
   await knex.schema.alterTable(name, (table) => {
     const noTypes = columns.filter((c) => !c.type);
     if (noTypes.length > 0) throw new Error(`Error altering table ${name} No type for columns: ${columns.map((d) => d.name).join()}`);
@@ -785,7 +788,7 @@ Worker.prototype.alterTable = async function ({ table: name, columns = [], index
     columns.forEach((c) => {
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
-      } = this.dialect.standardToKnex(c);
+      } = this.dialect.standardToKnex(c, version);
       debug(`Altering column ${c.name}`, c, 'Knex opts=', {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       });
