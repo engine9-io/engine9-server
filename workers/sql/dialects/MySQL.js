@@ -145,7 +145,7 @@ module.exports = {
       nullable = true;
     }
     // MySQL version 8. doesn't support UUID type
-    if (version.indexOf('8.') === 0 && type === 'uuid') {
+    if (version.indexOf('8.') === 0 && typeDef.column_type === 'uuid') {
       typeDef.knex_args = (() => (['char(36)']));
     }
 
