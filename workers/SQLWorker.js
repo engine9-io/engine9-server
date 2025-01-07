@@ -269,9 +269,6 @@ Worker.prototype.describe = async function describe(opts) {
   results.database = cols[0].DB;
   results.columns = cols.map((d) => {
     let defaultValue = d.COLUMN_DEFAULT;
-    const extra = d.EXTRA;
-    const onUpdate = 'on update current_timestamp()';
-    if (extra.toLowerCase().indexOf(onUpdate) >= 0) defaultValue = (`${defaultValue || ''} ${onUpdate}`).trim();
     if (defaultValue === 'NULL') {
       defaultValue = null;
     } else if (defaultValue === null) {
@@ -300,7 +297,7 @@ Worker.prototype.describe = async function describe(opts) {
       column_type: d.COLUMN_TYPE,
       length: d.CHARACTER_MAXIMUM_LENGTH,
       nullable: d.IS_NULLABLE.toUpperCase() === 'YES',
-      // extra: d.EXTRA, //not standardized
+      extra: d.EXTRA, // not standardized, but still useful
       default_value: defaultValue,
       auto_increment: (d.EXTRA || '').toUpperCase().indexOf('AUTO_INCREMENT') >= 0,
     };

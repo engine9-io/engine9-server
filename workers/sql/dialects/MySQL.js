@@ -161,6 +161,13 @@ module.exports = {
   },
   dialectToStandard(o, defaultColumn) {
     const input = { ...defaultColumn, ...o };
+
+    if (input.extra) {
+      // This is a bit ugly, should be pushed to the
+      if (input.default_value?.toLowerCase().indexOf('current_timestamp') === 0) input.default_value = 'current_timestamp()';
+      if (input.extra?.toLowerCase().indexOf('on update current_timestamp') >= 0) input.default_value = (`${input.default_value || ''} ${'on update current_timestamp'}`).trim();
+      delete input.extra;
+    }
     // test first for strings
     if (input.column_type.indexOf('varchar') === 0
           || input.column_type === 'mediumtext'
@@ -201,7 +208,7 @@ module.exports = {
     }
     if (input.column_type === 'char(36)') { // so, some systems don't supporter uuid, so treat char(36) as the same
       input.column_type = 'uuid';
-      delete input.length;
+      input.length = null;
     }
     if (input.column_type.indexOf('int') === 0
       || input.column_type.indexOf('smallint') === 0 // smallint isn't small enough to matter significantly
