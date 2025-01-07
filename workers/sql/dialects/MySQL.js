@@ -69,7 +69,7 @@ const mysqlTypes = [
     type: 'text', column_type: 'text', length: 65535, knex_method: 'text',
   },
   {
-    type: 'json', column_type: 'longtext', length: 4294967295, knex_method: 'json',
+    type: 'json', column_type: 'json', knex_method: 'json',
   },
   {
     type: 'created_at',
@@ -195,6 +195,9 @@ module.exports = {
     }
     if (input.column_type.indexOf('bigint') === 0) {
       input.column_type = 'bigint';
+    }
+    if (input.column_type === 'longtext' && input.length === 4294967295) { // so, some systems don't supporter json, so treat longtext as the same
+      input.column_type = 'json';
     }
     if (input.column_type === 'char(36)') { // so, some systems don't supporter uuid, so treat char(36) as the same
       input.column_type = 'uuid';
