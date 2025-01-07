@@ -165,7 +165,7 @@ module.exports = {
     if (input.extra) {
       // This is a bit ugly, should be pushed to the
       if (input.default_value?.toLowerCase().indexOf('current_timestamp') === 0) input.default_value = 'current_timestamp()';
-      if (input.extra?.toLowerCase().indexOf('on update current_timestamp') >= 0) input.default_value = (`${input.default_value || ''} ${'on update current_timestamp'}`).trim();
+      if (input.extra?.toLowerCase().indexOf('on update current_timestamp') >= 0) input.default_value = (`${input.default_value || ''} ${'on update current_timestamp()'}`).trim();
       delete input.extra;
     }
     // test first for strings
