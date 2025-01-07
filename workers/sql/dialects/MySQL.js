@@ -132,7 +132,7 @@ module.exports = {
   getType(type) {
     return mysqlTypes.find((t) => t.type === type);
   },
-  standardToKnex(col) { // return {method,args} for knex
+  standardToKnex(col, version) { // return {method,args} for knex
     // The name of the knex methods is ... inconsistent
     const { type } = col;
     const typeDef = mysqlTypes.find((t) => t.type === type);
@@ -143,6 +143,10 @@ module.exports = {
     }
     if (nullable === undefined) {
       nullable = true;
+    }
+    // MySQL version 8. doesn't support UUID type
+    if (version.indexOf('8.') === 0 && type === 'uuid') {
+      typeDef.knex_args = (() => (['char(36)']));
     }
 
     return {
