@@ -22,6 +22,8 @@ describe('Insert a stream of people with custom fields', async () => {
   const knex = await sqlWorker.connect();
   debug('Completed connecting to database');
   const personWorker = new PersonWorker({ accountId, knex });
+  const prefix = await personWorker.getNextTablePrefixCounter();
+  const tablePrefix = `person_custom_${prefix}_`;
 
   after(async () => {
     debug('Destroying knex');
@@ -29,41 +31,56 @@ describe('Insert a stream of people with custom fields', async () => {
   });
 
   it('Should be able to get the next prefix', async () => {
-    const prefix = await personWorker.getNextTablePrefixCounter();
     assert(prefix.match(/^[a-z0-9]+$/), 'Prefix does not match regex');
   });
-  /*
+
   it('Should be able to create a plugin with custom fields', async () => {
-    const prefix = await personWorker.getNextTablePrefixCounter();
     const opts = {
       id: pluginId,
+      type: 'local',
       name: 'Sample Custom Fields',
-      table_prefix: `person_custom_${prefix}`,
+      path: '@engine9-interfaces/person_custom',
+      tablePrefix,
       schema: {
-        custom_string: 'string',
-        custom_int: 'int',
+        tables: [
+          {
+            name: `${tablePrefix}field`,
+            columns: {
+              custom_string: 'string',
+              custom_int: 'int',
+              custom_date: 'date',
+              custom_datetime: 'datetime',
+            },
+          },
+        ],
       },
       transforms: {
+        inbound: [
+          {
+            path: 'upsertToTables',
+
+          },
+        ],
 
       },
     };
-    await personWorker.getPlugin(opts);
+    await personWorker.ensurePlugin(opts);
+    const { data } = await sqlWorker.query(`select * from plugin where table_prefix='${opts.tablePrefix}'`);
+    assert(data.length === 1, 'Invalid number of matching plugins');
   });
-  */
-  /*
+
   it('Should be able to save data to custom fields', async () => {
-    const stream = [
+    const batch = [
       {
         email: 'x@y.com',
-        custom_string: 'sample',
-        custom_int: 123,
-        custom_date: new Date().toISOString().slice(0, 10),
-        custom_json: { foo: 'bar' },
+        [`${tablePrefix}field.custom_string`]: 'sample',
+        [`${tablePrefix}field.custom_int`]: 123,
+        [`${tablePrefix}field.custom_date`]: new Date().toISOString().slice(0, 10),
+        [`${tablePrefix}field.custom_json`]: { foo: 'bar' },
       },
     ];
 
-    await personWorker.upsert({ stream });
-    const { data } = await sqlWorker.query('select * from ');
+    await personWorker.upsertPersonBatch({ batch });
+    // const { data } = await sqlWorker.query('select * from ');
   });
-  */
 });

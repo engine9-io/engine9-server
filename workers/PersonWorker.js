@@ -145,18 +145,21 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   /* Finished locking */
   return batch;
 };
+Worker.prototype.getSQLWorker = async function () {
+  let { sqlWorker } = this;
+  if (!sqlWorker) {
+    sqlWorker = new SQLWorker(this);
+    await sqlWorker.connect();
+  }
+  return sqlWorker;
+};
 
 Worker.prototype.appendPersonId = async function ({ batch, sourceInputId }) {
   const itemsWithNoIds = batch.filter((o) => !o.person_id);
   if (itemsWithNoIds.length === 0) return batch;
   const allIdentifiers = itemsWithNoIds.reduce((a, b) => a.concat(b.identifiers || []), []);
-  let { knex } = this;
+  const { knex } = await this.getSQLWorker();
 
-  if (!knex) {
-    const sqlWorker = new SQLWorker(this);
-    this.knex = await sqlWorker.connect();
-    knex = this.knex;
-  }
   performance.mark('start-existing-id-sql');
   const existingIds = await knex.select(['id_value', 'person_id'])
     .from('person_identifier')
@@ -188,6 +191,24 @@ Worker.prototype.appendPersonId = async function ({ batch, sourceInputId }) {
 };
 
 Worker.prototype.getDefaultPipelineConfig = async function () {
+  let customFields = [];
+
+  const sqlWorker = await this.getSQLWorker();
+  const { data: plugins } = await sqlWorker.query('select * from plugin where path=\'@engine9-interfaces/person_custom\'');
+  customFields = await Promise.all(plugins.map(async (plugin) => {
+    const table = `${plugin.table_prefix}field`;
+    try {
+      const desc = await sqlWorker.describe({ table });
+      return {
+        path: 'engine9-interfaces/person_custom/transforms/inbound/upsert_tables.js',
+        options: { table, schema: plugin.schema, columns: desc.columns },
+      };
+    } catch (e) {
+      // table may not exist
+      return null;
+    }
+  }));
+
   return {
     transforms: [
       { path: 'engine9-interfaces/person_remote/transforms/inbound/extract_identifiers.js', options: { } },
@@ -199,10 +220,10 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
       { path: 'person.appendPersonId' },
       { path: 'engine9-interfaces/person_email/transforms/inbound/upsert_tables.js', options: {} },
       { path: 'engine9-interfaces/person_phone/transforms/inbound/upsert_tables.js', options: {} },
-      // { path: 'engine9-interfaces/person_address/transforms/inbound/upsert_tables.js' },
+    ].concat(customFields.filter(Boolean))
+    // { path: 'engine9-interfaces/person_address/transforms/inbound/upsert_tables.js' },
       // { path: 'engine9-interfaces/segment/transforms/inbound/upsert_tables.js' },
-      { path: 'sql.upsertTables' },
-    ],
+      .concat({ path: 'sql.upsertTables' }),
   };
 };
 

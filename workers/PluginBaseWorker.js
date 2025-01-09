@@ -66,11 +66,12 @@ Worker.prototype.compilePlugin = async function ({ extensionPath }) {
 };
 
 /* Compiles the transform exclusively, bindings are handled elsewhere */
-Worker.prototype.compileTransform = async function ({ transform, path }) {
+Worker.prototype.compileTransform = async function ({ transform, path, options = {} }) {
   if (typeof transform === 'function') {
     return {
       path: 'custom_transform',
       bindings: {},
+      options,
       transform,
     };
   }
@@ -79,6 +80,7 @@ Worker.prototype.compileTransform = async function ({ transform, path }) {
     return {
       path,
       bindings: {},
+      options,
       transform: (opts) => this.appendPersonId(opts),
     };
   } if (path === 'sql.upsertTables') {
@@ -87,6 +89,7 @@ Worker.prototype.compileTransform = async function ({ transform, path }) {
       bindings: {
         tablesToUpsert: { type: 'sql.tables.upsert' },
       },
+      options,
       transform: (opts) => this.upsertTables(opts),
     };
   }
@@ -100,6 +103,7 @@ Worker.prototype.compileTransform = async function ({ transform, path }) {
   return {
     path,
     bindings: f.bindings || {},
+    options,
     transform: f.transform,
   };
 };
@@ -453,12 +457,23 @@ Worker.prototype.sortEntries = async function ({
   });
 };
 
-Worker.prototype.getPlugin = async function ({
+Worker.prototype.ensurePlugin = async function ({
   id,
+  type,
   path,
   name,
+  tablePrefix,
+  schema, // either an object with schema data, to be deployed, or a path to a schema
   unique = false, // indicates it should be unique
 }) {
+  if (!path) throw new Error("A path is required, either 'local' for an inline plugin, or a path to the root of the plugin");
+
+  // Some checks for local plugins
+  if (type === 'local') {
+    if (typeof schema === 'string') throw new Error('For local paths, schema must be an object');
+    if (!id) throw new Error('For local paths, you must specify an id');
+  }
+
   let query = { sql: 'select * from plugin where path=?', values: [path] };
   if (id) query = { sql: 'select * from plugin where id=?', values: [id] };
 
@@ -467,18 +482,27 @@ Worker.prototype.getPlugin = async function ({
   let plugin = plugins[0] || {};
   if (plugins.length === 0) {
     plugin = {
-      id: getUUIDv7(),
+      id: id || getUUIDv7(),
       path,
       name: name || path,
+      table_prefix: tablePrefix,
+      schema,
     };
-    await this.insertFromStream({ table: 'plugin', stream: [plugin] });
+    await this.knex.table('plugin').insert([plugin]);
   }
-  const { data: settings } = await this.query({ sql: 'select * from setting where plugin_id=?', values: [plugin.id] });
-  plugin.settings = settings.reduce((s, r) => {
+  if (plugin.schema) {
+    await this.deploy({ schema: plugin.schema });
+  }
+  return plugin;
+};
+
+Worker.prototype.getSettings = async function ({ pluginId }) {
+  const { data: settingsArr } = await this.query({ sql: 'select * from setting where plugin_id=?', values: [pluginId] });
+  const settings = settingsArr.reduce((s, r) => {
     s[r.name] = r.value;
     return s;
   }, {});
-  return plugin;
+  return settings;
 };
 
 Worker.prototype.setSetting = async function ({ pluginId, name, value }) {
@@ -487,13 +511,15 @@ Worker.prototype.setSetting = async function ({ pluginId, name, value }) {
 
 /* finds the next available table prefix */
 Worker.prototype.getNextTablePrefixCounter = async function () {
-  const plugin = await this.getPlugin({
+  const plugin = await this.ensurePlugin({
+    id: '00000000-0000-0000-0000-000000000001',
     path: '@engine9-interfaces/plugin',
     name: 'Core Plugin',
     unique: true,
   });
+  const settings = await this.getSettings({ pluginId: plugin.id });
 
-  let value = parseInt(plugin.settings?.table_prefix_counter || 2729, 10);// start with aaa
+  let value = parseInt(settings?.table_prefix_counter || 2729, 10);// start with aaa
   value += 1;
   await this.setSetting({ pluginId: plugin.id, name: 'table_prefix_counter', value });
   return value.toString(16);

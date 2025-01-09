@@ -112,10 +112,21 @@ which should return
 `{ ok: 1 }`
 
 
-## Initial Plugins - Standard Interfaces
-Engine9 is driven by plugins.  Plugins contain database schemas, transforms, UI configuration, and a variety of other things.  `Interfaces` are a standardized subset of plugins that are intended to be used as a standard across plugins, and allow plugins to leverage common concepts in Engine9, like `person` and `message`.  Every interface is a plugin, but not every plugin is an interface.
+## Plugins
+Engine9 is driven by plugins.  Plugins contain database schemas, transforms, UI configuration, and a variety of other things.
 
-Interfaces are maintained and deployed via a common GitHub repository:
+There are four main types of plugins you'll encounter in Engine9.  The type typically represents the location and installation process of a plugin.
+
+- **local** - Runs only for a given account, configuration happens exclusively in the database.  Custom fields for people or transactions are a good example of a local plugin.
+- **remote** - Configurations are hosted elsewhere, typically on a platform such as GitHub, and are shared with versions across many accounts.  There is a canonical 'path', often a URL, that uniquely identifies a plugin.  Remote plugins can be shared on the Engine9 Marketplace, or be private amongst a group of accounts.
+- **interface** - A subset of remote plugins that are available to all Engine9 accounts, and are used to ensure common standardized fields.  The path starts with `@engine9-interfaces/...`, and are hosted 
+- **file** - Only used when developing on a single machine, and not suitable for production.
+
+     
+
+
+### Initial Plugins - Standard Interfaces
+  `Interfaces` are a standardized subset of plugins that are intended to be used as a standard across plugins, and allow plugins to leverage common concepts in Engine9, like `person` and `message`.  Every interface is a plugin, but not every plugin is an interface.  You can use these standardized plugins as part of the initial deployment of Engine9, to produce the database tables you'll need to get started.
 
 https://github.com/engine9-io/engine9-interfaces
 
