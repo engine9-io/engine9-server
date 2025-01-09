@@ -14,7 +14,6 @@ require('util').inherits(Worker, BaseWorker);
 
 Worker.metadata = {
   alias: 'echo',
-  channel: 'utility',
 };
 
 Worker.prototype.echo = function echo(options, callback) {

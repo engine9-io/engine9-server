@@ -9,6 +9,8 @@ const { mkdirp } = require('mkdirp');
 
 const { Transform } = require('node:stream');
 
+const { bool } = require('../utilities');
+
 function Worker(config) {
   if (config) {
     this.accountId = String(config.accountId);
@@ -113,9 +115,10 @@ Worker.prototype.getTempDir = async function () {
 };
 
 Worker.prototype.getFileWriterStream = async function (options = {}) {
-  const postfix = options.postfix || 'jsonl';
+  const targetFormat = options.targetFormat || 'csv';
   const tempDir = await this.getTempDir();
-  const filename = `${tempDir}${path.sep}${this.accountId}_${new Date().getTime()}.${postfix}`;
+  let filename = `${tempDir}${path.sep}${this.accountId}_${new Date().getTime()}.${targetFormat}`;
+  if (bool(options.gzip, false)) filename += '.gz';
   const stream = fs.createWriteStream(filename);
   debug('Writing to file ', filename);
 
@@ -128,6 +131,9 @@ Worker.prototype.getFilename = function (options) {
 
   if (!f) throw new Error('No filename specified');
   if (typeof f !== 'string') throw new Error(`filename is a ${typeof f}`);
+
+  // s3 files are okay
+  if (f.indexOf('s3://') === 0) return f;
 
   let hasTilda = false;
 

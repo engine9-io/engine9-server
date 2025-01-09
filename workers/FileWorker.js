@@ -2,10 +2,11 @@ const fs = require('node:fs');
 
 const fsp = fs.promises;
 const zlib = require('node:zlib');
-const util = require('util');
-const { Readable, Transform } = require('node:stream');
+const util = require('node:util');
+const { Readable, Transform, PassThrough } = require('node:stream');
 
 const { pipeline } = require('node:stream/promises');
+const { stringify } = require('csv');
 const PacketTools = require('@engine9/packet-tools');
 const debug = require('debug')('FileWorker');
 // const through2 = require('through2');
@@ -13,6 +14,7 @@ const csv = require('csv');
 const es = require('event-stream');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const languageEncoding = require('detect-file-encoding-and-language');
+const S3Worker = require('./file/S3Worker');
 const analyzeStream = require('../utilities/analyze');
 
 const { bool } = require('../utilities');
@@ -129,20 +131,27 @@ Internal method to transform a file into a stream of objects.
 Worker.prototype.fileToObjectStream = async function (options) {
   const { filename } = options;
   if (!filename) throw new Error('fileToObjectStream: filename is required');
-  let postfix = options.source_postfix || filename.toLowerCase().split('.').pop();
+  let postfix = options.sourcePostfix || filename.toLowerCase().split('.').pop();
   if (postfix === 'zip') {
     debug('Invalid filename:', { filename });
     throw new Error('Cowardly refusing to turn a .zip file into an object stream, turn into a csv first');
   }
+  let encoding; let stream;
+  if (filename.indexOf('s3://') === 0) {
+    const s3Worker = new S3Worker(this);
+    stream = await s3Worker.getStream({ filename });
+    encoding = 'UTF-8';
+  } else {
+    stream = fs.createReadStream(filename);
+    encoding = await this.detectEncoding(options);
+  }
 
-  const { encoding } = await this.detectEncoding(options);
   let count = 0;
 
   debug(`Reading file ${filename} with encoding:`, encoding);
 
   const head = null;
   let transforms = [];
-  let stream = fs.createReadStream(filename);
 
   if (postfix === 'gz') {
     const gunzip = zlib.createGunzip();
@@ -229,8 +238,18 @@ Worker.prototype.fileToObjectStream = async function (options) {
 };
 Worker.prototype.objectStreamToFile = async function (options) {
   const { stream: inStream } = options;
-  const { filename, stream: fileWriterStream } = await this.getFileWriterStream();
+  const { filename, stream: fileWriterStream } = await this.getFileWriterStream(options);
   let records = 0;
+  let stringifier;
+  if (options.targetFormat === 'jsonl') {
+    stringifier = this.getJSONStringifyTransform().transform;
+  } else {
+    stringifier = stringify({ header: true });
+  }
+  let gzip = new PassThrough();
+  if (options.gzip) {
+    gzip = zlib.createGzip();
+  }
   await pipeline(
     inStream,
     new Transform({
@@ -240,7 +259,8 @@ Worker.prototype.objectStreamToFile = async function (options) {
         cb(null, d);
       },
     }),
-    this.getJSONStringifyTransform().transform,
+    stringifier,
+    gzip,
     fileWriterStream,
   );
   return { filename, records };
@@ -284,10 +304,10 @@ Worker.prototype.transform = async function (options) {
     stream = stream.pipe(f);
   });
 
-  const targetFormat = options.target_format || options.targetFormat;
+  const { targetFormat } = options;
 
   if (!targetFormat && (filename.toLowerCase().slice(-4) === '.csv' || filename.toLowerCase().slice(-7) === '.csv.gz')) {
-    options.target_format = 'csv';
+    options.targetFormat = 'csv';
   }
 
   return worker.objectStreamToFile({ ...options, stream });
@@ -295,17 +315,14 @@ Worker.prototype.transform = async function (options) {
 
 Worker.prototype.transform.metadata = {
   options: {
-    source_postfix: { description: "Override the source postfix, if for example it's a csv" },
+    sourcePostfix: { description: "Override the source postfix, if for example it's a csv" },
     encoding: { description: 'Manual override of source file encoding' },
     names: { description: 'Target field names (e.g. my_new_field,x,y,z)' },
     values: { description: "Comma delimited source field name, or Handlebars [[ ]] merge fields (e.g. 'my_field,x,y,z', '[[field1]]-[[field2]]', etc)" },
-    keep_source: { description: 'Keep original fields? (default false)' },
-    field_delimiter: { description: 'Custom field delimiter for the file, if not specified uses a comma if present, else a tab' },
-    target_filename: { description: 'Custom name of the output file (default auto-generated)' },
-    target_format: { description: 'Output format -- csv supported, or none for txt (default)' },
+    targetFilename: { description: 'Custom name of the output file (default auto-generated)' },
+    targetFormat: { description: 'Output format -- csv supported, or none for txt (default)' },
     targetRowDelimiter: { description: 'Row delimiter (default \n)' },
     targetFieldDelimiter: { description: 'Field delimiter (default \t or ,)' },
-    clean_header: { description: 'Clean the names in the incoming file, standardizing to [a-z0-9._] format' },
   },
 };
 Worker.prototype.testTransform = async function (options) {

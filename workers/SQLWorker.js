@@ -1073,7 +1073,7 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
     .filter((f) => array[0][f.name] !== undefined);
   if (includedColumns.length === 0) {
     debug('Table columns:', desc.columns.map((d) => d.name).join(), 'data columns:', Object.keys(array[0]).join(','));
-    throw new Error('The incoming data does not have any attributes that match column names');
+    throw new Error('The incoming data does not have any attributes that match column names in the database');
   }
 
   const rows = array.map((o) => {
@@ -1128,6 +1128,21 @@ Worker.prototype.drop.metadata = {
   bot: true,
   options: { table: { required: true } },
 };
+
+Worker.prototype.dropTables = async function (options) {
+  const { tables, filter } = options;
+  if (!tables && !filter) throw new Error('dropTables requires a tables list or a filter');
+  const { tables: tableList } = await this.tables(options);
+  await Promise.all(tableList.map(async (table) => this.drop({ table })));
+  return { tables: tableList };
+};
+Worker.prototype.dropTables.metadata = {
+  options: {
+    tables: {},
+    filter: {},
+  },
+};
+
 Worker.prototype.truncate = async function ({ table }) {
   if (!table) throw new Error('table is required');
 

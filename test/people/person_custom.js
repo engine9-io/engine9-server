@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 const {
   describe, it, after,
 } = require('node:test');
@@ -24,6 +25,7 @@ describe('Insert a stream of people with custom fields', async () => {
   const personWorker = new PersonWorker({ accountId, knex });
   const prefix = await personWorker.getNextTablePrefixCounter();
   const tablePrefix = `person_custom_${prefix}_`;
+  const table = `${tablePrefix}field`;
 
   after(async () => {
     debug('Destroying knex');
@@ -44,12 +46,14 @@ describe('Insert a stream of people with custom fields', async () => {
       schema: {
         tables: [
           {
-            name: `${tablePrefix}field`,
+            name: table,
             columns: {
+              id: 'id',
               custom_string: 'string',
               custom_int: 'int',
               custom_date: 'date',
               custom_datetime: 'datetime',
+              custom_json: 'json',
             },
           },
         ],
@@ -70,17 +74,38 @@ describe('Insert a stream of people with custom fields', async () => {
   });
 
   it('Should be able to save data to custom fields', async () => {
+    const d = {
+      custom_string: 'sample_string',
+      custom_int: 123,
+      custom_date: new Date().toISOString().slice(0, 10),
+      custom_datetime: `${new Date().toISOString().slice(0, -5)}Z`, // database doesn't store millis
+      custom_json: JSON.stringify({ foo: 'bar' }),
+    };
     const batch = [
       {
         email: 'x@y.com',
-        [`${tablePrefix}field.custom_string`]: 'sample',
-        [`${tablePrefix}field.custom_int`]: 123,
-        [`${tablePrefix}field.custom_date`]: new Date().toISOString().slice(0, 10),
-        [`${tablePrefix}field.custom_json`]: { foo: 'bar' },
+        [`${table}.custom_string`]: d.custom_string,
+        [`${table}.custom_int`]: d.custom_int,
+        [`${table}.custom_date`]: d.custom_date,
+        [`${table}.custom_datetime`]: d.custom_datetime,
+        [`${table}.custom_json`]: d.custom_json,
       },
     ];
 
     await personWorker.upsertPersonBatch({ batch });
-    // const { data } = await sqlWorker.query('select * from ');
+    const { data } = await sqlWorker.query(`select * from ${table}`);
+    assert(data.length > 0, `No records found in table ${table}`);
+    let f = 'custom_string';
+    assert.deepEqual(data[0][f], d[f], `Field ${f} input did not match output, table: ${table},input:${d[f]},output:${data[0][f]}`);
+    f = 'custom_int';
+    assert.deepEqual(data[0][f], d[f], `Field ${f} input did not match output, table: ${table},input:${d[f]},output:${data[0][f]}`);
+    f = 'custom_date';
+    assert.deepEqual(new Date(data[0][f]), new Date(d[f]), `Field ${f} input did not match output, table: ${table},input:${d[f]},output:${data[0][f]}`);
+    f = 'custom_datetime';
+    assert.deepEqual(new Date(data[0][f]), new Date(d[f]), `Field ${f} input did not match output, table: ${table},input:${d[f]},output:${data[0][f]}`);
+    f = 'custom_json';
+    assert.deepEqual(data[0][f], d[f], `Field ${f} input did not match output, table: ${table},input:${d[f]},output:${data[0][f]}`);
+
+    await sqlWorker.drop({ table });
   });
 });

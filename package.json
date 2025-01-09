@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/client-s3": "^3.723.0",
     "@engine9/packet-tools": "^1.1.6",
     "async": "^3.2.5",
     "better-sqlite3": "^11.7.0",
