@@ -176,6 +176,8 @@ Worker.prototype.diff = async function (opts) {
           if (['type', 'description', 'knex_args', 'values'].indexOf(k) >= 0) return out;
           // enum lengths are not really standardized
           if (c.type === 'enum' && k === 'length') return out;
+          // json lengths aren't standard
+          if (c.type === 'json' && k === 'length') return out;
           if (k === 'default_value') {
             // databases coerce undefined to NULL default values, this accounts for that
             if (dbColumn[k] === null && c[k] === undefined) {
@@ -209,7 +211,7 @@ Worker.prototype.diff = async function (opts) {
     }),
   );
   const tables = diffTables.filter(Boolean);
-  debug(`Returning ${tables.length} diff tables`);
+  debug(`Returning ${tables.length} diff tables for schema ${opts.schema}`);
   return { tables };
 };
 

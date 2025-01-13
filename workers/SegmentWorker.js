@@ -101,13 +101,15 @@ Worker.prototype.buildRule = function (rule) {
 */
 Worker.prototype.getSegment = async function (options) {
   if (options.segment_id) throw new Error('Please specify id, not segment_id');
-  if (!options.id) return options;
+  if (!options.id) {
+    return options;
+  }
   const { data } = await this.query({ sql: 'select * from segment where id=?', values: [options.id] });
   if (data.length === 0) throw new Error(`Could not find segment ${options.id}`);
   return data[0];
 };
 
-Worker.prototype.buildSQLFromQuery = async function (queryProp) {
+Worker.prototype.buildSQLFromQuery = async function ({ query: queryProp }) {
   if (!queryProp) throw new Error('No query provided to buildSQLFromQuery');
   let query = queryProp;
   if (typeof query === 'string') {
@@ -157,6 +159,8 @@ last_built: 'datetime',
 */
 Worker.prototype.build = async function (options) {
   const segment = await this.getSegment(options);
+  if (!segment.id) throw new Error('SegmentWorker.build requires an id to build');
+  const sqlFunctions = this.dialect.supportedFunctions();
 
   switch (segment.type) {
     case 'remote': return { message: 'No need to build remote' };
@@ -166,14 +170,17 @@ Worker.prototype.build = async function (options) {
       break;
     case 'query':
     default:
+      if (segment.query === undefined) throw new Error('Invalid segment - type is query, but no query object was defined');
       break;
   }
-  const whereClause = await this.buildSQLFromQuery(segment.query);
-  await this.query({ sql: `update segment set build_status='building',build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [segment.id] });
+  const whereClause = await this.buildSQLFromQuery(segment);
+  let records = null;
 
-  const { records } = await this.query({ sql: `insert ignore into person_segment (segment_id,person_id) select ?,id ${whereClause}`, values: [segment.id] });
+  await this.query({ sql: `update segment set build_status='building',build_status_modified_at=${sqlFunctions.NOW()} where id=?`, values: [segment.id] });
 
-  await this.query({ sql: `update segment set people=?,build_status='built',build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [records, segment.id] });
+  const o = await this.query({ sql: `insert ignore into person_segment (segment_id,person_id) select ?,id ${whereClause}`, values: [segment.id] });
+  records = o.records;
+  await this.query({ sql: `update segment set people=?,build_status='built',build_status_modified_at=${sqlFunctions.NOW()} where id=?`, values: [records, segment.id] });
 
   return {
     id: segment.id,
@@ -193,7 +200,6 @@ Worker.prototype.build.metadata = {
 
 Worker.prototype.count = async function (options) {
   const segment = await this.getSegment(options);
-  if (!segment.id) throw new Error('No segment_id');
 
   // remote counts we don't need to count them
   if (segment.build_type === 'remote_count') {
@@ -207,7 +213,7 @@ Worker.prototype.count = async function (options) {
     };
   }
   // We're already counted, just return that
-  if (['counted', 'built'].indexOf(segment.build_status) >= 0) {
+  if (['built'].indexOf(segment.build_status) >= 0) {
     if (segment.people === null) throw new Error(`Segment ${segment.id} has a build status of ${segment.build_status} but null people`);
     return {
       id: segment.id,
@@ -220,12 +226,10 @@ Worker.prototype.count = async function (options) {
     };
   }
 
-  const whereClause = await this.buildSQLFromQuery(segment.query);
-  await this.query({ sql: `update segment set build_status='counting',people=null,build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [segment.id] });
+  // just run a count
+  const whereClause = await this.buildSQLFromQuery(segment);
+  const { data } = await this.query({ sql: `select count(*) as people ${whereClause}` });
 
-  const { data } = await this.query(`select count(*) as people ${whereClause}`);
-
-  await this.query({ sql: `update segment set build_status='counted',people=?,build_status_modified_at=${this.sql_functions.NOW()} where id=?`, values: [data[0].people, segment.id] });
   return {
     id: segment.id,
     count: data[0].people,

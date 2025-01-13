@@ -57,6 +57,20 @@ describe('Insert File of people with options', async () => {
         call_status: 'Subscribed',
       },
       {
+        remote_phone_id: '123425388-13179562127',
+        remote_person_id: '123425388',
+        date_created: '2024-11-15 20:18:22',
+        last_modified: '2024-11-15 20:18:22',
+        do_not_call: null,
+        phone: '15555676790',
+        primary: null,
+        phone_type: 'Cell',
+        preference_order: null,
+        sms_status: 'Subscribed',
+        sms_deliverability_score: 80,
+        call_status: 'Subscribed',
+      },
+      {
         remote_phone_id: '123425390-19173341590',
         remote_person_id: '123425390',
         date_created: '2024-11-15 20:18:22',
@@ -72,7 +86,12 @@ describe('Insert File of people with options', async () => {
       },
     ];
 
+    await sqlWorker.truncate({ table: 'person' });
+    await sqlWorker.truncate({ table: 'person_phone' });
+    await sqlWorker.truncate({ table: 'person_identifier' });
     await personWorker.upsert({ stream });
+    const { data: person } = await sqlWorker.query('select count(*) as records from person');
+    assert.equal(person?.[0].records, 3, `Did not deduplicate on remote_person_id, there are ${person?.[0].records} matching people`);
     const { data } = await sqlWorker.query('select * from person_phone');
     const matchingPhones = data.filter((d) => d.phone === '15555676789').length;
     assert.equal(matchingPhones, 1, `Did not deduplicate on phone, there are ${matchingPhones} matching phones`);

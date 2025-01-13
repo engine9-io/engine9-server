@@ -1,4 +1,7 @@
 {
+    "adminUserIds": [
+        "<insert any administrator user ids>"
+    ],
     "accounts":{
         "engine9":{
             "name":"Engine9 Default",

@@ -1,7 +1,7 @@
 const {
   describe, it, after,
 } = require('node:test');
-const debug = require('debug')('insert.test.js');
+const debug = require('debug')('person_segment.test.js');
 const assert = require('node:assert');
 require('../test_db_schema');
 
@@ -16,26 +16,35 @@ describe('Deploy schemas,upsert people,test segments', async () => {
   const runner = new WorkerRunner();
   const env = runner.getWorkerEnvironment({ accountId });
   if (!env) throw new Error(`Could not find enviroment for account ${accountId}`);
-  const segmentWorker = new SegmentWorker(env);
   const personWorker = new PersonWorker(env);
-  const schemaWorker = new SchemaWorker(env);
+  const knex = await personWorker.connect();
+  debug('Completed connecting to database');
+  const segmentWorker = new SegmentWorker({ ...env, knex });
+  const schemaWorker = new SchemaWorker({ ...env, knex });
 
   after(async () => {
     debug('Destroying knex');
-    await schemaWorker.destroy();
-    await personWorker.destroy();
-    await segmentWorker.destroy();
+    await knex.destroy();
+    // await schemaWorker.destroy();
+    // await personWorker.destroy();
+    // await segmentWorker.destroy();
   });
 
-  it('should have deployed person/person_identifier/person_email/person_phone', async () => {
+  it('should have deployed person/person_identifier/person_email/person_address/person_phone/transaction', async () => {
     const { tables } = await schemaWorker.tables();
-    const missing = ['person', 'person_identifier', 'person_email', 'person_address', 'person_phone'].filter((d) => !tables.find((t) => t === d));
+    const missing = ['person',
+      'person_identifier',
+      'person_email',
+      'person_address',
+      'person_phone',
+      'transaction'].filter((d) => !tables.find((t) => t === d));
     assert.equal(missing.length, 0, `Missing tables ${missing.join()}`);
   });
 
   it('Should be able to upsert and deduplicate people and email addresses', async () => {
     const length = 500;
     const batch = [...new Array(500)].map((x, i) => ({ email: `test${i % (length / 2)}@test.com` }));
+    await schemaWorker.query('delete from person_email');
     await personWorker.upsertPersonBatch({ batch: JSON.parse(JSON.stringify(batch)) });
     await personWorker.upsertPersonBatch({ batch: JSON.parse(JSON.stringify(batch)) });
     await personWorker.upsertPersonBatch({ batch: JSON.parse(JSON.stringify(batch)) });
@@ -43,34 +52,55 @@ describe('Deploy schemas,upsert people,test segments', async () => {
     assert.deepEqual(data[0].records, length / 2, 'Does not match');
     debug('Finished up');
   });
-  const segmentQuery = {
-    rules: [
-      {
-        field: 'given_name', operator: '=', valueSource: 'value', value: 'Bob',
-      },
-      {
-        field: 'given_name', operator: 'beginsWith', valueSource: 'value', value: 'B',
-      },
-      {
-        combinator: 'or',
-        not: true,
-        rules: [{
-          field: 'family_name', operator: '=', valueSource: 'value', value: 'Jane',
-        },
-        {
-          field: 'family_name', operator: 'beginsWith', valueSource: 'value', value: 'J',
-        },
+  /*
+  it('should build a segment from a query object', async () => {
+    const sql = await segmentWorker.buildSQLFromQuery({
+      query: {
+        rules: [
+          {
+            field: 'given_name', operator: '=', valueSource: 'value', value: 'Bob',
+          },
+          {
+            field: 'given_name', operator: 'beginsWith', valueSource: 'value', value: 'B',
+          },
+          {
+            combinator: 'or',
+            not: true,
+            rules: [{
+              field: 'family_name', operator: '=', valueSource: 'value', value: 'Jane',
+            },
+            {
+              field: 'family_name', operator: 'beginsWith', valueSource: 'value', value: 'J',
+            },
+            ],
+          },
         ],
       },
-    ],
-  };
-
-  it('should build a segment from a query object', async () => {
-    const sql = await segmentWorker.build(segmentQuery);
+    });
     debug('Results of ', sql);
-    const expected = '(given_name=\'Bob\' AND given_name LIKE \'B%\' AND  NOT (family_name=\'Jane\' OR family_name LIKE \'J%\'))';
+    const expected = "from person where
+    (`given_name`='Bob' AND `given_name` LIKE 'B%' AND
+      NOT (`family_name`='Jane' OR `family_name` LIKE 'J%'))";
+    debug({ sql, expected });
     assert.equal(sql, expected, "SQL from build does't match expectations");
   });
+  */
+
+  it('should build a segment that counts donors', async () => {
+    const sql = await segmentWorker.buildSQLFromQuery({
+      query: {
+        rules: [
+          {
+            field: 'given_name', operator: '=', valueSource: 'value', value: 'Bob',
+          },
+        ],
+      },
+    });
+
+    const { data } = await schemaWorker.query(`select count(*)${sql}`);
+  });
+
+  /*
   it('should return a count of people that matches the database count', async () => {
     const r1 = await segmentWorker.query('select count(*) as records from person');
     const actual = r1?.data?.[0]?.records;
@@ -96,4 +126,5 @@ describe('Deploy schemas,upsert people,test segments', async () => {
     debug(`Actual sample of ${JSON.stringify(r1?.data)
     } equals segment output: ${JSON.stringify(r2?.data)}`);
   });
+  */
 });

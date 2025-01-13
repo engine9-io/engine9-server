@@ -14,18 +14,17 @@ async function drop(opts) {
 async function deploy(opts) {
   const schemaWorker = new SchemaWorker(opts);
 
-  const schemas = [
-    { schema: '@engine9-interfaces/person' },
-    { schema: '@engine9-interfaces/person_email' },
-    { schema: '@engine9-interfaces/person_phone' },
-    { schema: '@engine9-interfaces/person_address' },
-    { schema: '@engine9-interfaces/plugin' },
-    { schema: '@engine9-interfaces/timeline' },
-    { schema: '@engine9-interfaces/source_code' },
-  ];
   debug('Deploying schemas');
-  await Promise.all(schemas.map((s) => schemaWorker.deploy(s)));
+  await schemaWorker.deploy({ schema: '@engine9-interfaces/person' });
+  await schemaWorker.deploy({ schema: '@engine9-interfaces/person_email' });
+  await schemaWorker.deploy({ schema: '@engine9-interfaces/person_phone' });
+  await schemaWorker.deploy({ schema: '@engine9-interfaces/person_address' });
+  await schemaWorker.deploy({ schema: '@engine9-interfaces/plugin' });
+  await schemaWorker.deploy({ schema: '@engine9-interfaces/timeline' });
+  await schemaWorker.deploy({ schema: '@engine9-interfaces/source_code' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/transaction' });
   debug('Deployed all schemas');
+
   schemaWorker.destroy();
 }
 async function truncate(opts) {
@@ -36,10 +35,9 @@ async function truncate(opts) {
   schemaWorker.destroy();
 }
 
-async function insertDefaults(opts) {
-  const schemaWorker = new SchemaWorker(opts);
-  await schemaWorker.query('insert into plugin (path,name) values (\'engine9StubPlugin\',\'Stub Plugin\')');
-  schemaWorker.destroy();
+async function insertDefaults() {
+  // const schemaWorker = new SchemaWorker(opts);
+  // schemaWorker.destroy();
 }
 
 const accountId = 'test';

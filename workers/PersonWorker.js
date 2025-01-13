@@ -63,7 +63,7 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
     },
     {},
   );
-  const { knex } = this;
+  const knex = await this.connect();
 
   if (!knex) {
     throw new Error('No knex instance created');

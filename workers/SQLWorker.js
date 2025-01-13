@@ -712,7 +712,15 @@ Worker.prototype.createTable = async function ({
 
     columns.forEach((c) => {
       let o = c;
-      if (!o.isKnexDefinition) o = this.dialect.standardToKnex(c, version);
+      try {
+        if (!o.isKnexDefinition) o = this.dialect.standardToKnex(c, version);
+      } catch (e) {
+        if (e) {
+          debug(`Error with column ${c}`);
+          debug(e);
+          throw e;
+        }
+      }
       const {
         method, args, nullable, unsigned, defaultValue, defaultRaw,
       } = o;
@@ -1260,7 +1268,7 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
       MIN: async (x) => `MIN(${x})`,
     };
 
-    const functionFns = worker.dialect.supportedFunctions();
+    const sqlFunctions = worker.dialect.supportedFunctions();
 
     async function fromColumn(input, opts) {
       const {
@@ -1297,7 +1305,7 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
           throw new Error(`no such column: ${column} for ${table} with input:${JSON.stringify(input)} and opts:${JSON.stringify(opts)}`);
         }
 
-        const withFunction = await functionFns[func](`${dbWorker.escapeTable(table)}.${dbWorker.escapeColumn(column)}`);
+        const withFunction = await sqlFunctions[func](`${dbWorker.escapeTable(table)}.${dbWorker.escapeColumn(column)}`);
         result = await aggregateFns[aggregate](withFunction);
         if (name && !ignore_alias) result = `${result} as ${dbWorker.escapeColumn(name)}`;
       }

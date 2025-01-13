@@ -143,7 +143,7 @@ Worker.prototype.fileToObjectStream = async function (options) {
     encoding = 'UTF-8';
   } else {
     stream = fs.createReadStream(filename);
-    encoding = await this.detectEncoding(options);
+    encoding = (await this.detectEncoding(options)).encoding;
   }
 
   let count = 0;

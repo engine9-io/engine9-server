@@ -2,6 +2,7 @@
 .e9_cli_history
 .e9_parameters
 .firebase-credentials.json
+.google-service-account.json
 account-config.json
 .DS_Store
 # Logs

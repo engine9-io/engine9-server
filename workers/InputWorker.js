@@ -13,16 +13,46 @@ const { mkdirp } = require('mkdirp');
 const debug = require('debug')('InputWorker');
 const SQLite3 = require('better-sqlite3');
 const { parse: parseUUID } = require('uuid');
+const { getTempFilename, getUUIDv7 } = require('@engine9/packet-tools');
 const SQLWorker = require('./SQLWorker');
 const SQLiteWorker = require('./sql/SQLiteWorker');
-const PersonWorker = require('./PersonWorker');
+const PluginBaseWorker = require('./PluginBaseWorker');
 const FileWorker = require('./FileWorker');
 
 function Worker(worker) {
-  PersonWorker.call(this, worker);
+  PluginBaseWorker.call(this, worker);
 }
 
-util.inherits(Worker, PersonWorker);
+util.inherits(Worker, PluginBaseWorker);
+
+/*
+  The input id is either stored in the database, or generated and
+stored
+*/
+Worker.prototype.getInputId = async function (opts) {
+  const {
+    inputId, pluginId, remoteInputId, inputType = 'unknown',
+  } = opts;
+  if (inputId) return inputId;
+  if (!pluginId || !remoteInputId) throw new Error('pluginId and remoteInputId are both required');
+  const { data } = await this.query({ sql: 'select * from input where plugin_id=? and remote_input_id=?', values: [pluginId, remoteInputId] });
+  if (data.length > 0) return data[0].id;
+  const { data: plugin } = await this.query({ sql: 'select * from plugin where plugin_id=?', values: [pluginId] });
+  if (plugin.length === 0) throw new Error(`No such plugin:${pluginId}`);
+  const id = getUUIDv7(new Date());
+  await this.insertFromStream({
+    table: 'input',
+    stream: [{
+      id,
+      plugin_id: pluginId,
+      remote_input_id: remoteInputId,
+      input_type: inputType,
+    },
+    ],
+  });
+
+  return id;
+};
 
 /*
   An input storage db gets or creates an input storage DB file,
@@ -96,21 +126,22 @@ Worker.prototype.loadBatchToInputDB = async function ({
   });
 
   const output = { sqliteFile, records: 0 };
+  const fields = {
+    id: (a) => parseUUID(a.id),
+    ts: (a) => new Date(a.ts).getTime(),
+    entry_type_id: (a) => parseInt(a.entry_type_id, 10),
+    person_id: (a) => parseInt(a.person_id, 10),
+    source_code_id: (a) => parseInt(a.source_code_id, 10),
+  };
+  if (includeEmailDomain) fields.email_domain = ((a) => (a.email_domain || '').toLowerCase());
 
   const chunkSize = 100;
   try {
     db.prepare('BEGIN TRANSACTION').run();
-    const stmt = db.prepare(`insert into timeline (id,ts,entry_type_id,person_id,source_code_id,email_domain)
-    values ${new Array(chunkSize).fill('(?,?,?,?,?,?)').join(',')}
+    const stmt = db.prepare(`insert into timeline (${Object.keys(fields).join(',')})
+    values ${new Array(chunkSize).fill(`(${Object.keys(fields).map(() => '?').join(',')})`).join(',')}
     on conflict do nothing`);
-    const parsedVals = batch.map((a) => ([
-      parseUUID(a.id),
-      new Date(a.ts).getTime(),
-      parseInt(a.entry_type_id, 10),
-      parseInt(a.person_id, 10),
-      parseInt(a.source_code_id, 10),
-      a.email_domain,
-    ]));
+    const parsedVals = batch.map((a) => (Object.entries(fields).map(([, f]) => f(a))));
     let remainder = null;
     chunkArray(parsedVals, chunkSize).forEach((chunk) => {
       if (chunk.length === chunkSize) {
@@ -154,7 +185,15 @@ Worker.prototype.id = async function (options) {
   const fileWorker = new FileWorker(this);
 
   const idStream = csv.stringify({ header: true });
-  const idFileStream = fs.createWriteStream(`${filename}.with_ids.csv.gz${processId}`);
+  let outputFile;
+  if (filename.indexOf('/') === 0) {
+    outputFile = `${filename}.with_ids.csv.gz${processId}`;
+  } else {
+    outputFile = await getTempFilename({ postfix: '.with_ids.csv.gz' });
+  }
+
+  const idFileStream = fs.createWriteStream(`${outputFile}${processId}`);
+
   idStream
     .pipe(zlib.createGzip())
     .pipe(idFileStream);
@@ -202,7 +241,7 @@ Worker.prototype.id = async function (options) {
           delete b.source_input_id;// we already know these
           delete b.input_id;
           // eslint-disable-next-line prefer-destructuring
-          if (b.email) b.email_domain = b.email.split('@').slice(-1)[0];
+          if (b.email) b.email_domain = b.email.split('@').slice(-1)[0].toLowerCase();
           if (initialItem.email_hash_v1 === undefined) delete b.email_hash_v1;
           if (initialItem.phone_hash_v1 === undefined) delete b.phone_hash_v1;
 
@@ -220,9 +259,9 @@ Worker.prototype.id = async function (options) {
 
   await new Promise((resolve) => { idFileStream.on('finish', resolve); });
 
-  await fsp.rename(`${filename}.with_ids.csv.gz${processId}`, `${filename}.with_ids.csv.gz`);
+  await fsp.rename(`${outputFile}${processId}`, `${outputFile}`);
 
-  return { records, ids: `${filename}.with_ids.csv.gz`, details: `${filename}.details.csv.gz` };
+  return { records, id_filename: `${outputFile}` };
 };
 
 Worker.prototype.id.metadata = {
@@ -255,7 +294,11 @@ Worker.prototype.loadInputDB = async function (options) {
 
   let batches = 0;
   if (!sqliteFile) {
-    sqliteFile = filename.split(path.sep).slice(0, -1).concat('input.db').join(path.sep);
+    if (filename.indexOf('/') === 0) {
+      sqliteFile = filename.split(path.sep).slice(0, -1).concat('input.db').join(path.sep);
+    } else {
+      sqliteFile = await getTempFilename({ postfix: '.input.db' });
+    }
   }
   const output = { sqliteFile, records: 0 };
   await pipeline(

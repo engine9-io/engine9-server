@@ -9,6 +9,8 @@ const { mkdirp } = require('mkdirp');
 
 const { Transform } = require('node:stream');
 
+require('dotenv').config({ path: '.env' });
+
 const { bool } = require('../utilities');
 
 function Worker(config) {

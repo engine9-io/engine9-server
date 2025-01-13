@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.723.0",
+    "@dsnp/parquetjs": "^1.8.5",
     "@engine9/packet-tools": "^1.1.6",
     "async": "^3.2.5",
     "better-sqlite3": "^11.7.0",
@@ -25,6 +26,7 @@
     "express": "^5.0.0-beta.3",
     "express-jwt": "^8.4.1",
     "firebase-admin": "^12.3.0",
+    "googleapis": "^144.0.0",
     "json5": "^2.2.3",
     "knex": "^3.1.0",
     "knex-schema-inspector": "^3.1.0",
