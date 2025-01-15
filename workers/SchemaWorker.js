@@ -275,4 +275,24 @@ Worker.prototype.deploy.metadata = {
   },
 };
 
+Worker.prototype.deployStandard = async function deploy() {
+  const schemaWorker = this;
+
+  debug('Deploying schemas');
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/person' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/person_remote' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/person_email' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/person_phone' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/person_address' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/plugin' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/timeline' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/source_code' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/transaction' });
+  debug('Deployed all schemas');
+
+  schemaWorker.destroy();
+};
+Worker.prototype.deployStandard.metadata = {
+};
+
 module.exports = Worker;
