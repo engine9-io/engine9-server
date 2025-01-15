@@ -291,6 +291,7 @@ Worker.prototype.deployStandard = async function deploy() {
   debug('Deployed all schemas');
 
   schemaWorker.destroy();
+  return { complete: true };
 };
 Worker.prototype.deployStandard.metadata = {
 };
