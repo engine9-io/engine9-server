@@ -1109,7 +1109,10 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
   try {
     const { data } = await this.query(sql);
     data.forEach((d, i) => {
-      if (array[i].id && d.id !== array[i].id) throw new Error(`There was a problem upserting object with id ${array[i].id},invalid id returned`);
+      if (array[i].id && d.id !== array[i].id) {
+        debug({ d, i }, array[i]);
+        throw new Error(`There was a problem upserting object with id ${array[i].id},invalid id returned`);
+      }
       array[i].id = d.id;
     });
     return array;
