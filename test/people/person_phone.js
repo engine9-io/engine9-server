@@ -30,7 +30,7 @@ describe('Insert File of people with options', async () => {
     const stream = [
       {
         remote_phone_id: '123425385-16822018411',
-        remote_person_id: '123425385',
+        // remote_person_id: '123425385',
         date_created: '2024-11-15 20:18:22',
         last_modified: '2024-11-15 20:18:22',
         do_not_call: null,
@@ -44,7 +44,7 @@ describe('Insert File of people with options', async () => {
       },
       {
         remote_phone_id: '123425388-13179562126',
-        remote_person_id: '123425388',
+        // remote_person_id: '123425388',
         date_created: '2024-11-15 20:18:22',
         last_modified: '2024-11-15 20:18:22',
         do_not_call: null,
@@ -89,12 +89,12 @@ describe('Insert File of people with options', async () => {
     await sqlWorker.truncate({ table: 'person' });
     await sqlWorker.truncate({ table: 'person_phone' });
     await sqlWorker.truncate({ table: 'person_identifier' });
-    await personWorker.upsert({ stream });
+    await personWorker.upsertPeople({ stream, inputId: process.env.testingInputId });
     const { data: person } = await sqlWorker.query('select count(*) as records from person');
     assert.equal(person?.[0].records, 3, `Did not deduplicate on remote_person_id, there are ${person?.[0].records} matching people`);
     const { data } = await sqlWorker.query('select * from person_phone');
-    const matchingPhones = data.filter((d) => d.phone === '15555676789').length;
-    assert.equal(matchingPhones, 1, `Did not deduplicate on phone, there are ${matchingPhones} matching phones`);
+    const matchingPhones = data.filter((d) => d.phone === '+15555676789').length;
+    assert.equal(matchingPhones, 1, `Did not deduplicate on cleaned phone, there are ${matchingPhones} matching phones for +15555676789`);
     assert(data[0].phone_hash_v1.length > 0, 'Did not hash the phone');
     const missingPersons = data.filter((d) => !d.person_id);
     assert.ok(missingPersons.length === 0, 'There are phone entries without a person_id');

@@ -1,9 +1,10 @@
 const { performance, PerformanceObserver } = require('node:perf_hooks');
-
 const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
-const { v7: uuidv7 } = require('uuid');
+const { createHash } = require('node:crypto');
 const { Transform } = require('node:stream');
+
+const { v7: uuidv7 } = require('uuid');
 
 // const debug = require('debug')('PersonWorker');
 // const info = require('debug')('info:PersonWorker');
@@ -27,7 +28,8 @@ function Worker(worker) {
 util.inherits(Worker, PluginBaseWorker);
 
 /*
-  Okay, assigning ids is the one thing that we need to parallelize.
+  Okay, assigning ids is the one thing that may happen in parallel, so we
+  need to do some blocking.
   Presume two records are entering the database at the same time from
   multiple threads.
 
@@ -84,7 +86,9 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   for the conflicting thread to catch up to the problem zone
   */
   // await sleep(5000);
+  const existingIdLookup = {};
   existingIds.forEach((row) => {
+    existingIdLookup[row.id_value] = true;
     (identifierMap[row.id_value] || []).forEach((item) => {
       item.person_id = row.person_id;
       delete item.temp_id;
@@ -104,43 +108,48 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
     // family_name: lookupByTempId[id]?.family_name || ''
   }));
 
+  const tempIdToPersonIdLookup = {};
   if (toInsert.length > 0) {
     const response = await knex.table('person')
       .insert(toInsert);
     let currentId = response[0];
-    const tempIdToPersonIdLookup = {};
+
     tempIds.forEach((t) => {
       tempIdToPersonIdLookup[t] = currentId;
       currentId += 1;
     });
-
-    // Assign the person_ids to the batch,
-    // and build up a person_identifier insert object
-    const personIdentifersToInsert = {};
-    batch.forEach((item) => {
-      if (!item.person_id) {
-        item.person_id = tempIdToPersonIdLookup[item.temp_id];
-        if (!item.person_id) throw new Error(`Unusual error, could not find temp_id:${item.temp_id}`);
-        delete item.temp_id;
-        (item.identifiers || []).forEach((id) => {
-          personIdentifersToInsert[id.value] = {
-            person_id: item.person_id,
-            // source_input_id is the connection this record first came from.  It
-            // should be provided by the source stream, and will error if it's null.
-            // If there truly is no input, provide a 0 uuid
-            source_input_id: item.source_input_id,
-            id_type: id.type,
-            id_value: id.value,
-          };
-        });
-      }
-    });
-    const identifiersToInsert = Object.values(personIdentifersToInsert);
-    if (identifiersToInsert.length > 0) {
-      await knex.table('person_identifier')
-        .insert(identifiersToInsert);
-    }
   }
+
+  // Assign the person_ids to the batch,
+  // and build up a person_identifier insert object
+
+  const personIdentifersToInsert = {};
+  batch.forEach((item) => {
+    if (!item.person_id) {
+      item.person_id = tempIdToPersonIdLookup[item.temp_id];
+      if (!item.person_id) throw new Error(`Unusual error, could not find temp_id:${item.temp_id}`);
+      delete item.temp_id;
+    }
+    (item.identifiers || []).forEach((id) => {
+      if (existingIdLookup[id.value]) return;
+      personIdentifersToInsert[id.value] = {
+        person_id: item.person_id,
+        // source_input_id is the connection this record first came from.  It
+        // should be provided by the source stream, and will error if it's null.
+        // If there truly is no input, provide a 0 uuid
+        source_input_id: item.source_input_id,
+        id_type: id.type,
+        id_value: id.value,
+      };
+    });
+  });
+
+  const identifiersToInsert = Object.values(personIdentifersToInsert);
+  if (identifiersToInsert.length > 0) {
+    await knex.table('person_identifier')
+      .insert(identifiersToInsert);
+  }
+
   await knex.raw('unlock tables');
   /* Finished locking */
   return batch;
@@ -167,7 +176,7 @@ Worker.prototype.appendPersonId = async function ({ batch, sourceInputId }) {
   performance.mark('end-existing-id-sql');
   const lookup = existingIds.reduce(
     (a, b) => {
-      a[b.value] = b.person_id;
+      a[b.id_value] = b.person_id;
       return a;
     },
     {},
@@ -177,15 +186,19 @@ Worker.prototype.appendPersonId = async function ({ batch, sourceInputId }) {
     const matchingValue = (item.identifiers || []).find((id) => lookup[id.value])?.value;
     if (matchingValue) item.person_id = lookup[matchingValue];
   });
-  const itemsWithNoExistingIds = batch.filter((o) => !o.person_id);
   performance.mark('start-assign-ids-blocking');
+  /*
+  //so the problem with this is there may be more identifiers still in the input
+  // that need to make it to the person_identifier table
+  const itemsWithNoExistingIds = batch.filter((o) => !o.person_id);
+
   if (itemsWithNoExistingIds.length === 0) {
     performance.mark('end-assign-ids-blocking');
     return batch;
   }
-  // debug('Items with no ids:', JSON.stringify(itemsWithNoExistingIds));
-
   await this.assignIdsBlocking({ batch: itemsWithNoExistingIds, sourceInputId });
+  */
+  await this.assignIdsBlocking({ batch, sourceInputId });
   performance.mark('end-assign-ids-blocking');
   return batch;
 };
@@ -227,28 +240,24 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
   };
 };
 
-Worker.prototype.upsertPersonBatch = async function ({ batch }) {
-  if (!batch) throw new Error('upsert requires a batch');
-  if (!this.compiledPipeline) {
-    const pipelineConfig = await this.getDefaultPipelineConfig();
-    this.compiledPipeline = await this.compilePipeline(pipelineConfig);
-  }
-  // info(`Executing pipeline with batch of size ${batch.length}`);
-  const summary = await this.executeCompiledPipeline({ pipeline: this.compiledPipeline, batch });
-
-  return summary;
-};
-
-Worker.prototype.upsert = async function ({
-  stream, filename, packet, batchSize = 500,
-}) {
+Worker.prototype.upsertPeople = async function (options) {
   const worker = this;
+  const {
+    stream, filename, packet, batchSize = 500,
+  } = options;
+
+  // inputId, pluginId, remoteInputId, inputType = 'unknown',
+  const inputId = await this.getInputId(options);
+  if (!inputId) throw new Error('Could not get a required input id from options');
+
   const fileWorker = new FileWorker(this);
   const inStream = await fileWorker.getStream({
     stream, filename, packet, type: 'person',
   });
-  const pipelineConfig = await this.getDefaultPipelineConfig();
-  const compiledPipeline = await this.compilePipeline(pipelineConfig);
+  if (!worker.compiledPipeline) {
+    const pipelineConfig = await this.getDefaultPipelineConfig();
+    worker.compiledPipeline = await this.compilePipeline(pipelineConfig);
+  }
   let records = 0;
   const start = new Date();
   const summary = { executionTime: {} };
@@ -259,8 +268,9 @@ Worker.prototype.upsert = async function ({
     new Transform({
       objectMode: true,
       async transform(batch, encoding, cb) {
+        batch.forEach((b) => { b.source_input_id = b.source_input_id || inputId; });
         const batchSummary = await worker.executeCompiledPipeline(
-          { pipeline: compiledPipeline, batch },
+          { pipeline: worker.compiledPipeline, batch },
         );
         Object.entries(batchSummary.executionTime).forEach(([path, val]) => {
           summary.executionTime[path] = (summary.executionTime[path] || 0) + val;
@@ -277,21 +287,54 @@ Worker.prototype.upsert = async function ({
   // There are some pipeline-wide streams and promises
   // like new timeline streams, or outputs to a packet or timeline file
   // terminate the inputs for these streams
-  (compiledPipeline.newStreams || []).forEach((s) => s.push(null));
+  (this.compiledPipeline.newStreams || []).forEach((s) => s.push(null));
   // Await any file completions
-  await Promise.all(compiledPipeline.promises || []);
-  summary.files = compiledPipeline.files || [];
+  await Promise.all(this.compiledPipeline.promises || []);
+  summary.files = this.compiledPipeline.files || [];
   summary.records = records;
 
   return summary;
 };
 
-Worker.prototype.upsert.metadata = {
+Worker.prototype.upsertPeople.metadata = {
   options: {
     stream: {},
     filename: {},
     batchSize: {},
+    pluginId: {},
+    inputId: {},
+    remoteInputId: {},
+    inputType: {},
+    inputMetadata: {}, // metadata for new inputs
   },
+};
+
+Worker.prototype.upsertPeopleFromDatabase = async function (options) {
+  const { sql } = options;
+  if (!sql) throw new Error('sql is required');
+
+  const { data: pluginIds } = await this.query({ sql: 'select * from plugin where path=?', values: ['workerbots.DBBot'] });
+  if (pluginIds.length === 0) throw new Error("No available plugin with path 'workerbots.DBBot'");
+  if (pluginIds.length > 1) throw new Error("Multiple plugins with path 'workerbots.DBBot'");
+
+  const source = new SQLWorker(this);
+  const stream = await source.stream({ sql });
+
+  const remoteInputId = createHash('sha256')
+    .update(sql)
+    .digest('hex');
+
+  return this.upsertPeople({
+    stream,
+    remoteInputId,
+    pluginId: pluginIds[0].id,
+    inputType: 'sql',
+    inputMetadata: JSON.stringify({
+      sql: sql.slice(0, 1000),
+    }),
+  });
+};
+Worker.prototype.upsertPeopleFromDatabase.metadata = {
 };
 
 module.exports = Worker;

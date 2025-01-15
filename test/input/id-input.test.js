@@ -76,7 +76,7 @@ describe('Insert File of people with options', async () => {
       assert.ok(o.source_code_id > 0, `No valid source code for ${o.source_code}`);
     });
 
-    await inputWorker.upsertPersonBatch({ batch });
+    await inputWorker.upsertPeople({ stream: batch, inputId: process.env.testingInputId });
     batch.forEach((o) => {
       debug(`${o.email}->${o.person_id}`);
       assert.ok(o.person_id > 0, `No valid person information for ${o.email}`);
@@ -104,7 +104,7 @@ describe('Insert File of people with options', async () => {
 
   it('Should be able to append identifiers to a file, and load to the timeline', async () => {
     const filename = await createSampleActionFile();
-    const output = await inputWorker.load({ pluginId: 'testing', filename, loadTimeline: true });
+    const output = await inputWorker.id({ pluginId: 'testing', filename, loadTimeline: true });
     debug('Input', filename);
     debug('Output filename', output);
   });
@@ -115,14 +115,14 @@ describe('Insert File of people with options', async () => {
     const filename = await createSampleActionFile(
       { ts: new Date().toISOString(), remote_input_id: rid },
     );
-    const storedInputInfo = await inputWorker.load({ pluginId: 'testing', filename });
+    const storedInputInfo = await inputWorker.id({ pluginId: 'testing', filename });
 
     const sqliteFile = Object.values(storedInputInfo.outputFiles || [])?.[0]?.filename;
 
     const sqlite = new SQLLiteWorker({ accountId, sqliteFile });
     const { data: initial } = await sqlite.query('select count(*) as records from timeline');
     debug('Initial count', initial);
-    await inputWorker.load({ pluginId: 'testing', filename });
+    await inputWorker.id({ pluginId: 'testing', filename });
 
     const { data: deduped } = await sqlite.query('select count(*) as records from timeline');
     debug('Subsequent count', deduped);
@@ -131,7 +131,7 @@ describe('Insert File of people with options', async () => {
     const filename2 = await createSampleActionFile(
       { ts: new Date().toISOString(), remote_input_id: rid },
     );
-    await inputWorker.load({ pluginId: 'testing', filename: filename2 });
+    await inputWorker.id({ pluginId: 'testing', filename: filename2 });
     const { data: expanded } = await sqlite.query('select count(*) as records from timeline');
     assert(expanded[0]?.records > deduped[0]?.records, 'Records were overly deduplicated, there should be more of them');
     sqlite.destroy();
@@ -142,7 +142,7 @@ describe('Insert File of people with options', async () => {
     write a sqlite database, and load to the timeline for a lot of people`, async () => {
     const filename = await createSampleActionFile({ users: 1000000 });
     debug('Input', filename);
-    const output = await inputWorker.load({ pluginId: 'testing', filename, loadTimeline: true });
+    const output = await inputWorker.id{ pluginId: 'testing', filename, loadTimeline: true });
 
     debug('Output filename', output);
   });

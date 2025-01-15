@@ -13,7 +13,7 @@ const { mkdirp } = require('mkdirp');
 const debug = require('debug')('InputWorker');
 const SQLite3 = require('better-sqlite3');
 const { parse: parseUUID } = require('uuid');
-const { getTempFilename, getUUIDv7 } = require('@engine9/packet-tools');
+const { getTempFilename } = require('@engine9/packet-tools');
 const SQLWorker = require('./SQLWorker');
 const SQLiteWorker = require('./sql/SQLiteWorker');
 const PluginBaseWorker = require('./PluginBaseWorker');
@@ -24,35 +24,6 @@ function Worker(worker) {
 }
 
 util.inherits(Worker, PluginBaseWorker);
-
-/*
-  The input id is either stored in the database, or generated and
-stored
-*/
-Worker.prototype.getInputId = async function (opts) {
-  const {
-    inputId, pluginId, remoteInputId, inputType = 'unknown',
-  } = opts;
-  if (inputId) return inputId;
-  if (!pluginId || !remoteInputId) throw new Error('pluginId and remoteInputId are both required');
-  const { data } = await this.query({ sql: 'select * from input where plugin_id=? and remote_input_id=?', values: [pluginId, remoteInputId] });
-  if (data.length > 0) return data[0].id;
-  const { data: plugin } = await this.query({ sql: 'select * from plugin where plugin_id=?', values: [pluginId] });
-  if (plugin.length === 0) throw new Error(`No such plugin:${pluginId}`);
-  const id = getUUIDv7(new Date());
-  await this.insertFromStream({
-    table: 'input',
-    stream: [{
-      id,
-      plugin_id: pluginId,
-      remote_input_id: remoteInputId,
-      input_type: inputType,
-    },
-    ],
-  });
-
-  return id;
-};
 
 /*
   An input storage db gets or creates an input storage DB file,
@@ -228,8 +199,7 @@ Worker.prototype.id = async function (options) {
         worker.markPerformance('start-source-code-id');
         await worker.appendSourceCodeId({ batch });
         worker.markPerformance('start-upsert-person');
-        batch.forEach((b) => { b.source_input_id = b.source_input_id || inputId; });
-        await worker.upsertPersonBatch({ batch });
+        await worker.upsertPeople({ batch, inputId });
         worker.markPerformance('start-append-entry');
         await worker.appendEntryId({ inputId, batch });
         worker.markPerformance('end-batch');

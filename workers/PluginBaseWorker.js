@@ -65,6 +65,36 @@ Worker.prototype.compilePlugin = async function ({ extensionPath }) {
   });
 };
 
+/*
+  The input id is either stored in the database, or generated and
+stored
+*/
+Worker.prototype.getInputId = async function (opts) {
+  const {
+    inputId, pluginId, remoteInputId, inputType = 'unknown', inputMetadata = null,
+  } = opts;
+  if (inputId) return inputId;
+  if (!pluginId || !remoteInputId) throw new Error('Required inputId not specified, and pluginId and remoteInputId are both required to create one');
+  const { data } = await this.query({ sql: 'select * from input where plugin_id=? and remote_input_id=?', values: [pluginId, remoteInputId] });
+  if (data.length > 0) return data[0].id;
+  const { data: plugin } = await this.query({ sql: 'select * from plugin where id=?', values: [pluginId] });
+  if (plugin.length === 0) throw new Error(`No such plugin:${pluginId}`);
+  const id = getUUIDv7(new Date());
+  await this.insertFromStream({
+    table: 'input',
+    stream: [{
+      id,
+      plugin_id: pluginId,
+      remote_input_id: remoteInputId,
+      input_type: inputType,
+      input_metadata: inputMetadata || null,
+    },
+    ],
+  });
+
+  return id;
+};
+
 /* Compiles the transform exclusively, bindings are handled elsewhere */
 Worker.prototype.compileTransform = async function ({ transform, path, options = {} }) {
   if (typeof transform === 'function') {

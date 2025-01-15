@@ -3,6 +3,8 @@ const debug = require('debug')('test_db_schema.js');
 const SchemaWorker = require('../workers/SchemaWorker');
 const WorkerRunner = require('../scheduler/WorkerRunner');
 
+process.env.testingInputId = '11111111-0000-0000-0000-000000000000';// testing ID
+
 async function drop(opts) {
   const schemaWorker = new SchemaWorker(opts);
 
@@ -35,9 +37,14 @@ async function truncate(opts) {
   schemaWorker.destroy();
 }
 
-async function insertDefaults() {
-  // const schemaWorker = new SchemaWorker(opts);
-  // schemaWorker.destroy();
+async function insertDefaults(opts) {
+  const schemaWorker = new SchemaWorker(opts);
+  await schemaWorker.query({
+    sql: 'insert ignore into plugin (id,path,name) values (?,?,?)',
+    values: [process.env.testingInputId, 'workerbots.DBBot', 'Testing DBBot Plugin'],
+  });
+
+  schemaWorker.destroy();
 }
 
 const accountId = 'test';

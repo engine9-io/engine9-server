@@ -45,9 +45,18 @@ describe('Deploy schemas,upsert people,test segments', async () => {
     const length = 500;
     const batch = [...new Array(500)].map((x, i) => ({ email: `test${i % (length / 2)}@test.com` }));
     await schemaWorker.query('delete from person_email');
-    await personWorker.upsertPersonBatch({ batch: JSON.parse(JSON.stringify(batch)) });
-    await personWorker.upsertPersonBatch({ batch: JSON.parse(JSON.stringify(batch)) });
-    await personWorker.upsertPersonBatch({ batch: JSON.parse(JSON.stringify(batch)) });
+    await personWorker.upsertPeople({
+      stream: JSON.parse(JSON.stringify(batch)),
+      inputId: process.env.testingInputId,
+    });
+    await personWorker.upsertPeople({
+      stream: JSON.parse(JSON.stringify(batch)),
+      inputId: process.env.testingInputId,
+    });
+    await personWorker.upsertPeople({
+      stream: JSON.parse(JSON.stringify(batch)),
+      inputId: process.env.testingInputId,
+    });
     const { data } = await schemaWorker.query('select count(*) as records from person_email');
     assert.deepEqual(data[0].records, length / 2, 'Does not match');
     debug('Finished up');
@@ -98,6 +107,7 @@ describe('Deploy schemas,upsert people,test segments', async () => {
     });
 
     const { data } = await schemaWorker.query(`select count(*)${sql}`);
+    debug(data);
   });
 
   /*

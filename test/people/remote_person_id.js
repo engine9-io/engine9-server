@@ -10,7 +10,7 @@ const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
 require('../test_db_schema');
 
-describe('Insert File of people with options', async () => {
+describe('Testing remote_person_id deduplication', async () => {
   const accountId = 'test';
   const runner = new WorkerRunner();
   const env = runner.getWorkerEnvironment({ accountId });
@@ -26,31 +26,41 @@ describe('Insert File of people with options', async () => {
     await knex.destroy();
   });
 
-  it('Should be able to upsert and deduplicate people and phone status, and produce an audit output', async () => {
+  it('Should be able to upsert and deduplicate people with same email but different remote_person_id', async () => {
     const stream = [
       {
         remote_person_id: '123425385',
-        date_created: '2024-11-15 20:18:22',
-        last_modified: '2024-11-15 20:18:22',
+        email: 'dupe_email@test.com',
       },
       {
         remote_person_id: '123425388',
-        date_created: '2024-11-15 20:18:22',
-        last_modified: '2024-11-15 20:18:22',
+        email: 'dupe_email@test.com',
+      },
+      {
+        remote_person_id: '123425385',
+        email: 'second_email@y.com',
       },
       {
         remote_person_id: '123425390',
-        date_created: '2024-11-15 20:18:22',
-        last_modified: '2024-11-15 20:18:22',
+        email: 'unique_email@y.com',
       },
     ];
 
-    await sqlWorker.query('delete p from person_identifier pi join person p on (pi.person_id=p.id) where id_value in (\'123425385\',\'123425388\',\'123425390\')');
-    await sqlWorker.query('delete from person_identifier where id_value in (\'123425385\',\'123425388\',\'123425390\')');
-    const { data } = await sqlWorker.query("select count(*) as records from person_identifier where id_value in ('123425385','123425388','123425390')");
+    const values = Object.keys(
+      stream.reduce((a, b) => {
+        b.plugin_id = 'test-plugin';
+        a[`test-plugin.${b.remote_person_id}`] = 1; return a;
+      }, {}),
+    );
+
+    await sqlWorker.query({ sql: `delete p from person_identifier pi join person p on (pi.person_id=p.id) where id_value in (${values.map(() => '?').join(',')})`, values });
+    await sqlWorker.query({ sql: `delete p from person_identifier pi join person_email p on (pi.person_id=pi.person_id) where id_value in (${values.map(() => '?').join(',')})`, values });
+    await sqlWorker.query({ sql: `delete from person_identifier where id_value in (${values.map(() => '?').join(',')})`, values });
+    const { data } = await sqlWorker.query({ sql: `select count(*) as records from person_identifier where id_value in (${values.map(() => '?').join(',')})`, values });
     assert(data?.[0]?.records === 0, 'Should have deleted sample records');
-    await personWorker.upsert({ stream });
-    const { data: data2 } = await sqlWorker.query("select count(*) as records from person_identifier where id_value in ('123425385','123425388','123425390')");
-    assert(data2?.[0]?.records === 3, 'Should have created sample records');
+    await personWorker.upsertPeople({ stream, inputId: process.env.testingInputId });
+    const { data: data2 } = await sqlWorker.query({ sql: `select count(*) as records from person_identifier where id_value in (${values.map(() => '?').join(',')})`, values });
+    const ids = data2?.[0]?.records;
+    assert.equal(ids, 3, `Should have created 3 sample ids, instead created ${ids}`);
   });
 });

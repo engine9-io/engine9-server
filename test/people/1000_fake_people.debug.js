@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-const { rebuildDB, truncateDB } = require('./test_db_modifications');
+const { rebuildDB, truncateDB } = require('../test_db_schema');
 
 (async function () {
   const accountId = 'engine9';
@@ -32,7 +32,7 @@ const { rebuildDB, truncateDB } = require('./test_db_modifications');
     filename = `${__dirname}/1000_fake_people.csv.gz`;
   }
 
-  await personWorker.upsert({ filename });
+  await personWorker.upsertPeople({ filename, inputId: process.env.testingInputId });
 
   const { data } = await sqlWorker.query('select count(*) as records from person_email');
   debug('Retrieved ', data, ' from database');
