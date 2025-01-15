@@ -87,7 +87,7 @@ Worker.prototype.getInputId = async function (opts) {
       plugin_id: pluginId,
       remote_input_id: remoteInputId,
       input_type: inputType,
-      input_metadata: inputMetadata || null,
+      metadata: inputMetadata || null,
     },
     ],
   });
