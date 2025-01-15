@@ -58,6 +58,7 @@ describe('Insert File of people with options', async () => {
       },
       {
         remote_phone_id: '123425388-13179562127',
+        plugin_id: 'test-plugin',
         remote_person_id: '123425388',
         date_created: '2024-11-15 20:18:22',
         last_modified: '2024-11-15 20:18:22',
@@ -72,6 +73,7 @@ describe('Insert File of people with options', async () => {
       },
       {
         remote_phone_id: '123425390-19173341590',
+        plugin_id: 'test-plugin',
         remote_person_id: '123425390',
         date_created: '2024-11-15 20:18:22',
         last_modified: '2024-11-15 20:18:22',
