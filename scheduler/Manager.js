@@ -87,7 +87,7 @@ Manager.prototype.handleEvent = async function (event) {
         });
     }
   } catch (error) {
-    debug(error);
+    debug('Caught handle event error:', error);
   }
 };
 
@@ -280,7 +280,7 @@ Manager.prototype.forkJob = function (_job, callback) {
       // console.log("stdout received:",data.length);
       if (logToClient) debug((prefix + s).trim()[fork.color]);
       output += s;
-      logger(`Stdout coming from client:${s.length} bytes: ${s}`);
+      debug(`EXTRA: Stdout coming from client:${s.length} bytes: ${s}`);
     });
 
     fork.on('close', (code) => {
@@ -303,7 +303,7 @@ Manager.prototype.forkJob = function (_job, callback) {
           return jobError(`Perhaps too much data in the output -- please filter output, output length=${output.length}`);
         }
         if (logToClient) debug('Could not parse output starting with ', output.slice(0, 50), 'ending with', output.slice(-50));
-        debug(e);
+        debug('Error parsing content:', e);
         // String output not allowed -- at least until we fix some things
         return jobError(`Invalid, non-JSON output.  Look for 'console.log', should be 'console.err':Content starts with ${output.slice(0, 30)}, ${output}`);
         // out=output;
@@ -371,7 +371,7 @@ Manager.prototype.clear = function clear(options, callback) {
   manager.init({}, (exc) => {
     if (exc) return callback(exc);
     return manager.toSchedulerQueue.clear({}, (e, d) => {
-      debug(d);
+      debug('Clear queue response:', d);
       return manager.toManagerQueue.clear({}, callback);
     });
   });
