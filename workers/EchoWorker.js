@@ -37,6 +37,7 @@ Worker.prototype.echo = function echo(options, callback) {
 Worker.prototype.echo.metadata = {
   options: {
     seconds: {},
+    foo: {},
   },
 };
 

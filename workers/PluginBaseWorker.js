@@ -557,14 +557,19 @@ Worker.prototype.getNextTablePrefixCounter = async function () {
 Worker.prototype.getNextTablePrefixCounter.metadata = {
   options: {},
 };
-Worker.prototype.getPluginId = async function (opts) {
+Worker.prototype.getPlugin = async function (opts) {
   const { path, remotePluginId, pluginId } = opts;
-  if (pluginId) {
-    if (uuidRegex.test(pluginId)) return pluginId;
-    throw new Error(`Invalid pluginId, not a UUID:${pluginId}`);
-  }
+
   const conditions = [];
   const values = [];
+  if (pluginId) {
+    if (uuidRegex.test(pluginId)) {
+      conditions.push('id=?');
+      values.push(pluginId);
+    } else {
+      throw new Error(`Invalid pluginId, not a UUID:${pluginId}`);
+    }
+  }
   if (path) {
     conditions.push('path=?');
     values.push(path);
@@ -573,13 +578,14 @@ Worker.prototype.getPluginId = async function (opts) {
     conditions.push('remote_plugin_id=?');
     values.push(remotePluginId);
   }
+  if (conditions.length === 0) throw new Error(`getPlugin requires path, remotePluginId, or pluginId, not found in ${JSON.stringify(opts)}`);
 
-  const { data: plugins } = await this.query({ sql: `select id from plugin where ${conditions.join(' AND ')}`, values });
+  const { data: plugins } = await this.query({ sql: `select * from plugin where ${conditions.join(' AND ')}`, values });
   if (plugins.length === 0) throw new Error(`No available plugin with conditions ${conditions.join(' AND ')}`);
   if (plugins.length > 1) throw new Error(`Multiple plugins with condigions ${conditions.join(' AND ')}`);
-  return plugins[0].id;
+  return plugins[0];
 };
-Worker.prototype.getPluginId.metadata = {
+Worker.prototype.getPlugin.metadata = {
   options: {
     pluginId: {},
     remotePluginid: {},

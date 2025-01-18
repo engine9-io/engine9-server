@@ -309,7 +309,7 @@ Worker.prototype.loadPeople.metadata = {
   },
 };
 
-Worker.prototype.loadPeopleFromDatabase = async function (options) {
+Worker.prototype.internalLoadPeopleFromDatabase = async function (options) {
   const { sql, pluginId } = options;
   if (!sql) throw new Error('sql is required');
   if (!pluginId) throw new Error('pluginId is required');
@@ -317,7 +317,7 @@ Worker.prototype.loadPeopleFromDatabase = async function (options) {
   const source = new SQLWorker(this);
   const stream = await source.stream({ sql });
 
-  const remoteInputId = createHash('sha256')
+  const remoteInputId = options.remoteInputId || createHash('sha256')
     .update(sql)
     .digest('hex');
 
@@ -331,6 +331,5 @@ Worker.prototype.loadPeopleFromDatabase = async function (options) {
     }),
   });
 };
-Worker.prototype.loadPeopleFromDatabase.metadata = {};
 
 module.exports = Worker;
