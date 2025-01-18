@@ -1,0 +1,8 @@
+{
+ "uid": "engine9-scheduler-sqs",
+ "append": true,
+ "watch": true,
+ "script": "./SQSJobScheduler.js",
+ "sourceDir": ".",
+ "logFile":"/var/log/engine9/scheduler-sqs.log"
+}

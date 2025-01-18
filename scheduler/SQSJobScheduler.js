@@ -1,3 +1,4 @@
+require('dotenv').config({ path: `${__dirname}/../../.env` });
 const debug = require('debug')('SQLJobScheduler');
 
 const { mkdirp } = require('mkdirp');
@@ -8,8 +9,6 @@ const { SQSClient } = require('@aws-sdk/client-sqs');
 const { createQueue, QueueOrder } = require('simple-in-memory-queue');
 const Manager = require('./Manager');
 const EchoWorker = require('../workers/EchoWorker');// just to get the environment
-
-require('dotenv').config({ path: `${__dirname}/../../.env` });
 
 /*
   The SQS Job scheduler receives events from SQS,
@@ -110,6 +109,7 @@ Scheduler.prototype.init = async function () {
   inboundSQS.on('processing_error', (err) => { debug('Processing error:', err.message); });
 
   inboundSQS.start();
+  debug(`SQSJobScheduler started polling ${process.env.JOB_INBOUND_QUEUE}`);
 };
 
 Scheduler.prototype.handleEvent = async function (event) {

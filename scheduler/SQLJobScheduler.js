@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '../.env' });
 const util = require('node:util');
 const { createQueue, QueueOrder } = require('simple-in-memory-queue');
 const debug = require('debug')('SQLJobScheduler');
@@ -297,5 +298,12 @@ Scheduler.prototype.handleEvent = async function (event) {
   }
   return null;
 };
+
+if (require.main === module) {
+  const scheduler = new Scheduler();
+  await scheduler.init();
+  scheduler.toManagerQueue.push({ eventType: 'ping' });
+  scheduler.poll();
+}
 
 module.exports = Scheduler;

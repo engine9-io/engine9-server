@@ -1,0 +1,8 @@
+{
+ "uid": "engine9-scheduler-sql",
+ "append": true,
+ "watch": true,
+ "script": "./SQLJobScheduler.js",
+ "sourceDir": ".",
+ "logFile":"/var/log/engine9/scheduler-sql.log"
+}
