@@ -579,5 +579,12 @@ Worker.prototype.getPluginId = async function (opts) {
   if (plugins.length > 1) throw new Error(`Multiple plugins with condigions ${conditions.join(' AND ')}`);
   return plugins[0].id;
 };
+Worker.prototype.getPluginId.metadata = {
+  options: {
+    pluginId: {},
+    remotePluginid: {},
+    path: {},
+  },
+};
 
 module.exports = Worker;
