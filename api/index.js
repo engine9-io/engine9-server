@@ -117,6 +117,6 @@ if (process.env.ENGINE9_SSL_CERT_PATH) {
   app.listen(port, (e) => {
     if (e) throw e;
     // eslint-disable-next-line no-console
-    console.log('listening insecurely on:', port);
+    console.log('No ENGINE9_SSL_CERT_PATH, listening insecurely on:', port);
   });
 }

@@ -49,7 +49,7 @@ Manager.prototype.handleEvent = async function (event) {
         manager.toSchedulerQueue.add({ eventType: 'pong' });
         break;
       case 'job_kill':
-        manager.killJob(event, (_error, success) => {
+        manager.killJob(event.job, (_error, success) => {
           if (success) {
             // If it was successfully killed, no other message is necessary
             // Job NOT successfully killed
@@ -65,12 +65,16 @@ Manager.prototype.handleEvent = async function (event) {
             if (_error && _error === 'No running job') {
               error.message += ' (Process had died)';
             }
+            const job = event.job || event;
+            if (!job.accountId) {
+              throw new Error('no accountId');
+            }
 
             manager.toSchedulerQueue.add({
               eventType: 'job_error',
               job: {
-                accountId: event.accountId,
-                jobId: event.jobId,
+                accountId: job.accountId,
+                jobId: job.jobId,
                 error,
               },
             });
@@ -259,6 +263,7 @@ Manager.prototype.forkJob = function (_job, callback) {
       } else {
         if (logToClient) debug(new Date().toString(), 'Progress:'[fork.color], m.data);
         debug('Unknown message received from child:', m);
+        job.accountId = job.account_id || job.accountId;
         manager.toSchedulerQueue.add({
           eventType: 'job_modify',
           job: {
