@@ -8,6 +8,8 @@ function Worker(worker) {
 
 util.inherits(Worker, PersonWorker);
 
+Worker.metadata = {};
+
 /*
   A version of a PersonWorker devoted to locally stored data, often in a current database
 */
