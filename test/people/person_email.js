@@ -41,7 +41,7 @@ describe('Insert File of people with options', async () => {
       { email: 'dupe_email@y.com', subscription_status: 'Unsubscribed', email_type: 'Home' },
     ];
 
-    await personWorker.upsertPeople({ stream, inputId: process.env.testingInputId });
+    await personWorker.loadPeople({ stream, inputId: process.env.testingInputId });
     const { data } = await sqlWorker.query('select * from person_email');
     assert.equal(data.filter((d) => d.email === 'x@y.com').length, 1, 'Did not deduplicate on just email address');
     assert.equal(data.filter((d) => d.email === 'dupe_email@y.com').length, 2, 'Mistakenly deduplicated when there was a person_id');

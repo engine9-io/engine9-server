@@ -92,7 +92,7 @@ describe('Insert a stream of people with custom fields', async () => {
       },
     ];
 
-    await personWorker.upsertPeople({ stream: batch, inputId: process.env.testingInputId });
+    await personWorker.loadPeople({ stream: batch, inputId: process.env.testingInputId });
     const { data } = await sqlWorker.query(`select * from ${table}`);
     assert(data.length > 0, `No records found in table ${table}`);
     let f = 'custom_string';

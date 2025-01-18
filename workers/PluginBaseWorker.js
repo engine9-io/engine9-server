@@ -4,12 +4,11 @@ const fs = require('node:fs');
 const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
-const { getUUIDv7 } = require('@engine9/packet-tools');
+const { getUUIDv7, TIMELINE_ENTRY_TYPES, uuidRegex } = require('@engine9/packet-tools');
 const { v5: uuidv5 } = require('uuid');
 
 const PacketTools = require('@engine9/packet-tools');
 const { LRUCache } = require('lru-cache');
-const { TIMELINE_ENTRY_TYPES, uuidRegex } = require('@engine9/packet-tools');
 const SchemaWorker = require('./SchemaWorker');
 
 function Worker(worker) {
@@ -557,6 +556,28 @@ Worker.prototype.getNextTablePrefixCounter = async function () {
 
 Worker.prototype.getNextTablePrefixCounter.metadata = {
   options: {},
+};
+Worker.prototype.getPluginId = async function (opts) {
+  const { path, remotePluginId, pluginId } = opts;
+  if (pluginId) {
+    if (uuidRegex.test(pluginId)) return pluginId;
+    throw new Error(`Invalid pluginId, not a UUID:${pluginId}`);
+  }
+  const conditions = [];
+  const values = [];
+  if (path) {
+    conditions.push('path=?');
+    values.push(path);
+  }
+  if (remotePluginId) {
+    conditions.push('remote_plugin_id=?');
+    values.push(remotePluginId);
+  }
+
+  const { data: plugins } = await this.query({ sql: `select id from plugin where ${conditions.join(' AND ')}`, values });
+  if (plugins.length === 0) throw new Error(`No available plugin with conditions ${conditions.join(' AND ')}`);
+  if (plugins.length > 1) throw new Error(`Multiple plugins with condigions ${conditions.join(' AND ')}`);
+  return plugins[0].id;
 };
 
 module.exports = Worker;

@@ -35,7 +35,7 @@ describe('Insert File of people with options', async () => {
       filename = `${__dirname}/1000_fake_people.csv.gz`;
     }
 
-    await personWorker.upsertPeople({ filename, inputId: process.env.testingInputId });
+    await personWorker.loadPeople({ filename, inputId: process.env.testingInputId });
 
     const { data } = await sqlWorker.query('select count(*) as records from person_email');
     debug('Retrieved ', data, ' from database');

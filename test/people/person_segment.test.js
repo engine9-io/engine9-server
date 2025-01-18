@@ -45,15 +45,15 @@ describe('Deploy schemas,upsert people,test segments', async () => {
     const length = 500;
     const batch = [...new Array(500)].map((x, i) => ({ email: `test${i % (length / 2)}@test.com` }));
     await schemaWorker.query('delete from person_email');
-    await personWorker.upsertPeople({
+    await personWorker.loadPeople({
       stream: JSON.parse(JSON.stringify(batch)),
       inputId: process.env.testingInputId,
     });
-    await personWorker.upsertPeople({
+    await personWorker.loadPeople({
       stream: JSON.parse(JSON.stringify(batch)),
       inputId: process.env.testingInputId,
     });
-    await personWorker.upsertPeople({
+    await personWorker.loadPeople({
       stream: JSON.parse(JSON.stringify(batch)),
       inputId: process.env.testingInputId,
     });

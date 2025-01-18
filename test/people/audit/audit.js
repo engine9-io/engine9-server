@@ -43,7 +43,7 @@ describe('Insert File of people with options', async () => {
       { email: 'z@z.com' },
     ];
 
-    const { files } = await personWorker.upsertPeople({ stream });
+    const { files } = await personWorker.loadPeople({ stream });
     const content = fs.readFileSync(files[0]).toString().split('\n').map((d) => d.trim())
       .filter(Boolean);
     assert.equal(content[0], 'uuid,entry_type,person_id,reference_id', "First line doesn't match expected timeline csv header");

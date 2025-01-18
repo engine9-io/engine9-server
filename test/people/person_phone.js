@@ -91,7 +91,7 @@ describe('Insert File of people with options', async () => {
     await sqlWorker.truncate({ table: 'person' });
     await sqlWorker.truncate({ table: 'person_phone' });
     await sqlWorker.truncate({ table: 'person_identifier' });
-    await personWorker.upsertPeople({ stream, inputId: process.env.testingInputId });
+    await personWorker.loadPeople({ stream, inputId: process.env.testingInputId });
     const { data: person } = await sqlWorker.query('select count(*) as records from person');
     assert.equal(person?.[0].records, 3, `Did not deduplicate on remote_person_id, there are ${person?.[0].records} matching people`);
     const { data } = await sqlWorker.query('select * from person_phone');

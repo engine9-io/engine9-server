@@ -58,7 +58,7 @@ describe('Testing remote_person_id deduplication', async () => {
     await sqlWorker.query({ sql: `delete from person_identifier where id_value in (${values.map(() => '?').join(',')})`, values });
     const { data } = await sqlWorker.query({ sql: `select count(*) as records from person_identifier where id_value in (${values.map(() => '?').join(',')})`, values });
     assert(data?.[0]?.records === 0, 'Should have deleted sample records');
-    await personWorker.upsertPeople({ stream, inputId: process.env.testingInputId });
+    await personWorker.loadPeople({ stream, inputId: process.env.testingInputId });
     const { data: data2 } = await sqlWorker.query({ sql: `select count(*) as records from person_identifier where id_value in (${values.map(() => '?').join(',')})`, values });
     const ids = data2?.[0]?.records;
     assert.equal(ids, 3, `Should have created 3 sample ids, instead created ${ids}`);

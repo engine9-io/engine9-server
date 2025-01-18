@@ -240,7 +240,7 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
   };
 };
 
-Worker.prototype.upsertPeople = async function (options) {
+Worker.prototype.loadPeople = async function (options) {
   const worker = this;
   const {
     stream, filename, packet, batchSize = 500,
@@ -296,7 +296,7 @@ Worker.prototype.upsertPeople = async function (options) {
   return summary;
 };
 
-Worker.prototype.upsertPeople.metadata = {
+Worker.prototype.loadPeople.metadata = {
   options: {
     stream: {},
     filename: {},
@@ -309,13 +309,10 @@ Worker.prototype.upsertPeople.metadata = {
   },
 };
 
-Worker.prototype.upsertPeopleFromDatabase = async function (options) {
-  const { sql } = options;
+Worker.prototype.loadPeopleFromDatabase = async function (options) {
+  const { sql, pluginId } = options;
   if (!sql) throw new Error('sql is required');
-
-  const { data: pluginIds } = await this.query({ sql: 'select * from plugin where path=?', values: ['workerbots.DBBot'] });
-  if (pluginIds.length === 0) throw new Error("No available plugin with path 'workerbots.DBBot'");
-  if (pluginIds.length > 1) throw new Error("Multiple plugins with path 'workerbots.DBBot'");
+  if (!pluginId) throw new Error('pluginId is required');
 
   const source = new SQLWorker(this);
   const stream = await source.stream({ sql });
@@ -324,17 +321,16 @@ Worker.prototype.upsertPeopleFromDatabase = async function (options) {
     .update(sql)
     .digest('hex');
 
-  return this.upsertPeople({
+  return this.loadPeople({
     stream,
     remoteInputId,
-    pluginId: pluginIds[0].id,
+    pluginId,
     inputType: 'sql',
     inputMetadata: JSON.stringify({
       sql: sql.slice(0, 1000),
     }),
   });
 };
-Worker.prototype.upsertPeopleFromDatabase.metadata = {
-};
+Worker.prototype.loadPeopleFromDatabase.metadata = {};
 
 module.exports = Worker;

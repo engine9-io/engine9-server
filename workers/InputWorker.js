@@ -199,7 +199,7 @@ Worker.prototype.id = async function (options) {
         worker.markPerformance('start-source-code-id');
         await worker.appendSourceCodeId({ batch });
         worker.markPerformance('start-upsert-person');
-        await worker.upsertPeople({ batch, inputId });
+        await worker.loadPeople({ batch, inputId });
         worker.markPerformance('start-append-entry');
         await worker.appendEntryId({ inputId, batch });
         worker.markPerformance('end-batch');

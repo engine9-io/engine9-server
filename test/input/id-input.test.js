@@ -76,7 +76,7 @@ describe('Insert File of people with options', async () => {
       assert.ok(o.source_code_id > 0, `No valid source code for ${o.source_code}`);
     });
 
-    await inputWorker.upsertPeople({ stream: batch, inputId: process.env.testingInputId });
+    await inputWorker.loadPeople({ stream: batch, inputId: process.env.testingInputId });
     batch.forEach((o) => {
       debug(`${o.email}->${o.person_id}`);
       assert.ok(o.person_id > 0, `No valid person information for ${o.email}`);

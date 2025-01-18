@@ -189,7 +189,6 @@ Manager.prototype.forkJob = function (_job, callback) {
 
     const forkParams = [job.workerPath, job.workerMethod,
       `--accountId=${job.accountId}`,
-      `--workerId=${job.workerId}`,
       `_jobId=${job.jobId}`,
       `_jobLog=${manager.getLogPath(job)}`,
     ];
