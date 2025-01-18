@@ -1,6 +1,8 @@
 require('dotenv').config({ path: `${__dirname}/../../.env` });
 const debug = require('debug')('SQLJobScheduler');
 
+debug('Debug settings:', process.env.DEBUG);
+
 const { mkdirp } = require('mkdirp');
 const { Consumer } = require('sqs-consumer');
 const { Producer } = require('sqs-producer');
