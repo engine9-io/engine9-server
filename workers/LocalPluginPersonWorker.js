@@ -56,7 +56,7 @@ const internalMeta = {
 Worker.prototype.ensureSchema = async function () {
   return this.deployStandard();
 };
-Worker.prototype.importPeople.metadata = internalMeta;
+Worker.prototype.ensureSchema.metadata = internalMeta;
 
 Worker.prototype.importPeople = async function (options) {
   return this.internalLoadFromTable({ table: 'person', ...options });
