@@ -653,7 +653,13 @@ WorkerRunner.prototype.runAccount = function runAccount(accountId, callback) {
           modify.options = modify.options || {};
 
           if (process.send) {
-            debug(JSON.stringify(output));
+            if (process.stdout.isTTY) {
+              // eslint-disable-next-line no-console
+              console.log(util.inspect(output, { colors: true, depth: 6, maxArrayLength: 1000 }));
+            } else {
+              // eslint-disable-next-line no-console
+              console.log(JSON.stringify(output, null, 4));
+            }
             process.exit(0);
           } else {
             let timeout = 2000;
