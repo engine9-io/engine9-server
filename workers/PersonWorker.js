@@ -281,7 +281,7 @@ Worker.prototype.loadPeople = async function (options) {
       },
     }),
   );
-  performance.measure('existing-ids', 'start-existing-id-sql', 'end-existing-id-sql');
+  // performance.measure('existing-ids', 'start-existing-id-sql', 'end-existing-id-sql');
   performance.measure('assign-ids', 'start-assign-ids-blocking', 'end-assign-ids-blocking');
 
   // There are some pipeline-wide streams and promises
