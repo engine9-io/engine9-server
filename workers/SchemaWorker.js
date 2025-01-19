@@ -171,6 +171,8 @@ Worker.prototype.diff = async function (opts) {
       const columnDifferences = schemaColumns.map((c) => {
         const dbColumn = dbLookup[c.name];
         if (!dbColumn) return { differences: 'new', ...c };
+        // legacy hack -- don't change this column by hand
+        if (c.name === 'source_code_id') return null;
         const differenceKeys = Object.keys(c).reduce((out, k) => {
           // Ignore these attributes
           if (['type', 'description', 'knex_args', 'values'].indexOf(k) >= 0) return out;
