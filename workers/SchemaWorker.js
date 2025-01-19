@@ -167,9 +167,10 @@ Worker.prototype.diff = async function (opts) {
       }));
 
       const dbLookup = desc.columns.reduce((o, col) => Object.assign(o, { [col.name]: col }), {});
-
+      debug(dbLookup);
       const columnDifferences = schemaColumns.map((c) => {
         const dbColumn = dbLookup[c.name];
+        debug(table, c.name, dbColumn);
         if (!dbColumn) return { differences: 'new', ...c };
         // legacy hack -- don't change this column by hand
         if (c.name === 'source_code_id') return null;
@@ -249,11 +250,17 @@ Worker.prototype.deploy = async function (opts) {
           return worker.createTable({ table: prefix + table, columns, indexes });
         }
         // Okay, it's not missing
-        if (columns.length > 0 || indexes.length > 0) {
+        if (difference === 'columns') {
           const databaseType = await worker.tableType({ table: prefix + table });
           if (databaseType === 'view') return { name: table, difference, did_nothing_because_view: true };
           debug(`Altering table ${prefix}${table} with difference ${difference}`);
-          return worker.alterTable({ table: prefix + table, columns, indexes });
+          return worker.alterTable({ table: prefix + table, columns });
+        }
+        if (difference === 'indexes') {
+          const databaseType = await worker.tableType({ table: prefix + table });
+          if (databaseType === 'view') return { name: table, difference, did_nothing_because_view: true };
+          debug(`Altering table ${prefix}${table} with difference ${difference}`);
+          return worker.alterTable({ table: prefix + table, indexes });
         }
 
         return { table, difference, did_nothing: true };
