@@ -84,7 +84,7 @@ Worker.prototype.getBatchTransform = function ({ batchSize = 100 }) {
         cb();
       },
       flush(cb) {
-        if (this.buffer.length > 0) this.push(this.buffer);
+        if (this.buffer?.length > 0) this.push(this.buffer);
         cb();
       },
     }),
