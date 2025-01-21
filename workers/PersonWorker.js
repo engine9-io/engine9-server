@@ -281,8 +281,12 @@ Worker.prototype.loadPeople = async function (options) {
       },
     }),
   );
-  // performance.measure('existing-ids', 'start-existing-id-sql', 'end-existing-id-sql');
-  performance.measure('assign-ids', 'start-assign-ids-blocking', 'end-assign-ids-blocking');
+  try {
+    performance.measure('existing-ids', 'start-existing-id-sql', 'end-existing-id-sql');
+    performance.measure('assign-ids', 'start-assign-ids-blocking', 'end-assign-ids-blocking');
+  } catch (e) {
+    // debug(e);
+  }
 
   // There are some pipeline-wide streams and promises
   // like new timeline streams, or outputs to a packet or timeline file
