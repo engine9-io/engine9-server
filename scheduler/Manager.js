@@ -295,9 +295,21 @@ Manager.prototype.forkJob = function (_job, callback) {
             warning: m.data,
           },
         });
+      } else if (m.message_type === 'progress') {
+        // already logged
+        // if (logToClient) debug(new Date().toISOString(), 'Progress:'[fork.color], m.data);
+        // debug('Unknown message received from child:', m);
+        job.accountId = job.account_id || job.accountId;
+        manager.toSchedulerQueue.add({
+          eventType: 'job_modify',
+          job: {
+            accountId: job.accountId,
+            jobId: job.jobId,
+            progress: m.data,
+          },
+        });
       } else {
-        if (logToClient) debug(new Date().toISOString(), 'Progress:'[fork.color], m.data);
-        debug('Unknown message received from child:', m);
+        if (logToClient) debug(new Date().toISOString(), 'Unknow message:'[fork.color], m.data);
         job.accountId = job.account_id || job.accountId;
         manager.toSchedulerQueue.add({
           eventType: 'job_modify',
