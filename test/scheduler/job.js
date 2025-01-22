@@ -36,6 +36,7 @@ describe('Schedule and run jobs', async () => {
         account_id: 'test',
         worker_path: 'EchoWorker',
         worker_method: 'echo',
+        plugin_id: '00000000-0000-0000-0000-000000000001',
         options: JSON.stringify({ foo: 'bar' }),
       },
     );

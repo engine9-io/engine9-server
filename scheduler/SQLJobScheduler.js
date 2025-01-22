@@ -300,10 +300,12 @@ Scheduler.prototype.handleEvent = async function (event) {
 };
 
 if (require.main === module) {
-  const scheduler = new Scheduler();
-  await scheduler.init();
-  scheduler.toManagerQueue.push({ eventType: 'ping' });
-  scheduler.poll();
+  (async function () {
+    const scheduler = new Scheduler();
+    await scheduler.init();
+    scheduler.toManagerQueue.push({ eventType: 'ping' });
+    scheduler.poll();
+  }());
 }
 
 module.exports = Scheduler;

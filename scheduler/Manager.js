@@ -3,6 +3,8 @@ const debug = require('debug')('Manager');
 const async = require('async');
 const childProcess = require('child_process');
 
+let winston = null;
+
 /*
   The job manager listens for inbound events, and manages starting up
   processes to complete those events.
@@ -107,8 +109,41 @@ Manager.prototype.getColor = function () {
   return 'blue';
 };
 
-Manager.prototype.getLogger = function () {
-  return debug;
+const loggers = {};
+
+Manager.prototype.getLogPath = function getLogPath(job) {
+  if (!job.jobId) throw new Error(`Could not find jobId in ${JSON.stringify(job)}`);
+  if (!job.accountId) throw new Error(`Could not find accountId in ${JSON.stringify(job)}`);
+
+  const logDir = process.env.ENGINE9_LOG_DIR || '/var/log/engine9';
+  return `${logDir + path.sep}jobs${path.sep}${job.accountId}_${job.jobId}.txt`;
+};
+
+Manager.prototype.getLogger = function getLogger(job) {
+  const logPath = this.getLogPath(job);
+
+  if (!loggers[path]) {
+    debug(`Creating logfile ${path}`);
+    // eslint-disable-next-line global-require
+    winston = winston || require('winston');
+    const winstonLogger = winston.createLogger({
+      format: winston.format.simple(),
+      transports: [
+        new (winston.transports.File)({ level: 'debug', filename: logPath, json: false }),
+      ],
+    });
+    loggers[path] = winstonLogger;
+  }
+
+  function log(m) {
+    let stringVal = m;
+    if (m.message) stringVal = m.message;
+    if (typeof stringVal === 'object') stringVal = JSON.stringify(stringVal);
+
+    loggers[path].info(stringVal);
+  }
+
+  return log;
 };
 
 Manager.prototype.forkJob = function (_job, callback) {
@@ -182,8 +217,8 @@ Manager.prototype.forkJob = function (_job, callback) {
 
     let prefix = `${job.accountId} ${job.workerPath}.${job.workerMethod}`;
 
-    logger({ type: 'start', message: `Starting ${prefix}` });
-    logger({ type: 'options', message: JSON.stringify(job.options || '{}') });
+    logger(`Starting ${prefix}`);
+    logger(JSON.stringify(job.options || '{}'));
 
     prefix += ': ';
 
@@ -218,7 +253,7 @@ Manager.prototype.forkJob = function (_job, callback) {
       lastStdErr = data.toString();
       // console.log("stderr:",data.length);
 
-      logger(`${job.jobId}: ${lastStdErr}`);
+      logger(`${lastStdErr}`);
 
       if (logToClient) debug((prefix + data.toString()).trim()[fork.color]);
     });
@@ -226,6 +261,7 @@ Manager.prototype.forkJob = function (_job, callback) {
     // messages sent from child messages can be error or progress messages
     fork.on('message', (m) => {
       if (logToClient) debug('Message received:', m);
+      logger(m);
       if (m.message_type === 'error') {
         if (logToClient) debug('Received error, setting processError');
         processError = m.data;
@@ -280,7 +316,7 @@ Manager.prototype.forkJob = function (_job, callback) {
       // console.log("stdout received:",data.length);
       if (logToClient) debug((prefix + s).trim()[fork.color]);
       output += s;
-      debug(`EXTRA: Stdout coming from client:${s.length} bytes: ${s}`);
+      // debug(`EXTRA: Stdout coming from client:${s.length} bytes: ${s}`);
     });
 
     fork.on('close', (code) => {

@@ -8,7 +8,7 @@ async function rebuildDB(opts) {
   await schemaWorker.drop({ table: 'job' });
 
   const schemas = [
-    { schema: '../engine9-interfaces/job/schema.js' },
+    { schema: 'engine9-interfaces/job' },
   ];
   debug('Deploying schemas');
   await Promise.all(schemas.map((s) => schemaWorker.deploy(s)));

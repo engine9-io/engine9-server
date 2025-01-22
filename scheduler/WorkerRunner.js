@@ -21,7 +21,6 @@ try {
 }
 
 let prompt = null;
-let winston = null;
 
 const allNames = process.argv.slice(3).map((x) => x.split(/[=]/g)[0].replace(/^[-]*/, '')); // this treats all command line options as strings, not numbers
 const argv = minimist(process.argv.slice(2), { string: allNames });
@@ -106,43 +105,6 @@ WorkerRunner.prototype.getWorkerConstructor = function getWorkerConstructor(opti
       return cb(null, WorkerConstructor);
     },
   }, (e, { WorkerConstructor } = {}) => callback(e, WorkerConstructor));
-};
-
-const loggers = {};
-
-WorkerRunner.prototype.getLogPath = function getLogPath(job) {
-  if (!job.jobId) throw new Error(`Could not find jobId in ${JSON.stringify(job)}`);
-  if (!job.job_list_id) throw new Error(`Could not find job_list_id in ${JSON.stringify(job)}`);
-
-  const logDir = process.env.ENGINE9_LOG_DIR || '/var/log/engine9';
-  return `${logDir + path.sep}jobs${path.sep}${job.accountId}_${job.job_list_id}_${job.jobId}.txt`;
-};
-
-WorkerRunner.prototype.getLogger = function getLogger(job) {
-  const runner = this;
-  const logPath = runner.getLogPath(job);
-
-  if (!loggers[path]) {
-    debug(`Creating logfile ${path}`);
-    // eslint-disable-next-line global-require
-    winston = winston || require('winston');
-    const winstonLogger = winston.createLogger({
-      format: winston.format.simple(),
-      transports: [
-        new (winston.transports.File)({ level: 'debug', filename: logPath, json: false }),
-      ],
-    });
-    loggers[path] = winstonLogger;
-  }
-
-  function log(m) {
-    let stringVal = m;
-    if (m.message) stringVal = m.message;
-
-    loggers[path].info(stringVal);
-  }
-
-  return log;
 };
 
 WorkerRunner.prototype.getMethod = function getMethod(WorkerConstructor, callback) {
