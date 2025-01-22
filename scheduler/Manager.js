@@ -241,7 +241,7 @@ Manager.prototype.forkJob = function (_job, callback) {
       forkParams,
       opts,
     );
-    let logToClient = true;
+    let logToClient = false;
     if (process.env.NODE_DEBUG && process.env.NODE_DEBUG.indexOf('Manager') >= 0) logToClient = true;
 
     fork.color = color;
@@ -296,7 +296,7 @@ Manager.prototype.forkJob = function (_job, callback) {
           },
         });
       } else {
-        if (logToClient) debug(new Date().toString(), 'Progress:'[fork.color], m.data);
+        if (logToClient) debug(new Date().toISOString(), 'Progress:'[fork.color], m.data);
         debug('Unknown message received from child:', m);
         job.accountId = job.account_id || job.accountId;
         manager.toSchedulerQueue.add({
