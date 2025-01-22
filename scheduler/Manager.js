@@ -261,7 +261,7 @@ Manager.prototype.forkJob = function (_job, callback) {
     // messages sent from child messages can be error or progress messages
     fork.on('message', (m) => {
       if (logToClient) debug('Message received:', m);
-      logger(m);
+      // logger(m);
       if (m.message_type === 'error') {
         if (logToClient) debug('Received error, setting processError');
         processError = m.data;
@@ -309,7 +309,7 @@ Manager.prototype.forkJob = function (_job, callback) {
           },
         });
       } else {
-        if (logToClient) debug(new Date().toISOString(), 'Unknow message:'[fork.color], m.data);
+        if (logToClient) debug(new Date().toISOString(), 'Unknown message:'[fork.color], m.data);
         job.accountId = job.account_id || job.accountId;
         manager.toSchedulerQueue.add({
           eventType: 'job_modify',

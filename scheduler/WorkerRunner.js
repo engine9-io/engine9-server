@@ -504,7 +504,8 @@ WorkerRunner.prototype.runAccount = function runAccount(accountId, callback) {
             / workerInstance.local_progress_total;
         }
 
-        debug(new Date().toISOString(), 'Progress: ', o);
+        // eslint-disable-next-line no-console
+        console.error('Progress: ', o);
         // Don't overwhelm our progress tracker -- 1 per 3 seconds
         if (progressLimiter.tryRemoveTokens(1)) {
           if (process.send) {
