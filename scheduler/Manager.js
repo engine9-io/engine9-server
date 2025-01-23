@@ -122,8 +122,8 @@ Manager.prototype.getLogPath = function getLogPath(job) {
 Manager.prototype.getLogger = function getLogger(job) {
   const logPath = this.getLogPath(job);
 
-  if (!loggers[path]) {
-    debug(`Creating logfile ${path}`);
+  if (!loggers[logPath]) {
+    debug(`Creating logfile ${logPath}`);
     // eslint-disable-next-line global-require
     winston = winston || require('winston');
     const winstonLogger = winston.createLogger({
@@ -132,7 +132,7 @@ Manager.prototype.getLogger = function getLogger(job) {
         new (winston.transports.File)({ level: 'debug', filename: logPath, json: false }),
       ],
     });
-    loggers[path] = winstonLogger;
+    loggers[logPath] = winstonLogger;
   }
 
   function log(m) {
@@ -140,7 +140,7 @@ Manager.prototype.getLogger = function getLogger(job) {
     if (m.message) stringVal = m.message;
     if (typeof stringVal === 'object') stringVal = JSON.stringify(stringVal);
 
-    loggers[path].info(stringVal);
+    loggers[logPath].info(stringVal);
   }
 
   return log;
