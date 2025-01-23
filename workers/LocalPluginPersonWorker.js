@@ -37,9 +37,14 @@ Worker.prototype.internalLoadFromTable = async function (options) {
     if (start) conditions.push(`${dateColumn}>=${this.escapeDate(relativeDate(start))}`);
     if (end) conditions.push(`${dateColumn}<${this.escapeDate(relativeDate(end))}`);
   }
+  const ignore = ['id'];
+  const includes = desc.columns.map((d) => {
+    if (ignore.indexOf(d.name) < 0) return d.name;
+    return null;
+  }).filter(Boolean);
 
   return this.internalLoadPeopleFromDatabase({
-    sql: `select *,'${plugin.id}' as plugin_id from ${table} ${conditions.length > 0 ? `where ${conditions.join(' AND ')}` : ''}`,
+    sql: `select ${includes.join(',')},'${plugin.id}' as plugin_id from ${table} ${conditions.length > 0 ? `where ${conditions.join(' AND ')}` : ''}`,
     pluginId: plugin.id,
     remoteInputId: `${(options.remotePluginId || plugin.id)}.${table}`,
   });

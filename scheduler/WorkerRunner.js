@@ -334,7 +334,6 @@ WorkerRunner.prototype.getWorkerEnvironment = function getWorkerEnvironment(opti
 WorkerRunner.prototype.run = function () {
   const accountIds = getAccountIds();
   function processCallback(_e, uncaught) {
-    debug('Processing callback');
     if (_e) {
       let e = _e;
       if (!e.stack && typeof e === 'object')e = JSON.stringify(e, null, 4);
