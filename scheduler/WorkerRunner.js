@@ -41,20 +41,20 @@ function getFiles(dir, files = []) {
 }
 
 WorkerRunner.prototype.getWorkerPath = function getWorkerPath(options, callback) {
-  debug('Getting worker path with ', argv);
+  // debug('Getting worker path with ', argv);
   let pathLookup = argv._[0];
   if (!pathLookup) return callback('No path specified in command line');
   pathLookup = pathLookup.toLowerCase();
   if (pathLookup === 'sql')pathLookup = 'sqlworker';// optimization for sql specific worker
   const d = path.resolve(__dirname, '../workers');
-  debug('Looking for workers in path:', d);
+  // debug('Looking for workers in path:', d);
   const availableWorkerPaths = getFiles(d);
   const paths = availableWorkerPaths.filter((p) => p.toLowerCase().indexOf(pathLookup) >= 0);
   if (paths.length === 0) {
     debug(`No worker path found that matches ${pathLookup}`);
     return callback(`Could not find a worker that matches ${pathLookup}`);
   }
-  debug('Found worker paths:', paths);
+  // debug('Found worker paths:', paths);
   const p = paths[0];
   if (paths.length > 1) debug(`Multiple paths found, using ${p}`); // notify, but don't error, for convenience
   debug('Returning path ', p);
@@ -181,7 +181,7 @@ function getStdIn(cb) {
     debug('This is a TTY, returning blank options');
     return cb(null, {});
   }
-  debug('This is not a TTY, resuming stdin input');
+  // debug('This is not a TTY, resuming stdin input');
 
   process.stdin.resume();
   // process.stdin.setEncoding('utf8');
@@ -326,7 +326,7 @@ WorkerRunner.prototype.getWorkerEnvironment = function getWorkerEnvironment(opti
   if (!options) throw new Error('getWorkerEnvironment requires options');
   const accountEnvironment = config.accounts?.[options.accountId] || {};
   // don't print the environment, could have credentials
-  debug('Using environment with keys:', Object.keys(accountEnvironment));
+  // debug('Using environment with keys:', Object.keys(accountEnvironment));
   accountEnvironment.accountId = options.accountId;
   return (typeof callback === 'function') ? callback(null, accountEnvironment) : accountEnvironment;
 };

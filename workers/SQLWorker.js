@@ -128,7 +128,7 @@ Worker.prototype.query = async function (options) {
   try {
     const knex = await this.connect();
     this.debugCounter = (this.debugCounter || 0) + 1;
-    if (this.debugCounter < 10) debug(`Running:${this.debugCounter}`, `${opts.sql.slice(0, 300)}...`);
+    if (this.debugCounter < 10) debug(`Running:${this.debugCounter}`, `${opts.sql.slice(0, 500)}...`);
     const results = await knex.raw(opts.sql, opts.values || []);
 
     return this.parseQueryResults({ sql: opts.sql, results });
