@@ -235,7 +235,11 @@ Manager.prototype.forkJob = function (_job, callback) {
     opts.env = { ...process.env };
 
     // Different debugging options depending on what debug level we have set
-    opts.env.DEBUG = job.debug || '';
+    if (job.debug) {
+      opts.env.DEBUG = `${job.debug},WAS_SET_BY_JOB`;
+    } else {
+      opts.env.DEBUG = '';
+    }
     const fork = childProcess.fork(
       runnerPath,
       forkParams,
