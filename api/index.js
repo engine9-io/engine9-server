@@ -47,6 +47,7 @@ try {
 }
 
 const ui = require('./object/ui.console.config');
+const logs = require('./object/log');
 const { addUserToRequest } = require('./object/permissions');
 const packetServer = require('./packet-api/index');
 
@@ -63,6 +64,7 @@ app.use(addUserToRequest);
 app.get('/user', (req, res) => { res.json({ user: req.user }); });
 
 app.use('/data', data);
+app.use('/log', logs);
 
 app.use('/packet', packetServer);
 
