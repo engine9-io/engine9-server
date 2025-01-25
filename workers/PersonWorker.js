@@ -3,6 +3,7 @@ const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
 const { createHash } = require('node:crypto');
 const { Transform } = require('node:stream');
+const debug = require('debug')('PersonWorker');
 
 const { v7: uuidv7 } = require('uuid');
 
@@ -268,6 +269,7 @@ Worker.prototype.loadPeople = async function (options) {
     new Transform({
       objectMode: true,
       async transform(batch, encoding, cb) {
+        debug(`Processing batch of length ${batch.length} Total records:${records} Sample:`, batch[0]);
         batch.forEach((b) => { b.source_input_id = b.source_input_id || inputId; });
         const batchSummary = await worker.executeCompiledPipeline(
           { pipeline: worker.compiledPipeline, batch },
