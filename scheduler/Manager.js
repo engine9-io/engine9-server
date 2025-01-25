@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '../.env' });
 const path = require('node:path');
 const debug = require('debug')('Manager');
 const async = require('async');
@@ -238,7 +239,7 @@ Manager.prototype.forkJob = function (_job, callback) {
     if (job.debug) {
       opts.env.DEBUG = `${job.debug},WAS_SET_BY_JOB`;
     } else {
-      opts.env.DEBUG = '';
+      opts.env.DEBUG = opts.env.DEBUG || 'NO_DEBUG_SET_BY_MANAGER';
     }
     const fork = childProcess.fork(
       runnerPath,
