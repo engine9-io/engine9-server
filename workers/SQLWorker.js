@@ -364,7 +364,19 @@ Worker.prototype.tableType.metadata = {
 Worker.prototype.stream = async function ({ sql }) {
   if (!sql) throw new Error('stream required a sql parameter');
   const knex = await this.connect();
-  return knex.raw(sql).stream();
+  return new Promise((resolve, reject) => {
+    debug(`Streaming ${sql.slice(0, 500)}`);
+    const stream = knex.raw(sql).stream();
+    let err = null;
+    stream.on('error', (e) => {
+      debug(e);
+      err = e;
+    });
+    setTimeout(() => {
+      if (err) reject(err);
+      else resolve(stream);
+    }, 100);
+  });
 };
 
 Worker.prototype.stream.metadata = {

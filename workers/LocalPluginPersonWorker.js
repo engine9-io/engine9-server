@@ -44,7 +44,7 @@ Worker.prototype.internalLoadFromTable = async function (options) {
   }).filter(Boolean);
 
   return this.internalLoadPeopleFromDatabase({
-    sql: `select ${includes.join(',')},'${plugin.id}' as plugin_id from ${table} ${conditions.length > 0 ? `where ${conditions.join(' AND ')}` : ''}`,
+    sql: `select ${includes.map((d) => this.escapeColumn(d)).join(',')},'${plugin.id}' as plugin_id from ${table} ${conditions.length > 0 ? `where ${conditions.join(' AND ')}` : ''}`,
     pluginId: plugin.id,
     remoteInputId: `${(options.remotePluginId || plugin.id)}.${table}`,
   });

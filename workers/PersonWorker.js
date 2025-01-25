@@ -222,7 +222,6 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
       return null;
     }
   }));
-
   return {
     transforms: [
       { path: 'engine9-interfaces/person_remote/transforms/inbound/extract_identifiers.js', options: { } },
