@@ -1140,7 +1140,10 @@ Worker.prototype.upsertArray = async function ({ table, array }) {
 
 Worker.prototype.upsertTables = async function ({ tablesToUpsert }) {
   return Promise.all(Object.keys(tablesToUpsert)
-    .map((table) => this.upsertArray({ table, array: tablesToUpsert[table] })));
+    .map((table) => {
+      const array = tablesToUpsert[table];
+      return this.upsertArray({ table, array });
+    }));
 };
 
 Worker.prototype.drop = async function ({ table }) {
