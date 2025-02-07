@@ -231,6 +231,8 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
         options: { dedupe_with_phone: true },
       },
       { path: 'person.appendPersonId' },
+      // add the name
+      { path: 'engine9-interfaces/person/transforms/inbound/upsert_tables.js', options: {} },
       { path: 'engine9-interfaces/person_email/transforms/inbound/upsert_tables.js', options: {} },
       { path: 'engine9-interfaces/person_phone/transforms/inbound/upsert_tables.js', options: {} },
     ].concat(customFields.filter(Boolean))
@@ -254,8 +256,9 @@ Worker.prototype.loadPeople = async function (options) {
   const inStream = await fileWorker.getStream({
     stream, filename, packet, type: 'person',
   });
+  let pipelineConfig = null;
   if (!worker.compiledPipeline) {
-    const pipelineConfig = await this.getDefaultPipelineConfig();
+    pipelineConfig = await this.getDefaultPipelineConfig();
     worker.compiledPipeline = await this.compilePipeline(pipelineConfig);
   }
   let records = 0;
@@ -297,6 +300,7 @@ Worker.prototype.loadPeople = async function (options) {
   await Promise.all(this.compiledPipeline.promises || []);
   summary.files = this.compiledPipeline.files || [];
   summary.records = records;
+  summary.pipeline = pipelineConfig;
 
   return summary;
 };
