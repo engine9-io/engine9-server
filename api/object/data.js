@@ -12,6 +12,7 @@ const Knex = require('knex');
 const { uuidRegex } = require('@engine9/packet-tools');
 const ReportWorker = require('../../workers/ReportWorker');
 const SegmentWorker = require('../../workers/SegmentWorker');
+const PersonWorker = require('../../workers/PersonWorker');
 const { ObjectError } = require('../../utilities');
 
 const reports = require('./reports');
@@ -481,6 +482,17 @@ router.get('/query/fields', async (req, res) => {
       { name: 'alarm', label: 'Daily Alarm', inputType: 'time' },
     ],
   });
+});
+
+router.get('/nexttablecounter', async (req, res) => {
+  try {
+    const personWorker = new PersonWorker(req.databaseWorker);
+    const counter = await personWorker.getNextTablePrefixCounter();
+    return res.json({ counter });
+  } catch (error) {
+    debug('Error handling request:', error, error.code, error.message);
+    return res.status(error.status || 500).json({ message: error.message || 'Error with request' });
+  }
 });
 
 module.exports = router;
