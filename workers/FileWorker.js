@@ -350,13 +350,15 @@ Worker.prototype.getStream = async function ({
     throw new Error(`Invalid stream type:${typeof stream}`);
   } else if (filename) {
     return this.fileToObjectStream({ filename });
-  } else {
+  } else if (packet) {
     let { stream: packetStream } = await PacketTools.getStream({ packet, type });
     const { transforms } = this.csvToObjectTransforms({});
     transforms.forEach((t) => {
       packetStream = packetStream.pipe(t);
     });
     return { stream: packetStream };
+  } else {
+    throw new Error('getStream must be passed a stream, filename, or packet');
   }
 };
 

@@ -3,7 +3,12 @@ const debug = require('debug')('test_db_schema.js');
 const SchemaWorker = require('../workers/SchemaWorker');
 const WorkerRunner = require('../scheduler/WorkerRunner');
 
+process.env.testingPluginId = '10000000-0000-0000-0000-000000000000';// testing ID
 process.env.testingInputId = '11111111-0000-0000-0000-000000000000';// testing ID
+
+const accountId = 'test';
+const runner = new WorkerRunner();
+const env = runner.getWorkerEnvironment({ accountId });
 
 async function drop(opts) {
   const schemaWorker = new SchemaWorker(opts);
@@ -38,18 +43,14 @@ async function truncate(opts) {
 }
 
 async function insertDefaults(opts) {
-  const schemaWorker = new SchemaWorker(opts);
+  const schemaWorker = new SchemaWorker({ accountId, ...opts });
   await schemaWorker.query({
     sql: 'insert ignore into plugin (id,path,name) values (?,?,?)',
-    values: [process.env.testingInputId, 'workerbots.DBBot', 'Testing DBBot Plugin'],
+    values: [process.env.testingPluginId, 'workerbots.DBBot', 'Testing Plugin'],
   });
 
   schemaWorker.destroy();
 }
-
-const accountId = 'test';
-const runner = new WorkerRunner();
-const env = runner.getWorkerEnvironment({ accountId });
 
 async function run() {
   if (process.argv.indexOf('drop') >= 0) {

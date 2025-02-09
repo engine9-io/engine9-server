@@ -1,6 +1,7 @@
 const parquet = require('@dsnp/parquetjs');
 const { v7: uuidv7 } = require('uuid');
 const { getTempFilename } = require('@engine9/packet-tools');
+const debug = require('debug')('parquet test');
 
 const {
   describe,
@@ -39,5 +40,5 @@ describe('Should write a sample file', async () => {
     in_stock: true,
   });
   await writer.close();
-  console.log(`Wrote ${filename}`);
+  debug(`Wrote ${filename}`);
 });

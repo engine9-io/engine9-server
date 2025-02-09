@@ -1,7 +1,14 @@
 const util = require('node:util');
+const { pipeline } = require('node:stream/promises');
+const { Transform } = require('node:stream');
+const path = require('node:path');
 
 const Knex = require('knex');
 const debug = require('debug')('debug info');
+const { parse: parseUUID } = require('uuid');
+const { getTempFilename } = require('@engine9/packet-tools');
+const FileWorker = require('../FileWorker');
+
 const SQLWorker = require('../SQLWorker');
 
 function Worker(worker) {
@@ -23,11 +30,13 @@ Worker.prototype.info = function () {
 };
 
 Worker.prototype.connect = async function connect(options = {}) {
+  const worker = this;
   if (this.knex) return this.knex;
   this.driver = 'better-sqlite3';
-  this.sqliteFile = options.filename || this.sqliteFile;
+  this.sqliteFile = this.sqliteFile || options.sqliteFile;
   if (!this.sqliteFile) {
-    throw new Error('database filename must be specified');
+    debug('No sqliteFile in ', options);
+    throw new Error(`database sqliteFile must be specified, not found in ${Object.keys(options)}`);
   }
 
   const authConfig = {
@@ -35,17 +44,22 @@ Worker.prototype.connect = async function connect(options = {}) {
     connection: {
       filename: this.sqliteFile,
     },
+    useNullAsDefault: true, // we have to add this as SQLite doesn't support default values
     pool: {
       afterCreate(conn, done) {
+        worker.raw_connection = conn;
         conn.pragma('journal_mode = WAL');
+        conn.pragma('synchronous = OFF');
         done();
       },
     },
   };
 
   this.knex = Knex(authConfig);
+
   return this.knex;
 };
+
 // This is engine dependent
 Worker.prototype.parseQueryResults = function ({ results }) {
   let data; let records; let modified; let columns;
@@ -65,6 +79,15 @@ Worker.prototype.parseQueryResults = function ({ results }) {
     data, records, modified, columns,
   };
 };
+
+function chunkArray(arr, size) {
+  const chunkedArray = [];
+  for (let i = 0; i < arr.length; i += size) {
+    const c = arr.slice(i, i + size);
+    chunkedArray.push(c);
+  }
+  return chunkedArray;
+}
 
 Worker.prototype.describe = async function describe({ table }) {
   const desc = await this.query(`PRAGMA table_info(${table})`);
@@ -87,6 +110,134 @@ Worker.prototype.describe = async function describe({ table }) {
 Worker.prototype.onDuplicate = function () { return 'on conflict do update set'; };
 Worker.prototype.onDuplicateFieldValue = function (f) { return `excluded.${f}`; };
 
+Worker.prototype.ensureTimelineSchema = async function ({ includeEmailDomain } = {}) {
+  try {
+    await this.describe({ table: 'timeline' });
+    return { exists: true };
+  } catch (e) {
+    // do nothing, it doesn't exist
+  }
+
+  await this.query(`create table timeline(
+    id blob PRIMARY KEY,
+    ts integer not null,
+    entry_type_id smallint not null,
+    person_id bigint not null,
+    source_code_id bigint not null
+    ${includeEmailDomain ? ',email_domain text' : ''}
+  )`);
+  return { created: true, includeEmailDomain };
+};
+
+Worker.prototype.loadBatchToTimeline = async function ({
+  batch,
+}) {
+  const includeEmailDomain = !!batch?.[0]?.email_domain;
+  this.ensureTimelineSchema({ includeEmailDomain });
+
+  const output = { sqliteFile: this.sqliteFile, records: 0 };
+  const fields = {
+    id: (a) => parseUUID(a.id),
+    ts: (a) => new Date(a.ts).getTime(),
+    entry_type_id: (a) => parseInt(a.entry_type_id, 10),
+    person_id: (a) => parseInt(a.person_id, 10),
+    source_code_id: (a) => parseInt(a.source_code_id, 10),
+  };
+  if (includeEmailDomain) fields.email_domain = ((a) => (a.email_domain || '').toLowerCase());
+
+  const chunkSize = 100;
+  try {
+    /* Uses the raw connection for transactions and prepared statements */
+    this.raw_connection.prepare('BEGIN TRANSACTION').run();
+    const stmt = this.raw_connection.prepare(`insert into timeline (${Object.keys(fields).join(',')})
+    values ${new Array(chunkSize).fill(`(${Object.keys(fields).map(() => '?').join(',')})`).join(',')}
+    on conflict do nothing`);
+    const parsedVals = batch.map((a) => (Object.entries(fields).map(([, f]) => f(a))));
+    let remainder = null;
+    chunkArray(parsedVals, chunkSize).forEach((chunk) => {
+      if (chunk.length === chunkSize) {
+        stmt.run(...chunk);
+        output.records += chunk.length;
+      } else {
+        remainder = chunk;
+      }
+    });
+    if (remainder) {
+      const rstmt = this.raw_connection.prepare(`insert into timeline (id,ts,entry_type_id,person_id,source_code_id,email_domain)
+    values ${new Array(remainder.length).fill('(?,?,?,?,?,?)').join(',')}
+    on conflict do nothing`);
+      rstmt.run(...remainder);
+      output.records += remainder.length;
+    }
+    this.raw_connection.prepare('END TRANSACTION').run();
+  } catch (e) {
+    debug('Error for db file {sqliteFile}');
+    throw e;
+  } finally {
+    // we could reuse this
+    // db.destroy();
+  }
+
+  return output;
+};
+
+/*
+  Load data to a timeline table
+*/
+Worker.prototype.loadTimeline = async function (options) {
+  const worker = this;
+
+  const {
+    filename,
+  } = options;
+  let { sqliteFile } = this;
+
+  const fileWorker = new FileWorker(this);
+  const batcher = this.getBatchTransform({ batchSize: 300 }).transform;
+
+  let inputRecords = 0;
+
+  let batches = 0;
+  if (!sqliteFile) {
+    if (filename.indexOf('/') === 0) {
+      sqliteFile = filename.split(path.sep).slice(0, -1).concat('timeline.sqlite').join(path.sep);
+    } else {
+      sqliteFile = await getTempFilename({ postfix: '.timeline.sqlite' });
+    }
+  }
+  const output = { sqliteFile, records: 0 };
+  await pipeline(
+    (await fileWorker.fileToObjectStream({ filename })).stream,
+    batcher,
+    new Transform({
+      objectMode: true,
+      async transform(batch, encoding, cb) {
+        // eslint-disable-next-line no-underscore-dangle
+        if (batch[0]?._is_placeholder) {
+          return cb(null);
+        }
+        batches += 1;
+        inputRecords += batch.length;
+        if (batches % 10 === 0) debug(`Processed ${batches} batches, ${inputRecords} records`);
+
+        const { records } = await worker.loadBatchToTimeline({ sqliteFile, batch });
+        output.records += records;
+
+        worker.markPerformance('end-batch');
+        return cb();
+      },
+    }),
+  );
+
+  return output;
+};
+
+Worker.prototype.loadTimeline.metadata = {
+  options: {
+    filename: { required: true },
+  },
+};
+
 Worker.prototype.sizes = async function (options) {
   await this.connect(options);
   return this.query('select name,sum("pgsize") from dbstat group by name');
@@ -94,6 +245,24 @@ Worker.prototype.sizes = async function (options) {
 Worker.prototype.sizes.metadata = {
   options: {
     filename: {},
+  },
+};
+
+/*
+  Loads a file from an inputDB to the database
+*/
+Worker.prototype.loadToWarehouseTimeline = async function (options) {
+  const { inputId } = options;
+  if (!inputId) throw new Error('No inputId');
+
+  const sqlWorker = new SQLWorker(this);
+  const stream = await this.stream({ sql: `select *,${this.escapeValue(inputId)} as input_id from timeline limit 1000` });
+
+  return sqlWorker.insertFromStream({ table: 'timeline', upsert: true, stream });
+};
+Worker.prototype.loadToWarehouseTimeline.metadata = {
+  options: {
+    inputId: { required: true },
   },
 };
 
