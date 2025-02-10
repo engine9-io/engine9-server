@@ -89,7 +89,7 @@ async function createSampleTransactionFile() {
 
 async function createSampleActionFile(opts) {
   const actionArray = [];
-  const { users = 10, ts, remote_input_id: rid } = opts || {};
+  const { users = 10, ts, remoteInputId: rid } = opts || {};
   const userArray = faker.helpers.multiple(createRandomPerson, {
     count: users,
   });

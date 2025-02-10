@@ -39,7 +39,7 @@ describe('Insert File of people with options', async () => {
     // make sure we use a fresh input
     const rid = `Testing Input ${new Date().toISOString()}`;
     const filename = await createSampleActionFile(
-      { ts: new Date().toISOString(), remote_input_id: rid },
+      { ts: new Date().toISOString(), remoteInputId: rid },
     );
     const inputId = inputWorker.getInputId({
       pluginId: process.env.testingPluginId,
@@ -67,7 +67,7 @@ describe('Insert File of people with options', async () => {
     assert(initial[0]?.records === deduped[0]?.records, `Records were not deduplicated, initial=${initial[0]?.records}, deduped=${deduped[0]?.records}`);
 
     const filename2 = await createSampleActionFile(
-      { ts: new Date().toISOString(), remote_input_id: rid },
+      { ts: new Date().toISOString(), remoteInputId: rid },
     );
 
     const { idFilename: idFile2 } = await inputWorker.id({ inputId, filename: filename2 });

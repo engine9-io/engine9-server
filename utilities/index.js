@@ -286,6 +286,25 @@ function deepMerge(a, b, _stack) {
 
   return clone;
 }
+function analyzeTypeToParquet(t) {
+  switch (t) {
+    case 'date':
+    case 'datetime':
+      return { type: 'TIMESTAMP_MILLIS', map: (v) => new Date(v) };
+    case 'boolean':
+      return { type: 'BOOLEAN', map: (v) => bool(v) };
+    case 'int':
+      return { type: 'IN64', map: (v) => parseInt(v, 10) };
+    case 'decimal':
+    case 'double':
+      return { type: 'DOUBLE', map: (v) => parseFloat(v, 10) };
+    case 'uuid':
+    case 'string':
+    default:
+      return { type: 'UTF8', map: (v) => v };
+  }
+}
+
 module.exports = {
   bool,
   parseRegExp,
@@ -299,4 +318,5 @@ module.exports = {
   generateUniqueKey,
   ObjectError,
   deepMerge,
+  analyzeTypeToParquet,
 };

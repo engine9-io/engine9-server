@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop */
 /* eslint-disable camelcase */
 
 const util = require('node:util');
@@ -9,6 +10,7 @@ const fsp = fs.promises;
 const path = require('node:path');
 
 const zlib = require('node:zlib');
+const parquet = require('@dsnp/parquetjs');
 const csv = require('csv');
 const { mkdirp } = require('mkdirp');
 const debug = require('debug')('InputWorker');
@@ -18,6 +20,7 @@ const SQLiteWorker = require('./sql/SQLiteWorker');
 const PluginBaseWorker = require('./PluginBaseWorker');
 const FileWorker = require('./FileWorker');
 const PersonWorker = require('./PersonWorker');
+const { analyzeTypeToParquet } = require('../utilities');
 
 function Worker(worker) {
   PluginBaseWorker.call(this, worker);
@@ -26,11 +29,14 @@ function Worker(worker) {
 util.inherits(Worker, PluginBaseWorker);
 
 /*
-  An input storage db gets or creates an input storage DB file,
-  currently a SQLite database with a timestamp
+  Input files can be stored in a directory, or s3
 */
 const store = process.env.ENGINE9_STORED_INPUT_PATH;
 if (!store) throw new Error('No ENGINE9_STORED_INPUT_PATH configured');
+
+/*
+  Sometimes we like to use a SQLite DB for calculating stats
+*/
 Worker.prototype.getTimelineInputSQLiteDB = async function ({
   sqliteFile,
   inputId,
@@ -68,10 +74,124 @@ Worker.prototype.destroy = async function () {
   });
 };
 
+Worker.prototype.id = async function (options) {
+  const worker = this;
+
+  const {
+    inputId, defaultEntryType, filename,
+  } = options;
+  if (!inputId) {
+    throw new Error('id requires an inputId');
+  }
+  const processId = `.${new Date().getTime()}.processing`;
+
+  const fileWorker = new FileWorker(this);
+  const personWorker = new PersonWorker(this);
+  const { fields } = await fileWorker.analyze({ filename });
+
+  const initialSchema = {
+    // So, this is a UUID, but it's a pain to read them in the files, so do string instead
+    // until node.js supports the UUID type natively
+    // id: { parquetType: 'BYTE_ARRAY',parquetMap: (v) => v  },
+    id: { parquetType: 'UTF8', parquetMap: (v) => v },
+    ts: { parquetType: 'TIMESTAMP_MILLIS', parquetMap: (v) => new Date(v) },
+    entry_type_id: { parquetType: 'INT32', parquetMap: (v) => parseInt(v, 10) },
+    person_id: { parquetType: 'INT64', parquetMap: (v) => parseInt(v, 10) },
+    source_code_id: { parquetType: 'INT64', parquetMap: (v) => parseInt(v, 10) },
+  };
+  if (fields.find((d) => d.name === 'email')) {
+    initialSchema.email_domain = { parquetType: 'UTF8', parquetMap: (v, obj) => (obj.email || '').split('@').slice(-1)[0].toLowerCase() };
+  }
+
+  const fieldMap = fields.reduce((a, b) => {
+    const pq = analyzeTypeToParquet(b.type);
+    if (a[b.name]) return a;
+    // ignore these, as they're specified by id, but keep the person info just in case
+    if (['identifiers', 'entry_type', 'source_code'].indexOf(b.name) >= 0) return a;
+    a[b.name] = {
+      type: b.type,
+      parquetType: pq.type,
+      parquetMap: pq.map,
+    };
+    return a;
+  }, initialSchema);
+
+  const parquetSchemaDefinition = {};
+  Object.entries(fieldMap).forEach(([name, obj]) => {
+    parquetSchemaDefinition[name] = { type: obj.parquetType };
+  });
+
+  const parquetSchema = new parquet.ParquetSchema(parquetSchemaDefinition);
+
+  let outputFile;
+  if (filename.indexOf('/') === 0) {
+    outputFile = `${filename}.with_ids.parquet`;
+  } else {
+    outputFile = await getTempFilename({ postfix: '.with_ids.parquet' });
+  }
+
+  const writer = await parquet.ParquetWriter.openFile(parquetSchema, `${outputFile}${processId}`);
+
+  const batcher = this.getBatchTransform({ batchSize: 500 }).transform;
+  let records = 0;
+  let batches = 0;
+  await pipeline(
+    (await fileWorker.fileToObjectStream({ filename })).stream,
+    batcher,
+    new Transform({
+      objectMode: true,
+      async transform(batch, encoding, cb) {
+        // eslint-disable-next-line no-underscore-dangle
+        if (batch[0]?._is_placeholder) {
+          return cb(null);
+        }
+
+        batches += 1;
+        records += batch.length;
+        if (batches % 10 === 0) debug(`Processed ${batches} batches, ${records} records`);
+        worker.markPerformance('start-entry-type-id');
+        await worker.appendEntryTypeId({ batch, defaultEntryType });
+        worker.markPerformance('start-source-code-id');
+        await worker.appendSourceCodeId({ batch });
+        worker.markPerformance('start-upsert-person');
+        await personWorker.appendPersonId({ batch, inputId });
+        worker.markPerformance('start-append-entry');
+        await worker.appendEntryId({ inputId, batch });
+        worker.markPerformance('end-batch');
+        batch.forEach((b) => {
+          const row = {};
+          Object.entries(fieldMap).forEach(([name, { parquetMap }]) => {
+            row[name] = parquetMap(b[name], b);
+          });
+
+          writer.appendRow(row);
+        });
+
+        return cb();
+      },
+    }),
+  );
+  await writer.close();
+
+  await fsp.rename(`${outputFile}${processId}`, `${outputFile}`);
+  debug(`Finished writing ${outputFile}`);
+
+  return { records, idFilename: outputFile };
+};
+
+Worker.prototype.id.metadata = {
+  options: {
+    filename: {},
+    defaultEntryType: {
+      description: 'Default entry type if not specified in the file',
+    },
+  },
+};
+
 /*
   Add ids to an input file -- presumed to already be split by inputs
 */
-Worker.prototype.id = async function (options) {
+Worker.prototype.idCSV = async function (options) {
   const worker = this;
 
   const {
@@ -96,13 +216,6 @@ Worker.prototype.id = async function (options) {
   idStream
     .pipe(zlib.createGzip())
     .pipe(idFileStream);
-
-  /*
-  //this is for a separate stream of detail data, but that may just be extraneous
-  const detailStream = csv.stringify({ header: true });
-  const detailFileStream = fs.createWriteStream(`${filename}.details.csv.gz${processId}`);
-  detailStream.pipe(zlib.createGzip()).pipe(detailFileStream);
-  */
 
   const batcher = this.getBatchTransform({ batchSize: 500 }).transform;
   let records = 0;
@@ -162,7 +275,7 @@ Worker.prototype.id = async function (options) {
   return { records, idFilename: `${outputFile}` };
 };
 
-Worker.prototype.id.metadata = {
+Worker.prototype.idCSV.metadata = {
   options: {
     filename: {},
     defaultEntryType: {
@@ -171,8 +284,60 @@ Worker.prototype.id.metadata = {
   },
 };
 
+/*
+//Sample multi-file inputs
+fileArray: [
+    {
+      inputId: '2b335df4-940d-52c9-94d2-b3a06883bc1b',
+      remoteInputId: 'abc1230',
+      filename:
+      '/var/folders/59/2025-02-09/2025_02_09_20_01_07_921_3497.input.csv.gz',
+      path: 's3://engine9-accounts/dev/stored_input/2b33/2b335df4-940d-52c9-94d2-b3a06883bc1b/2025_02_09_20_01_07_921_3497.input.csv.gz',
+      records: 4
+    },
+    {
+      inputId: '16f8d68e-8c37-51b3-8c87-dc67ac305d69',
+      remoteInputId: 'abc1232',
+      filename: '/var/folders/59/T/dev/2025-02-09/2025_02_09_20_01_07_924_9112.input.csv.gz',
+      path: 's3://engine9-accounts/dev/stored_input/16f8/16f8d68e-8c37-51b3-8c87-dc67ac305d69/2025_02_09_20_01_07_924_9112.input.csv.gz',
+      records: 3
+    }
+  ],
+
+*/
+Worker.prototype.idAndLoadFiles = async function (options) {
+  let arr = options.fileArray;
+  if (typeof arr === 'string') arr = JSON.parse(arr);
+  if (!Array.isArray(arr))arr = [options];
+  const output = [];
+  // eslint-disable-next-line no-restricted-syntax
+  for (const o of arr) {
+    const { inputId, filename } = o;
+    const { idFilename } = await this.id({ filename, inputId });
+    const timeline = await this.loadTimeline({ filename: idFilename, inputId });
+    let details = null;
+    if (options.detailsTable) details = await this.loadTimelineDetails({ filename, inputId });
+    output.push({
+      inputId,
+      filename,
+      timeline,
+      details,
+    });
+  }
+
+  return output;
+};
+Worker.prototype.idAndLoadFiles.metadata = {
+  options: {
+    fileArray: {},
+    filename: {},
+    inputId: {},
+    detailsTable: {},
+  },
+};
+
 Worker.prototype.loadTimeline = async function (options) {
-  if (!options.inputId) throw new Error('loadTimeline requires and inputId');
+  if (!options.inputId) throw new Error('loadTimeline requires an inputId');
   const fileWorker = new FileWorker(this);
   const { stream: inputStream } = await fileWorker.getStream(options);
   const required = ['ts', 'person_id', 'entry_type_id', 'source_code_id'];
@@ -201,12 +366,12 @@ Worker.prototype.loadTimeline.metadata = {
   },
 };
 
-Worker.prototype.loadTimelineExtension = async function (options) {
+Worker.prototype.loadTimelineDetails = async function (options) {
   const fileWorker = new FileWorker(this);
   const { stream } = await fileWorker.getStream(options);
   return this.insertFromStream({ table: options.table, stream, upsert: true });
 };
-Worker.prototype.loadTimelineExtension.metadata = {
+Worker.prototype.loadTimelineDetails.metadata = {
   options: {
     stream: {},
     filename: {},

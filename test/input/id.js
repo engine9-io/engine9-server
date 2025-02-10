@@ -1,10 +1,10 @@
+process.env.DEBUG = '*';
 const {
   describe, it, after, before,
 } = require('node:test');
 const assert = require('node:assert');
 const { getUUIDTimestamp } = require('@engine9/packet-tools');
 
-process.env.DEBUG = '*';
 const debug = require('debug')('test-framework');
 // const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
@@ -109,14 +109,6 @@ describe('Add ids', async () => {
 
     const output = await inputWorker.id({ inputId, filename });
 
-    debug('Input', filename);
-    debug('Output filename', output);
-  });
-
-  it('Should be able to append identifiers to a file with one method', async () => {
-    const filename = await createSampleActionFile();
-    const inputId = inputWorker.getInputId({ pluginId: process.env.testingPluginId, remoteInputId: 'testActionIdentifiers' });
-    const output = await inputWorker.id({ inputId, filename, loadTimeline: true });
     debug('Input', filename);
     debug('Output filename', output);
   });

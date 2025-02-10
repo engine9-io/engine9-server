@@ -68,7 +68,7 @@ describe('Insert File of people with options', async () => {
     // make sure we use a fresh input
     const rid = `Testing Input ${new Date().toISOString()}`;
     const filename = await createSampleActionFile(
-      { ts: new Date().toISOString(), remote_input_id: rid },
+      { ts: new Date().toISOString(), remoteInputId: rid },
     );
     const inputId = await inputWorker.getInputId({
       pluginId: process.env.testingPluginId,
@@ -78,25 +78,25 @@ describe('Insert File of people with options', async () => {
     const { idFilename: idFile } = await inputWorker.id({ inputId, filename });
 
     await inputWorker.loadTimeline({ filename: idFile, inputId });
-    await inputWorker.loadTimelineExtension({ filename: idFile, table: `${tablePrefix}testing_action_input` });
+    await inputWorker.loadTimelineDetails({ filename: idFile, table: `${tablePrefix}testing_action_input` });
 
     const { data: initial } = await sqlWorker.query('select count(*) as records from timeline');
     debug('Initial count', initial);
 
     await inputWorker.loadTimeline({ filename: idFile, inputId });
-    await inputWorker.loadTimelineExtension({ filename: idFile, table: `${tablePrefix}testing_action_input` });
+    await inputWorker.loadTimelineDetails({ filename: idFile, table: `${tablePrefix}testing_action_input` });
 
     const { data: deduped } = await sqlWorker.query('select count(*) as records from timeline');
     debug('Subsequent count', deduped);
     assert(initial[0]?.records === deduped[0]?.records, `Records were not deduplicated, initial=${initial[0]?.records}, deduped=${deduped[0]?.records}`);
 
     const filename2 = await createSampleActionFile(
-      { ts: new Date().toISOString(), remote_input_id: rid },
+      { ts: new Date().toISOString(), remoteInputId: rid },
     );
 
     const { idFilename: idFile2 } = await inputWorker.id({ inputId, filename: filename2 });
     await inputWorker.loadTimeline({ filename: idFile2, inputId });
-    await inputWorker.loadTimelineExtension({ filename: idFile2, table: `${tablePrefix}testing_action_input` });
+    await inputWorker.loadTimelineDetails({ filename: idFile2, table: `${tablePrefix}testing_action_input` });
 
     const { data: expanded } = await sqlWorker.query('select count(*) as records from timeline');
     assert(

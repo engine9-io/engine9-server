@@ -1,3 +1,4 @@
+process.env.DEBUG = '*';
 const parquet = require('@dsnp/parquetjs');
 const { v7: uuidv7 } = require('uuid');
 const { getTempFilename } = require('@engine9/packet-tools');
@@ -11,10 +12,10 @@ describe('Should write a sample file', async () => {
 // declare a schema for the `fruits` table
   const schema = new parquet.ParquetSchema({
     uuid: { type: 'BYTE_ARRAY' },
+    ts: { type: 'TIMESTAMP_MILLIS' },
     name: { type: 'UTF8' },
     quantity: { type: 'INT64' },
     price: { type: 'DOUBLE' },
-    date: { type: 'TIMESTAMP_MILLIS' },
     in_stock: { type: 'BOOLEAN' },
   });
   const filename = await getTempFilename({ postfix: '.parquet' });
