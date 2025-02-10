@@ -158,14 +158,16 @@ Worker.prototype.id = async function (options) {
         worker.markPerformance('start-append-entry');
         await worker.appendEntryId({ inputId, batch });
         worker.markPerformance('end-batch');
-        batch.forEach((b) => {
+        // parquetjs requires the appendRow to be completed before subsequent calls
+        // eslint-disable-next-line no-restricted-syntax
+        for (const b of batch) {
           const row = {};
           Object.entries(fieldMap).forEach(([name, { parquetMap }]) => {
             row[name] = parquetMap(b[name], b);
           });
-
-          writer.appendRow(row);
-        });
+          await writer.appendRow(row);
+        }
+        debug(`Wrote ${records} records`);
 
         return cb();
       },
