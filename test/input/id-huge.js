@@ -35,7 +35,7 @@ describe('Add ids', async () => {
   it('Should be able to append identifiers to a huge file', async () => {
     debug('Generating large file');
     const filename = await createSampleActionFile({
-      users: 1000000,
+      users: 300000,
     });
     debug('Completed generating large file:', filename);
     const inputId = inputWorker.getInputId({

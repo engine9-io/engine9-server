@@ -90,11 +90,18 @@ async function createSampleTransactionFile() {
 async function createSampleActionFile(opts) {
   const actionArray = [];
   const { users = 10, ts, remoteInputId: rid } = opts || {};
-  const userArray = faker.helpers.multiple(createRandomPerson, {
-    count: users,
-  });
-  userArray.forEach((user) => {
-    if (Math.random() > 0.3) return null;
+
+  debug(`Creating ${users} users`);
+  const userArray = faker.helpers.multiple(createRandomPerson, { count: users });
+  debug(`Created ${users} users`);
+
+  let userCounter = 0;
+  // eslint-disable-next-line no-restricted-syntax
+  for (const user of userArray) {
+    // const user = createRandomPerson();
+    userCounter += 1;
+    if (userCounter % 5000 === 0) debug(`Created ${userCounter}/${users} random users`);
+
     const { email } = user;
     const transCount = Math.random() * 3;
     for (let i = 0; i < transCount; i += 1) {
@@ -111,8 +118,7 @@ async function createSampleActionFile(opts) {
         action_content: faker.lorem.lines(),
       });
     }
-    return null;
-  });
+  }
   const filename = await getTempFilename({ postfix });
   await pipeline(
     Readable.from(actionArray),

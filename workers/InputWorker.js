@@ -130,7 +130,14 @@ Worker.prototype.id = async function (options) {
     outputFile = await getTempFilename({ postfix: '.with_ids.parquet' });
   }
 
-  const writer = await parquet.ParquetWriter.openFile(parquetSchema, `${outputFile}${processId}`);
+  const writer = await parquet.ParquetWriter.openFile(parquetSchema, `${outputFile}${processId}`, {
+    bloomFilters: [
+      {
+        column: 'ts',
+        numFilterBytes: 1024,
+      },
+    ],
+  });
 
   const batcher = this.getBatchTransform({ batchSize: 500 }).transform;
   let records = 0;
@@ -154,7 +161,7 @@ Worker.prototype.id = async function (options) {
         worker.markPerformance('start-source-code-id');
         await worker.appendSourceCodeId({ batch });
         worker.markPerformance('start-upsert-person');
-        await personWorker.appendPersonId({ batch, inputId });
+        await personWorker.loadPeople({ stream: batch, inputId });
         worker.markPerformance('start-append-entry');
         await worker.appendEntryId({ inputId, batch });
         worker.markPerformance('end-batch');
