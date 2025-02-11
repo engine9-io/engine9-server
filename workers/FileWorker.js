@@ -15,6 +15,7 @@ const es = require('event-stream');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const languageEncoding = require('detect-file-encoding-and-language');
 const S3Worker = require('./file/S3Worker');
+const ParquetWorker = require('./ParquetWorker');
 const analyzeStream = require('../utilities/analyze');
 
 const { bool } = require('../utilities');
@@ -129,7 +130,9 @@ Worker.prototype.detectEncoding.metadata = {
 Internal method to transform a file into a stream of objects.
 */
 Worker.prototype.fileToObjectStream = async function (options) {
-  const { filename } = options;
+  const { filename, columns, limit: limitOption } = options;
+  let limit;
+  if (limitOption) limit = parseInt(limitOption, 10);
   if (!filename) throw new Error('fileToObjectStream: filename is required');
   let postfix = options.sourcePostfix || filename.toLowerCase().split('.').pop();
   if (postfix === 'zip') {
@@ -137,9 +140,12 @@ Worker.prototype.fileToObjectStream = async function (options) {
     throw new Error('Cowardly refusing to turn a .zip file into an object stream, turn into a csv first');
   }
   let encoding; let stream;
-  if (filename.indexOf('s3://') === 0) {
+  if (filename.slice(-8) === '.parquet') {
+    const pq = new ParquetWorker(this);
+    return pq.stream({ filename, columns, limit });
+  } if (filename.indexOf('s3://') === 0) {
     const s3Worker = new S3Worker(this);
-    stream = await s3Worker.getStream({ filename });
+    stream = (await s3Worker.stream({ filename, columns, limit })).stream;
     encoding = 'UTF-8';
   } else {
     stream = fs.createReadStream(filename);
@@ -338,8 +344,8 @@ Worker.prototype.testTransform.metadata = {
 };
 
 /* Get a stream from an actual stream, or an array, or a file, or a packet */
-Worker.prototype.getStream = async function ({
-  stream, filename, packet, type,
+Worker.prototype.stream = async function ({
+  stream, filename, packet, type, columns, limit,
 } = {}) {
   if (stream) {
     if (Array.isArray(stream)) {
@@ -349,9 +355,9 @@ Worker.prototype.getStream = async function ({
     if (typeof stream === 'object') return { stream };
     throw new Error(`Invalid stream type:${typeof stream}`);
   } else if (filename) {
-    return this.fileToObjectStream({ filename });
+    return this.fileToObjectStream({ filename, columns, limit });
   } else if (packet) {
-    let { stream: packetStream } = await PacketTools.getStream({ packet, type });
+    let { stream: packetStream } = await PacketTools.stream({ packet, type, limit });
     const { transforms } = this.csvToObjectTransforms({});
     transforms.forEach((t) => {
       packetStream = packetStream.pipe(t);

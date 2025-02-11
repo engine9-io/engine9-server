@@ -18,17 +18,18 @@ Worker.metadata = {
 };
 
 async function getReader(options) {
-  const { path = 's3://engine9-accounts/test/big.csv.with_ids.parquet' } = options;
-  if (path.indexOf('s3://') === 0) {
+  const { filename } = options;
+  if (!filename) throw new Error('filename is required');
+  if (filename.indexOf('s3://') === 0) {
     const client = new S3Client({});
-    const parts = path.split('/');
+    const parts = filename.split('/');
 
     return parquet.ParquetReader.openS3(client, {
       Bucket: parts[2],
       Key: parts.slice(3).join('/'),
     });
   }
-  return parquet.ParquetReader.openFile(path);
+  return parquet.ParquetReader.openFile(filename);
 }
 
 Worker.prototype.meta = async function (options) {
@@ -57,19 +58,28 @@ Worker.prototype.stream = async function (options) {
   const stream = new Readable({ objectMode: true });
 
   const reader = await getReader(options);
+  let columns;
+  if (options.columns) {
+    if (typeof options.columns === 'string') columns = options.columns.split(',').map((d) => d.trim());
+    else columns = options.columns.map((d) => d.trim());
+  }
+  let limit = 0;
+  if (parseInt(options.limit, 10) === options.limit) limit = parseInt(options.limit, 10);
   // create a new cursor
-  const cursor = reader.getCursor(['id', 'person_id', 'ts']);
+  debug(`Reading parquet file with columns ${columns?.join(',')} and limit ${limit}`);
+  const cursor = reader.getCursor(columns);
 
   // read all records from the file and print them
   let record = null;
   let counter = 0;
+
   const start = new Date().getTime();
   do {
     // eslint-disable-next-line no-await-in-loop
     record = await cursor.next();
     counter += 1;
-    if (counter > 100) {
-      stream.push(null);
+    if (limit && counter > limit) {
+      debug(`Reached limit of ${limit}, stopping`);
       break;
     }
     if (counter % 5000 === 0) {
@@ -78,6 +88,7 @@ Worker.prototype.stream = async function (options) {
     }
     stream.push(record);
   } while (record);
+  stream.push(null);
   await reader.close();
 
   return { stream };
@@ -91,7 +102,7 @@ Worker.prototype.stream.metadata = {
 
 Worker.prototype.toFile = async function (options) {
   const { stream } = await this.stream(options);
-  const fworker = new FileWorker();
+  const fworker = new FileWorker(this);
   return fworker.objectStreamToFile({ ...options, stream });
 };
 Worker.prototype.toFile.metadata = {

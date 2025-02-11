@@ -45,16 +45,16 @@ Worker.prototype.getMetadata.metadata = {
   },
 };
 
-Worker.prototype.getStream = async function ({ filename }) {
+Worker.prototype.stream = async function ({ filename }) {
   const s3Client = new S3Client({});
   const { Bucket, Key } = getParts(filename);
   const command = new GetObjectCommand({ Bucket, Key });
   const response = await s3Client.send(command);
   debug(`Streaming file ${Key}`);
 
-  return response.Body;
+  return { stream: response.Body };
 };
-Worker.prototype.getStream.metadata = {
+Worker.prototype.stream.metadata = {
   options: {
     filename: {},
   },

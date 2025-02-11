@@ -104,7 +104,7 @@ Worker.prototype.getDebatchTransform = function () {
 
 Worker.prototype.getTempDir = async function () {
   const worker = this;
-  const accountPart = worker.account_id || 'unknown';
+  const accountPart = worker.accountId || 'unknown';
   const dir = [os.tmpdir(), accountPart, new Date().toISOString().substring(0, 10)].join(path.sep);
 
   try {

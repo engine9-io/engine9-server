@@ -348,8 +348,9 @@ Worker.prototype.idAndLoadFiles.metadata = {
 Worker.prototype.loadTimeline = async function (options) {
   if (!options.inputId) throw new Error('loadTimeline requires an inputId');
   const fileWorker = new FileWorker(this);
-  const { stream: inputStream } = await fileWorker.getStream(options);
-  const required = ['ts', 'person_id', 'entry_type_id', 'source_code_id'];
+  const columns = ['id', 'ts', 'person_id', 'entry_type_id', 'source_code_id'];
+  const { stream: inputStream } = await fileWorker.stream({ ...options, columns });
+
   const stream = inputStream.pipe(
     new Transform({
       objectMode: true,
@@ -357,7 +358,7 @@ Worker.prototype.loadTimeline = async function (options) {
         if (!uuidRegex.test(item.id)) {
           throw new Error('loadTimeline requires items to have a uuid style id');
         }
-        const missing = required.filter((k) => item[k] === undefined);
+        const missing = columns.filter((k) => item[k] === undefined);
         if (missing.length > 0) throw new Error(`loadTimeline is missing required fields ${missing.join(',')}`);
         cb(null, item);
       },
@@ -376,14 +377,19 @@ Worker.prototype.loadTimeline.metadata = {
 };
 
 Worker.prototype.loadTimelineDetails = async function (options) {
+  const { columns } = await this.describe(options);
+
+  const columnNames = columns.map((d) => d.name);
+
   const fileWorker = new FileWorker(this);
-  const { stream } = await fileWorker.getStream(options);
+  const { stream } = await fileWorker.stream({ ...options, columns: columnNames });
   return this.insertFromStream({ table: options.table, stream, upsert: true });
 };
 Worker.prototype.loadTimelineDetails.metadata = {
   options: {
     stream: {},
     filename: {},
+    columns: {},
   },
 };
 
