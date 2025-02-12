@@ -1,5 +1,5 @@
 const {
-  describe, it, after,
+  describe, it, after, before,
 } = require('node:test');
 
 process.env.DEBUG = '*';
@@ -8,7 +8,7 @@ const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-require('../test_db_schema');
+const { insertDefaults } = require('../test_db_schema');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'test';
@@ -20,6 +20,10 @@ describe('Insert File of people with options', async () => {
   const knex = await sqlWorker.connect();
   debug('Completed connecting to database');
   const personWorker = new PersonWorker({ accountId, knex });
+
+  before(async () => {
+    await insertDefaults();
+  });
 
   after(async () => {
     debug('Destroying knex');

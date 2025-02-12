@@ -1,7 +1,9 @@
 const debug = require('debug')('S3Worker');
 const fs = require('node:fs');
 const { getTempFilename } = require('@engine9/packet-tools');
-const { S3Client, GetObjectCommand, GetObjectAttributesCommand } = require('@aws-sdk/client-s3');
+const {
+  S3Client, GetObjectCommand, GetObjectAttributesCommand, PutObjectCommand,
+} = require('@aws-sdk/client-s3');
 
 const BaseWorker = require('../BaseWorker');
 
@@ -83,6 +85,32 @@ Worker.prototype.download = async function ({ filename }) {
 Worker.prototype.download.metadata = {
   options: {
     filename: {},
+  },
+};
+
+Worker.prototype.put = async function (options) {
+  const { filename, directory } = options;
+  if (!filename) throw new Error('Local filename required');
+  if (!directory?.indexOf('s3://')) throw new Error('path must start with s3://');
+
+  const file = options.file || filename.split('/').pop();
+  const parts = directory.split('/');
+  const Bucket = parts[2];
+  const Key = parts.slice(3).filter(Boolean).concat(file).join('/');
+  const Body = fs.createReadStream('path/to/your/file');
+
+  debug(`Putting ${filename} to ${JSON.stringify({ Bucket, Key })}}`);
+  const s3Client = new S3Client({});
+
+  const command = new PutObjectCommand({ Bucket, Key, Body });
+
+  return s3Client.send(command);
+};
+Worker.prototype.put.metadata = {
+  options: {
+    filename: {},
+    directory: { description: 'Directory to put file, e.g. s3://foo-bar/dir/xyz' },
+    file: { description: 'Name of file, defaults to the filename' },
   },
 };
 

@@ -156,7 +156,9 @@ Worker.prototype.compilePipeline = async function (_pipeline) {
   return { transforms };
 };
 
-Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch, sourceInputId }) {
+Worker.prototype.executeCompiledPipeline = async function ({
+  pipeline, batch, sourceInputId, pluginId,
+}) {
   // pipeline level bindings
   pipeline.bindings = pipeline.bindings || {};
   // New streams that are started during a pipeline,
@@ -181,7 +183,9 @@ Worker.prototype.executeCompiledPipeline = async function ({ pipeline, batch, so
         })}`);
       }
       const cleanPath = path.replace(/^[a-zA-Z/_-]*/, '_');
-      const transformArguments = { batch, options, sourceInputId };
+      const transformArguments = {
+        batch, options, sourceInputId, pluginId,
+      };
       const bindingNames = Object.keys(bindings);
       /*
       Bindings are the heart of getting data into and out of a transform.  Bindings allow for

@@ -208,8 +208,8 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
   let customFields = [];
 
   const sqlWorker = await this.getSQLWorker();
-  const { data: plugins } = await sqlWorker.query('select * from plugin where path=\'@engine9-interfaces/person_custom\'');
-  customFields = await Promise.all(plugins.map(async (plugin) => {
+  const { data: customPlugins } = await sqlWorker.query('select * from plugin where path=\'@engine9-interfaces/person_custom\'');
+  customFields = await Promise.all(customPlugins.map(async (plugin) => {
     const table = `${plugin.table_prefix}field`;
     try {
       const desc = await sqlWorker.describe({ table });
@@ -250,10 +250,17 @@ Worker.prototype.loadPeople = async function (options) {
 
   // inputId, pluginId, remoteInputId, inputType = 'unknown',
   const inputId = await this.getInputId(options);
-  if (!inputId) throw new Error('Could not get a required input id from options');
+  if (!inputId) throw new Error('Could not get a required inputId from options');
+
+  let { pluginId } = options;
+  if (!pluginId) {
+    const { data: plugin } = await this.query({ sql: 'select plugin_id from input where id=?', values: [inputId] });
+    pluginId = plugin?.[0]?.plugin_id;
+    if (!pluginId) throw new Error(`Could not find pluginId for inputId=${inputId}`);
+  }
 
   const fileWorker = new FileWorker(this);
-  const inStream = await fileWorker.getStream({
+  const inStream = await fileWorker.stream({
     stream, filename, packet, type: 'person',
   });
   let pipelineConfig = null;
@@ -274,7 +281,7 @@ Worker.prototype.loadPeople = async function (options) {
         debug(`Processing batch of length ${batch.length} Total records:${records} Sample:`, batch[0]);
         batch.forEach((b) => { b.source_input_id = b.source_input_id || inputId; });
         const batchSummary = await worker.executeCompiledPipeline(
-          { pipeline: worker.compiledPipeline, batch },
+          { pipeline: worker.compiledPipeline, batch, pluginId },
         );
         Object.entries(batchSummary.executionTime).forEach(([path, val]) => {
           summary.executionTime[path] = (summary.executionTime[path] || 0) + val;

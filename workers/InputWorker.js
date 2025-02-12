@@ -19,20 +19,20 @@ const { uuidRegex, getTempFilename } = require('@engine9/packet-tools');
 const SQLiteWorker = require('./sql/SQLiteWorker');
 const PluginBaseWorker = require('./PluginBaseWorker');
 const FileWorker = require('./FileWorker');
+const S3Worker = require('./file/S3Worker');
 const PersonWorker = require('./PersonWorker');
 const { analyzeTypeToParquet } = require('../utilities');
 
 function Worker(worker) {
   PluginBaseWorker.call(this, worker);
+  /*
+    Input files can be stored in a directory, or s3
+  */
+  this.store_path = process.env.ENGINE9_STORED_INPUT_PATH;
+  if (!this.store_path) throw new Error('No ENGINE9_STORED_INPUT_PATH configured');
 }
 
 util.inherits(Worker, PluginBaseWorker);
-
-/*
-  Input files can be stored in a directory, or s3
-*/
-const store = process.env.ENGINE9_STORED_INPUT_PATH;
-if (!store) throw new Error('No ENGINE9_STORED_INPUT_PATH configured');
 
 /*
   Sometimes we like to use a SQLite DB for calculating stats
@@ -46,7 +46,7 @@ Worker.prototype.getTimelineInputSQLiteDB = async function ({
   let dbpath = sqliteFile;
   this.timelineSQLiteDBCache = this.timelineSQLiteDBCache || {};
   if (!dbpath) {
-    const dir = [store, this.accountId, inputId.slice(0, 4), inputId].join(path.sep);
+    const dir = [this.store_path, this.accountId, inputId.slice(0, 4), inputId].join(path.sep);
     await (mkdirp(dir));
     dbpath = `${dir + path.sep}input.db`;
   }
@@ -83,6 +83,13 @@ Worker.prototype.id = async function (options) {
   if (!inputId) {
     throw new Error('id requires an inputId');
   }
+  let { pluginId } = options;
+  if (!pluginId) {
+    const { data: plugin } = await this.query({ sql: 'select plugin_id from input where id=?', values: [inputId] });
+    pluginId = plugin?.[0]?.plugin_id;
+    if (!pluginId) throw new Error(`Could not find pluginId for inputId=${inputId}`);
+  }
+
   const processId = `.${new Date().getTime()}.processing`;
 
   const fileWorker = new FileWorker(this);
@@ -161,7 +168,7 @@ Worker.prototype.id = async function (options) {
         worker.markPerformance('start-source-code-id');
         await worker.appendSourceCodeId({ batch });
         worker.markPerformance('start-upsert-person');
-        await personWorker.loadPeople({ stream: batch, inputId });
+        await personWorker.loadPeople({ stream: batch, pluginId, inputId });
         worker.markPerformance('start-append-entry');
         await worker.appendEntryId({ inputId, batch });
         worker.markPerformance('end-batch');
@@ -181,10 +188,20 @@ Worker.prototype.id = async function (options) {
     }),
   );
   await writer.close();
-
-  await fsp.rename(`${outputFile}${processId}`, `${outputFile}`);
   debug(`Finished writing ${outputFile}`);
 
+  await fsp.rename(`${outputFile}${processId}`, `${outputFile}`);
+  // copy it back to s3
+  if (filename.indexOf('s3://') === 0) {
+    debug('Copying to s3');
+    const s3 = new S3Worker(this);
+    const file = filename.split('/').pop();
+    const directory = filename.split('/').slice(0, -1).join('/');
+    const s3Results = await s3.put({ filename: outputFile, directory });
+    return {
+      records, idFilename: `${directory}/${file}`, sourceIdFilename: outputFile, s3Results,
+    };
+  }
   return { records, idFilename: outputFile };
 };
 
@@ -299,16 +316,16 @@ fileArray: [
     {
       inputId: '2b335df4-940d-52c9-94d2-b3a06883bc1b',
       remoteInputId: 'abc1230',
-      filename:
+      source_filename:
       '/var/folders/59/2025-02-09/2025_02_09_20_01_07_921_3497.input.csv.gz',
-      path: 's3://engine9-accounts/dev/stored_input/2b33/2b335df4-940d-52c9-94d2-b3a06883bc1b/2025_02_09_20_01_07_921_3497.input.csv.gz',
+      filename: 's3://engine9-accounts/dev/stored_input/2b33/2b335df4-940d-52c9-94d2-b3a06883bc1b/2025_02_09_20_01_07_921_3497.input.csv.gz',
       records: 4
     },
     {
       inputId: '16f8d68e-8c37-51b3-8c87-dc67ac305d69',
       remoteInputId: 'abc1232',
-      filename: '/var/folders/59/T/dev/2025-02-09/2025_02_09_20_01_07_924_9112.input.csv.gz',
-      path: 's3://engine9-accounts/dev/stored_input/16f8/16f8d68e-8c37-51b3-8c87-dc67ac305d69/2025_02_09_20_01_07_924_9112.input.csv.gz',
+      source_filename: '/var/folders/59/T/dev/2025-02-09/2025_02_09_20_01_07_924_9112.input.csv.gz',
+      filename: 's3://engine9-accounts/dev/stored_input/16f8/16f8d68e-8c37-51b3-8c87-dc67ac305d69/2025_02_09_20_01_07_924_9112.input.csv.gz',
       records: 3
     }
   ],
@@ -325,7 +342,9 @@ Worker.prototype.idAndLoadFiles = async function (options) {
     const { idFilename } = await this.id({ filename, inputId });
     const timeline = await this.loadTimeline({ filename: idFilename, inputId });
     let details = null;
-    if (options.detailsTable) details = await this.loadTimelineDetails({ filename, inputId });
+    if (options.detailsTable) {
+      details = await this.loadTimelineDetails({ filename, inputId });
+    }
     output.push({
       inputId,
       filename,

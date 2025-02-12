@@ -48,6 +48,10 @@ async function insertDefaults(opts) {
     sql: 'insert ignore into plugin (id,path,name) values (?,?,?)',
     values: [process.env.testingPluginId, 'workerbots.DBBot', 'Testing Plugin'],
   });
+  await schemaWorker.query({
+    sql: 'insert ignore into input (id,plugin_id,remote_input_id) values (?,?,?)',
+    values: [process.env.testingInputId, process.env.testingPluginId, 'testing-input'],
+  });
 
   schemaWorker.destroy();
 }
