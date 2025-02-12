@@ -545,16 +545,16 @@ Worker.prototype.setSetting = async function ({ pluginId, name, value }) {
 /* finds the next available table prefix */
 Worker.prototype.getNextTablePrefixCounter = async function () {
   const plugin = await this.ensurePlugin({
-    id: '00000000-0000-0000-0000-000000000001',
+    plugin_id: '00000000-0000-0000-0000-000000000001',
     path: '@engine9-interfaces/plugin',
     name: 'Core Plugin',
     unique: true,
   });
-  const settings = await this.getSettings({ pluginId: plugin.id });
+  const settings = await this.getSettings({ pluginId: plugin.plugin_id });
 
   let value = parseInt(settings?.table_prefix_counter || 2729, 10);// start with aaa
   value += 1;
-  await this.setSetting({ pluginId: plugin.id, name: 'table_prefix_counter', value });
+  await this.setSetting({ pluginId: plugin.plugin_id, name: 'table_prefix_counter', value });
   return value.toString(16);
 };
 
