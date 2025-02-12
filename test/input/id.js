@@ -1,21 +1,21 @@
+process.env.DEBUG = '*';
 const {
-  describe, it, after,
+  describe, it, after, before,
 } = require('node:test');
 const assert = require('node:assert');
 const { getUUIDTimestamp } = require('@engine9/packet-tools');
 
-process.env.DEBUG = '*';
 const debug = require('debug')('test-framework');
 // const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
-const SQLLiteWorker = require('../../workers/sql/SQLiteWorker');
 const InputWorker = require('../../workers/InputWorker');
-require('../test_db_schema');
+const PersonWorker = require('../../workers/PersonWorker');
+const { insertDefaults } = require('../test_db_schema');
 const { createSampleActionFile } = require('../sample_data/generate_sample_data');
 
-describe('Insert File of people with options', async () => {
-  const accountId = 'engine9';
+describe('Add ids', async () => {
+  const accountId = 'test';
   const runner = new WorkerRunner();
   const env = runner.getWorkerEnvironment({ accountId });
   debug('Using env:', env);
@@ -24,6 +24,12 @@ describe('Insert File of people with options', async () => {
   const knex = await sqlWorker.connect();
   debug('Completed connecting to database');
   const inputWorker = new InputWorker({ accountId, knex });
+  debug('Completed connecting to database');
+  const personWorker = new PersonWorker({ accountId, knex });
+
+  before(async () => {
+    await insertDefaults();
+  });
 
   after(async () => {
     await knex.destroy();
@@ -59,7 +65,7 @@ describe('Insert File of people with options', async () => {
           + 'Centum veritatis spero corporis cruentus mollitia defleo auditor.',
       },
     ];
-    const pluginId = 'testing';
+    const pluginId = process.env.testingPluginId;
 
     await inputWorker.appendInputId({ pluginId, batch });
     batch.forEach((o) => {
@@ -76,7 +82,7 @@ describe('Insert File of people with options', async () => {
       assert.ok(o.source_code_id > 0, `No valid source code for ${o.source_code}`);
     });
 
-    await inputWorker.loadPeople({ stream: batch, inputId: process.env.testingInputId });
+    await personWorker.appendPersonId({ batch, inputId: process.env.testingInputId });
     batch.forEach((o) => {
       debug(`${o.email}->${o.person_id}`);
       assert.ok(o.person_id > 0, `No valid person information for ${o.email}`);
@@ -96,55 +102,14 @@ describe('Insert File of people with options', async () => {
 
   it('Should be able to append identifiers to a file', async () => {
     const filename = await createSampleActionFile();
-    const output = await inputWorker.id({ pluginId: 'testing', filename });
+    const inputId = inputWorker.getInputId({
+      pluginId: process.env.testingPluginId,
+      remoteInputId: 'testActions',
+    });
+
+    const output = await inputWorker.id({ inputId, filename });
 
     debug('Input', filename);
     debug('Output filename', output);
   });
-
-  it('Should be able to append identifiers to a file, and load to the timeline', async () => {
-    const filename = await createSampleActionFile();
-    const output = await inputWorker.id({ pluginId: 'testing', filename, loadTimeline: true });
-    debug('Input', filename);
-    debug('Output filename', output);
-  });
-
-  it('Should be able to append identifiers to a file, write a sqlite database TWICE, and be deduped', async () => {
-    // make sure we use a fresh input
-    const rid = `Testing Input ${new Date().toISOString()}`;
-    const filename = await createSampleActionFile(
-      { ts: new Date().toISOString(), remote_input_id: rid },
-    );
-    const storedInputInfo = await inputWorker.id({ pluginId: 'testing', filename });
-
-    const sqliteFile = Object.values(storedInputInfo.outputFiles || [])?.[0]?.filename;
-
-    const sqlite = new SQLLiteWorker({ accountId, sqliteFile });
-    const { data: initial } = await sqlite.query('select count(*) as records from timeline');
-    debug('Initial count', initial);
-    await inputWorker.id({ pluginId: 'testing', filename });
-
-    const { data: deduped } = await sqlite.query('select count(*) as records from timeline');
-    debug('Subsequent count', deduped);
-    assert(initial[0]?.records === deduped[0]?.records, 'Records were not deduplicated');
-
-    const filename2 = await createSampleActionFile(
-      { ts: new Date().toISOString(), remote_input_id: rid },
-    );
-    await inputWorker.id({ pluginId: 'testing', filename: filename2 });
-    const { data: expanded } = await sqlite.query('select count(*) as records from timeline');
-    assert(expanded[0]?.records > deduped[0]?.records, 'Records were overly deduplicated, there should be more of them');
-    sqlite.destroy();
-  });
-
-  /*
-  it(`Scale test -- Should be able to append identifiers to a file,
-    write a sqlite database, and load to the timeline for a lot of people`, async () => {
-    const filename = await createSampleActionFile({ users: 1000000 });
-    debug('Input', filename);
-    const output = await inputWorker.id{ pluginId: 'testing', filename, loadTimeline: true });
-
-    debug('Output filename', output);
-  });
-  */
 });

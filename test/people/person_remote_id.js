@@ -1,5 +1,5 @@
 const {
-  describe, it, after,
+  describe, it, after, before,
 } = require('node:test');
 
 process.env.DEBUG = '*';
@@ -8,7 +8,7 @@ const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-require('../test_db_schema');
+const { insertDefaults } = require('../test_db_schema');
 
 describe('Testing remote_person_id deduplication', async () => {
   const accountId = 'test';
@@ -20,6 +20,10 @@ describe('Testing remote_person_id deduplication', async () => {
   const knex = await sqlWorker.connect();
   debug('Completed connecting to database');
   const personWorker = new PersonWorker({ accountId, knex });
+
+  before(async () => {
+    await insertDefaults();
+  });
 
   after(async () => {
     debug('Destroying knex');
@@ -48,8 +52,7 @@ describe('Testing remote_person_id deduplication', async () => {
 
     const values = Object.keys(
       stream.reduce((a, b) => {
-        b.plugin_id = 'test-plugin';
-        a[`test-plugin.${b.remote_person_id}`] = 1; return a;
+        a[`${process.env.testingPluginId}.${b.remote_person_id}`] = 1; return a;
       }, {}),
     );
 
