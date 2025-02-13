@@ -325,7 +325,8 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   let itemsWithNoIds = batch.filter((o) => {
     if (o[outputField]) return false;//
     // ensure the field exists, even if it doesn't have a value
-    o[outputField] = null;
+    // 0 works for blank entries, such as blank source codes -- not sure this is right
+    o[outputField] = 0;
     if (!o[inputField]) { // if there's not an input field, check for defaults
       if (defaultInputFieldValue) {
         o[inputField] = defaultInputFieldValue;

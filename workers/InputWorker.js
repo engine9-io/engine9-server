@@ -157,6 +157,8 @@ Worker.prototype.id = async function (options) {
       },
     ],
   });
+  // for debugging
+  // writer.setRowGroupSize(1);
 
   const batcher = this.getBatchTransform({ batchSize: 500 }).transform;
   let records = 0;
@@ -216,6 +218,7 @@ Worker.prototype.id = async function (options) {
             debug(`Error processing file ${filename}`);
             debug(`Working on writing ${outputFile}`);
             debug('Parquet definition:', JSON.stringify(parquetSchemaDefinition, null, 4));
+            debug('File analysis:', fields);
             debug('Last entry:', row);
             await writer.close();
             throw e;
