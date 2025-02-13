@@ -294,7 +294,7 @@ function analyzeTypeToParquet(t) {
     case 'boolean':
       return { type: 'BOOLEAN', map: (v) => bool(v) };
     case 'int':
-      return { type: 'IN64', map: (v) => parseInt(v, 10) };
+      return { type: 'INT64', map: (v) => parseInt(v, 10) };
     case 'decimal':
     case 'double':
       return { type: 'DOUBLE', map: (v) => parseFloat(v, 10) };
