@@ -220,11 +220,12 @@ Worker.prototype.id = async function (options) {
   await fsp.rename(`${outputFile}${processId}`, `${outputFile}`);
   // copy it back to s3
   if (filename.indexOf('s3://') === 0) {
-    debug(`Copying ${outputFile} to s3`);
+    // debug(`Copying ${outputFile} to s3`);
     const s3 = new S3Worker(this);
-    const file = filename.split('/').pop();
+
     const directory = filename.split('/').slice(0, -1).join('/');
     const s3Results = await s3.put({ filename: outputFile, directory });
+    const file = outputFile.split('/').pop();
     return {
       records, idFilename: `${directory}/${file}`, sourceIdFilename: outputFile, s3Results,
     };
@@ -370,7 +371,7 @@ Worker.prototype.idAndLoadFiles = async function (options) {
   for (const o of arr) {
     const { inputId, pluginId, filename } = o;
     const { idFilename } = await this.id({ filename, inputId, pluginId });
-    debug(`After id, idFilename=${idFilename}`);
+    // debug(`After id, idFilename=${idFilename}`);
 
     let timelineResults = null;
     if (loadTimeline) {
