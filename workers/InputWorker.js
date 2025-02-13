@@ -351,6 +351,7 @@ fileArray: [
 */
 Worker.prototype.idAndLoadFiles = async function (options) {
   const loadTimeline = bool(options.loadTimeline, false);
+  if (options.detailsTable && !loadTimeline) throw new Error('Cowardly refusing to load details table without loadTimeline as well');
   let arr = options.fileArray;
   if (typeof arr === 'string') arr = JSON.parse(arr);
   if (!Array.isArray(arr))arr = [options];
@@ -360,6 +361,7 @@ Worker.prototype.idAndLoadFiles = async function (options) {
   for (const o of arr) {
     const { inputId, filename } = o;
     const { idFilename } = await this.id({ filename, inputId });
+
     let timelineResults = null;
     if (loadTimeline) timelineResults = await this.loadTimeline({ filename: idFilename, inputId });
     let detailResults = null;
