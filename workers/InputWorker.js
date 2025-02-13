@@ -93,7 +93,7 @@ Worker.prototype.id = async function (options) {
     const { data: inputData } = await this.query({ sql: 'select * from input where id=?', values: [inputId] });
     const input = inputData[0];
     if (!input) {
-      throw new Error(`No pluginId specified, and could not find input id ${inputId} in the database`);
+      throw new Error(`pluginId is required to identify new people, was not specified, and could not find input id ${inputId} in the database to track it down`);
     }
     pluginId = input.plugin_id;
   }
@@ -368,11 +368,16 @@ Worker.prototype.idAndLoadFiles = async function (options) {
   const directories = {};
   // eslint-disable-next-line no-restricted-syntax
   for (const o of arr) {
-    const { inputId, filename } = o;
-    const { idFilename } = await this.id({ filename, inputId });
+    const { inputId, pluginId, filename } = o;
+    const { idFilename } = await this.id({ filename, inputId, pluginId });
 
     let timelineResults = null;
-    if (loadTimeline) timelineResults = await this.loadTimeline({ filename: idFilename, inputId });
+    if (loadTimeline) {
+      timelineResults = await this.loadTimeline({
+        filename: idFilename,
+        inputId,
+      });
+    }
     let detailResults = null;
     if (options.detailsTable) {
       detailResults = await this.loadTimelineDetails({ filename, inputId });
