@@ -91,7 +91,7 @@ Worker.prototype.download.metadata = {
 Worker.prototype.put = async function (options) {
   const { filename, directory } = options;
   if (!filename) throw new Error('Local filename required');
-  if (!directory?.indexOf('s3://')) throw new Error('path must start with s3://');
+  if (!directory?.indexOf('s3://')) throw new Error(`directory path must start with s3://, is ${directory}`);
 
   const file = options.file || filename.split('/').pop();
   const parts = directory.split('/');
