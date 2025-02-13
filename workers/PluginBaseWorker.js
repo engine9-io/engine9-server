@@ -81,7 +81,11 @@ Worker.prototype.getInputId = async function (opts) {
 
   return inputMutex.runExclusive(async () => {
     try {
-      await this.knex.raw('lock tables input write,plugin write');
+      try {
+        await this.knex.raw('lock tables input write,plugin write');
+      } catch (e) {
+      // we may not have permissions here, but try anyway
+      }
       const { data } = await this.query({ sql: 'select * from input where plugin_id=? and remote_input_id=?', values: [pluginId, remoteInputId] });
       if (data.length > 0) return data[0].id;
       const { data: plugin } = await this.query({ sql: 'select * from plugin where id=?', values: [pluginId] });

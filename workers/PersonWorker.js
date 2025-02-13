@@ -77,7 +77,11 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   won't cause identical identifiers to be inserted.  Without it the same identifier could
   have 2 separate person_ids, which defeats the purpose
   */
-  await knex.raw('lock tables person write,person_identifier write');
+  try {
+    await knex.raw('lock tables person write,person_identifier write');
+  } catch (e) {
+  // we may not have permissions here
+  }
   /* First check to see if any new IDS have slotted in here */
   const existingIds = await knex.select(['id_value', 'person_id'])
     .from('person_identifier')
