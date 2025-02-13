@@ -1,12 +1,11 @@
 const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
 const { Transform } = require('node:stream');
-const path = require('node:path');
 
 const Knex = require('knex');
 const debug = require('debug')('debug info');
 const { parse: parseUUID } = require('uuid');
-const { getTempFilename } = require('@engine9/packet-tools');
+
 const FileWorker = require('../FileWorker');
 
 const SQLWorker = require('../SQLWorker');
@@ -119,25 +118,31 @@ Worker.prototype.ensureTimelineSchema = async function ({ includeEmailDomain } =
   }
 
   await this.query(`create table timeline(
-    id blob PRIMARY KEY,
-    ts integer not null,
-    entry_type_id smallint not null,
-    person_id bigint not null,
-    source_code_id bigint not null
-    ${includeEmailDomain ? ',email_domain text' : ''}
+    id BLOB PRIMARY KEY,
+    ts INTEGER not null,
+    entry_type_id INTEGER not null,${''/* technically a smallint */}
+    person_id INTEGER not null,${''/* technically a bigint */}
+    source_code_id INTEGER not null${''/* technically a bigint */}
+    ${includeEmailDomain ? ',email_domain TEXT' : ''}
   )`);
-  return { created: true, includeEmailDomain };
+  return { created: true };
 };
 
 Worker.prototype.loadBatchToTimeline = async function ({
   batch,
 }) {
   const includeEmailDomain = !!batch?.[0]?.email_domain;
-  this.ensureTimelineSchema({ includeEmailDomain });
+  await this.ensureTimelineSchema({ includeEmailDomain });
 
   const output = { sqliteFile: this.sqliteFile, records: 0 };
   const fields = {
-    id: (a) => parseUUID(a.id),
+    id: (a) => {
+      try {
+        return parseUUID(a.id);
+      } catch (e) {
+        throw new Error(`Invalid UUID:${a.id}`);
+      }
+    },
     ts: (a) => new Date(a.ts).getTime(),
     entry_type_id: (a) => parseInt(a.entry_type_id, 10),
     person_id: (a) => parseInt(a.person_id, 10),
@@ -163,8 +168,8 @@ Worker.prototype.loadBatchToTimeline = async function ({
       }
     });
     if (remainder) {
-      const rstmt = this.raw_connection.prepare(`insert into timeline (id,ts,entry_type_id,person_id,source_code_id,email_domain)
-    values ${new Array(remainder.length).fill('(?,?,?,?,?,?)').join(',')}
+      const rstmt = this.raw_connection.prepare(`insert into timeline (${Object.keys(fields).join(',')})
+    values ${new Array(remainder.length).fill(`(${Object.keys(fields).map(() => '?').join(',')})`).join(',')}
     on conflict do nothing`);
       rstmt.run(...remainder);
       output.records += remainder.length;
@@ -190,7 +195,6 @@ Worker.prototype.loadTimeline = async function (options) {
   const {
     filename,
   } = options;
-  let { sqliteFile } = this;
 
   const fileWorker = new FileWorker(this);
   const batcher = this.getBatchTransform({ batchSize: 300 }).transform;
@@ -198,16 +202,12 @@ Worker.prototype.loadTimeline = async function (options) {
   let inputRecords = 0;
 
   let batches = 0;
-  if (!sqliteFile) {
-    if (filename.indexOf('/') === 0) {
-      sqliteFile = filename.split(path.sep).slice(0, -1).concat('timeline.sqlite').join(path.sep);
-    } else {
-      sqliteFile = await getTempFilename({ postfix: '.timeline.sqlite' });
-    }
-  }
-  const output = { sqliteFile, records: 0 };
+
+  const output = { sqliteFile: this.sqliteFile, records: 0 };
+  const columnNames = ['id', 'ts', 'person_id', 'entry_type_id', 'source_code_id', 'email_domain'];// pull email domain, IF it's there
+
   await pipeline(
-    (await fileWorker.fileToObjectStream({ filename })).stream,
+    (await fileWorker.fileToObjectStream({ filename, columns: columnNames })).stream,
     batcher,
     new Transform({
       objectMode: true,
@@ -220,7 +220,7 @@ Worker.prototype.loadTimeline = async function (options) {
         inputRecords += batch.length;
         if (batches % 10 === 0) debug(`Processed ${batches} batches, ${inputRecords} records`);
 
-        const { records } = await worker.loadBatchToTimeline({ sqliteFile, batch });
+        const { records } = await worker.loadBatchToTimeline({ batch });
         output.records += records;
 
         worker.markPerformance('end-batch');
@@ -228,6 +228,7 @@ Worker.prototype.loadTimeline = async function (options) {
       },
     }),
   );
+  output.columns = (await worker.describe({ table: 'timeline' })).columns;
 
   return output;
 };
@@ -264,6 +265,10 @@ Worker.prototype.loadToWarehouseTimeline.metadata = {
   options: {
     inputId: { required: true },
   },
+};
+Worker.prototype.destroy = async function () {
+  await this.knex.destroy();
+  // await this.raw_connection.close();
 };
 
 module.exports = Worker;

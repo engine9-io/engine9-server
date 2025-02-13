@@ -369,7 +369,7 @@ Worker.prototype.stream = async function ({
 };
 
 Worker.prototype.analyze = async function (opts) {
-  const { stream } = await this.getStream(opts);
+  const { stream } = await this.stream(opts);
   return analyzeStream({ stream });
 };
 Worker.prototype.analyze.metadata = {

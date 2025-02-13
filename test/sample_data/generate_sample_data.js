@@ -108,7 +108,7 @@ async function createSampleActionFile(opts) {
       const formId = Math.floor(Math.random() * formNames.length);
       actionArray.push({
         remote_entry_uuid: faker.string.uuid(),
-        ts: ts || faker.date.past().toISOString(),
+        ts: ts || faker.date.recent().toISOString(),
         entry_type: 'FORM_SUBMIT',
         remote_input_id: rid || `form_${formId}`,
         remote_input_name: formNames[formId],

@@ -5,7 +5,6 @@ const assert = require('node:assert');
 
 process.env.DEBUG = '*';
 const debug = require('debug')('test-framework');
-const { v7: uuidv7 } = require('uuid');
 
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
@@ -25,15 +24,15 @@ describe('id and load multiple files', async () => {
   const inputWorker = new InputWorker({ accountId, knex });
   const prefix = await inputWorker.getNextTablePrefixCounter();
   const tablePrefix = `testing_${prefix}_`;
+  const detailsTable = `${tablePrefix}timeline_sample_details`;
 
   before(async () => {
     await deploy(env);
     await truncate(env);
     await insertDefaults();
     await sqlWorker.query('select 1');
-    const pluginId = uuidv7();
     const opts = {
-      id: pluginId,
+      id: process.env.testingPluginId,
       type: 'local',
       name: 'Sample Timeline Testing',
       path: 'engine9-testing/sql-plugin-timeline',
@@ -41,7 +40,7 @@ describe('id and load multiple files', async () => {
       schema: {
         tables: [
           {
-            name: `${tablePrefix}timeline_action`,
+            name: detailsTable,
             columns: {
               id: 'id_uuid',
               remote_input_id: 'string',
@@ -78,12 +77,12 @@ describe('id and load multiple files', async () => {
       });
       return { filename, inputId };
     }));
-    const output = await inputWorker.idAndLoadFiles({ fileArray });
+    const output = await inputWorker.idAndLoadFiles({ fileArray, detailsTable });
     const records = output.reduce((a, b) => a + b.timeline.records, 0);
     const { data } = await sqlWorker.query('select count(*) as records from timeline');
     assert(data[0].records === records, `There were ${data[0].records} found, expected ${records}`);
     // try again, making sure it dedupes
-    await inputWorker.idAndLoadFiles({ fileArray });
+    await inputWorker.idAndLoadFiles({ fileArray, detailsTable });
     const { data: data2 } = await sqlWorker.query('select count(*) as records from timeline');
     assert(data2[0].records === records, `There were ${data[0].records} found, expected ${records}`);
 

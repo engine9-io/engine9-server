@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 /* eslint-disable no-await-in-loop */
 /* eslint-disable camelcase */
 
@@ -15,6 +16,7 @@ const csv = require('csv');
 const { mkdirp } = require('mkdirp');
 const debug = require('debug')('InputWorker');
 const { uuidRegex, getTempFilename } = require('@engine9/packet-tools');
+const { TIMELINE_ENTRY_TYPES } = require('@engine9/packet-tools');
 // const SQLWorker = require('./SQLWorker');
 const SQLiteWorker = require('./sql/SQLiteWorker');
 const PluginBaseWorker = require('./PluginBaseWorker');
@@ -202,7 +204,7 @@ Worker.prototype.id = async function (options) {
       records, idFilename: `${directory}/${file}`, sourceIdFilename: outputFile, s3Results,
     };
   }
-  return { records, idFilename: outputFile };
+  return { records, idFilename: outputFile, fields };
 };
 
 Worker.prototype.id.metadata = {
@@ -336,24 +338,30 @@ Worker.prototype.idAndLoadFiles = async function (options) {
   if (typeof arr === 'string') arr = JSON.parse(arr);
   if (!Array.isArray(arr))arr = [options];
   const output = [];
+  const directories = {};
   // eslint-disable-next-line no-restricted-syntax
   for (const o of arr) {
     const { inputId, filename } = o;
     const { idFilename } = await this.id({ filename, inputId });
-    const timeline = await this.loadTimeline({ filename: idFilename, inputId });
-    let details = null;
+    const timelineResults = await this.loadTimeline({ filename: idFilename, inputId });
+    let detailResults = null;
     if (options.detailsTable) {
-      details = await this.loadTimelineDetails({ filename, inputId });
+      detailResults = await this.loadTimelineDetails({ filename, inputId });
     }
+    directories[idFilename.split('/').slice(0, -1).join('/')] = true;
     output.push({
       inputId,
-      filename,
-      timeline,
-      details,
+      timelineResults,
+      detailResults,
+      idFilename,
+      sourceFilename: filename,
     });
   }
 
-  return output;
+  return {
+    fileArray: output,
+    directoryArray: Object.keys(directories).map((directory) => ({ directory })),
+  };
 };
 Worker.prototype.idAndLoadFiles.metadata = {
   options: {
@@ -361,6 +369,135 @@ Worker.prototype.idAndLoadFiles.metadata = {
     filename: {},
     inputId: {},
     detailsTable: {},
+  },
+};
+
+/*
+  Calculate statistics for a directory using an in-memory
+  SQLite database for deduplication.
+  Requires an idFilename (so just a random filename shouldn't be run)
+*/
+
+Worker.prototype.statistics = async function (options) {
+  let arr = options.directoryArray;
+  if (typeof arr === 'string') {
+    if (arr.indexOf('[') === 0) arr = JSON.parse(arr);
+    else arr = arr.split(',').map((directory) => ({ directory }));
+  }
+  if (!Array.isArray(arr))arr = [options];
+  const results = [];
+  for (const d of arr) {
+    const files = [];
+
+    if (d.idFilename) {
+      files.push(d);
+    } else {
+      // TODO get a list of files from the directory
+    }
+    if (files.length === 0) {
+      results.push({
+        no_files: true,
+        ...d,
+      });
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
+    const sqliteWorker = new SQLiteWorker({ sqliteFile: ':memory:', accountId: this.accountId });
+    sqliteWorker.connect();
+
+    const sources = [];
+    let includeEmailDomain;
+    // eslint-disable-next-line no-restricted-syntax
+    for (const o of files) {
+      const { idFilename } = o;
+      const { columns, ...timeline } = await sqliteWorker.loadTimeline({
+        filename: idFilename,
+        includeEmailDomain,
+      });
+      if (includeEmailDomain === undefined) {
+        if (columns.find((c) => c.name === 'email_domain')) {
+          includeEmailDomain = true;
+        } else {
+          includeEmailDomain = false;
+        }
+      }
+      sources.push({ ...timeline, idFilename });
+    }
+    const { data } = await sqliteWorker.query(`select count(*) as records,
+      count(distinct person_id) as distinct_people,
+      min(ts) as min_ts,
+      max(ts) as max_ts from timeline`);
+    const statistics = data[0];
+    statistics.min_ts = new Date(data[0].min_ts).toISOString();
+    statistics.max_ts = new Date(data[0].max_ts).toISOString();
+
+    statistics.byType = (await sqliteWorker.query(`
+        select entry_type_id,
+        count(*) as records,
+        count(distinct person_id) as distinct_people
+        from timeline group by entry_type_id`)).data?.map(({ entry_type_id, ...rest }) => ({
+      entry_type: TIMELINE_ENTRY_TYPES[entry_type_id],
+      ...rest,
+    }));
+    statistics.byTypeByHour = (await sqliteWorker.query(`
+        select strftime('%Y-%m-%d %H:00:00', ts/1000, 'unixepoch') as date,
+        entry_type_id,
+        count(*) as records,count(distinct person_id) as distinct_people 
+        from timeline group by 1,2 order by 1,2`)).data?.map(({ entry_type_id, ...rest }) => ({
+      entry_type: TIMELINE_ENTRY_TYPES[entry_type_id],
+      ...rest,
+    }));
+
+    if (includeEmailDomain) {
+      const { data: domains } = await sqliteWorker.query('select email_domain,count(*) as records from timeline group by 1 order by count(*) desc limit 50');
+
+      statistics.byEmailDomain = (await sqliteWorker.query({
+        sql: `select email_domain,
+        entry_type_id,
+        count(*) as records,
+        count(distinct person_id) as distinct_people
+        from timeline 
+        where email_domain in (${domains.map(() => '?').join(',')})
+        group by email_domain,entry_type_id`,
+        values: domains.map((o) => o.email_domain),
+      })).data?.map(({ entry_type_id, ...rest }) => ({
+        entry_type: TIMELINE_ENTRY_TYPES[entry_type_id],
+        ...rest,
+      }));
+    }
+    await sqliteWorker.destroy();
+    results.push({
+      directory: d.directory,
+      sources,
+      statistics,
+    });
+  }
+
+  return results;
+};
+
+Worker.prototype.statistics.metadata = {
+  options: {
+    /*
+      Provide an array of directories, or a directory, or an actual filename
+    */
+    directoryArray: {},
+    directory: {},
+    idFilename: {},
+  },
+};
+
+/*
+  Calculate statistics for a whole directory, and put back a statistics file
+*/
+Worker.prototype.calculateAndPutStatisticsFile = async function (options) {
+  return { ...options };
+};
+
+Worker.prototype.calculateAndPutStatisticsFile.metadata = {
+  options: {
+    directory: {},
   },
 };
 
