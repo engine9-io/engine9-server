@@ -4,10 +4,11 @@ const fs = require('node:fs');
 const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
-const { getUUIDv7, TIMELINE_ENTRY_TYPES, uuidRegex } = require('@engine9/packet-tools');
+const {
+  getUUIDv7, getInputUUID, TIMELINE_ENTRY_TYPES, uuidRegex, getTimelineOutputStream,
+} = require('@engine9/packet-tools');
 const { v5: uuidv5 } = require('uuid');
 
-const PacketTools = require('@engine9/packet-tools');
 const { LRUCache } = require('lru-cache');
 const { Mutex } = require('async-mutex');
 
@@ -73,10 +74,12 @@ stored
 const inputMutex = new Mutex();
 Worker.prototype.getInputId = async function (opts) {
   const {
-    inputId, pluginId, remoteInputId, inputType = 'unknown', inputMetadata = null,
+    inputId, pluginId, remoteInputId, remoteInputName, inputType = 'unknown', inputMetadata = null,
   } = opts;
-  if (inputId) return inputId;
-  if (!pluginId || !remoteInputId) throw new Error('Required inputId not specified, and pluginId and remoteInputId are both required to create one');
+
+  // We have to confirm it's in the database, so can't just return it
+  if (!pluginId || !remoteInputId) throw new Error('pluginId and remoteInputId are both required to create one');
+  if (inputId && inputId !== getInputUUID(pluginId, remoteInputId)) throw new Error('An invalid inputId was specified -- it should be generated from pluginId=remoteInputId');
 
   return inputMutex.runExclusive(async () => {
     try {
@@ -85,7 +88,7 @@ Worker.prototype.getInputId = async function (opts) {
       if (data.length > 0) return data[0].id;
       const { data: plugin } = await this.query({ sql: 'select * from plugin where id=?', values: [pluginId] });
       if (plugin.length === 0) throw new Error(`No such plugin:${pluginId}`);
-      const id = getUUIDv7(new Date());
+      const id = inputId || getInputUUID(pluginId, remoteInputId);
       await this.insertFromStream({
         table: 'input',
         upsert: true,
@@ -93,6 +96,7 @@ Worker.prototype.getInputId = async function (opts) {
           id,
           plugin_id: pluginId,
           remote_input_id: remoteInputId,
+          remote_input_name: remoteInputName,
           input_type: inputType,
           metadata: inputMetadata || null,
         },
@@ -217,7 +221,7 @@ Worker.prototype.executeCompiledPipeline = async function ({
           const {
             stream: timelineStream, promises,
             files,
-          } = await PacketTools.getTimelineOutputStream({});
+          } = await getTimelineOutputStream({});
           debug(`Creating a new output timeline for binding ${name}`);
           pipeline.bindings[name] = timelineStream;
           pipeline.newStreams = pipeline.newStreams.concat(timelineStream);
