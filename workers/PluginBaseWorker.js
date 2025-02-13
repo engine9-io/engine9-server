@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 const util = require('node:util');
 const fs = require('node:fs');
 
@@ -70,20 +71,20 @@ stored
 */
 Worker.prototype.getInputId = async function (opts) {
   const {
-    inputId, pluginId, remoteInputId, inputType = 'unknown', inputMetadata = null,
+    inputId, plugin_id, remoteInputId, inputType = 'unknown', inputMetadata = null,
   } = opts;
   if (inputId) return inputId;
-  if (!pluginId || !remoteInputId) throw new Error('Required inputId not specified, and pluginId and remoteInputId are both required to create one');
-  const { data } = await this.query({ sql: 'select * from input where plugin_id=? and remote_input_id=?', values: [pluginId, remoteInputId] });
+  if (!plugin_id || !remoteInputId) throw new Error('Required inputId not specified, and pluginId and remoteInputId are both required to create one');
+  const { data } = await this.query({ sql: 'select * from input where plugin_id=? and remote_input_id=?', values: [plugin_id, remoteInputId] });
   if (data.length > 0) return data[0].id;
-  const { data: plugin } = await this.query({ sql: 'select * from plugin where id=?', values: [pluginId] });
-  if (plugin.length === 0) throw new Error(`No such plugin:${pluginId}`);
+  const { data: plugin } = await this.query({ sql: 'select * from plugin where id=?', values: [plugin_id] });
+  if (plugin.length === 0) throw new Error(`No such plugin:${plugin_id}`);
   const id = getUUIDv7(new Date());
   await this.insertFromStream({
     table: 'input',
     stream: [{
       id,
-      plugin_id: pluginId,
+      plugin_id,
       remote_input_id: remoteInputId,
       input_type: inputType,
       metadata: inputMetadata || null,
@@ -491,7 +492,7 @@ Worker.prototype.sortEntries = async function ({
 };
 
 Worker.prototype.ensurePlugin = async function ({
-  id,
+  plugin_id,
   type,
   path,
   name,
@@ -504,18 +505,18 @@ Worker.prototype.ensurePlugin = async function ({
   // Some checks for local plugins
   if (type === 'local') {
     if (typeof schema === 'string') throw new Error('For local paths, schema must be an object');
-    if (!id) throw new Error('For local paths, you must specify an id');
+    if (!plugin_id) throw new Error('For local paths, you must specify an id');
   }
 
   let query = { sql: 'select * from plugin where path=?', values: [path] };
-  if (id) query = { sql: 'select * from plugin where id=?', values: [id] };
+  if (plugin_id) query = { sql: 'select * from plugin where id=?', values: [plugin_id] };
 
   const { data: plugins } = await this.query(query);
   if (unique && plugins.length > 1) throw new Error('Error in plugin table, there are more than one plugins configured with @engine9-interfaces/plugin');
   let plugin = plugins[0] || {};
   if (plugins.length === 0) {
     plugin = {
-      id: id || getUUIDv7(),
+      plugin_id: plugin_id || getUUIDv7(),
       path,
       name: name || path,
       table_prefix: tablePrefix,
