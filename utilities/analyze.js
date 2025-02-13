@@ -18,6 +18,7 @@ module.exports = async function analyzeStream(options) {
     // eslint-disable-next-line no-restricted-globals
     return !isNaN(str) && !isNaN(parseFloat(str));
   }
+  const numMatcher = /^[0-9]+$/;
   const dateMatcher = /^([+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-2])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)([.,]\d+(?!:))?)?(\17[0-5]\d([.,]\d+)?)?([zZ]|([+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/;
   let hints = null;
   if (fieldHints?.length > 0) {
@@ -52,7 +53,11 @@ module.exports = async function analyzeStream(options) {
         if (value === null || type === 'undefined') {
           r.empty += 1;
         } else if (r.type !== 'string') { // once we go string we can't go back
-          if (value && (value instanceof Date || (type === 'string' && dateMatcher.test(value)))) {
+          if (value && (value instanceof Date || (type === 'string'
+              // is not a pure number -- some numbers, like 1208346 pretend to be a date
+              && !numMatcher.test(value)
+              && dateMatcher.test(value) // matches a likely date
+          ))) {
             if (type === 'string') value = new Date(value);
             if (r.type !== 'datetime' && value.getTime() % 100000 === 0) {
               r.type = 'date';
