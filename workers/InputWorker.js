@@ -85,17 +85,18 @@ Worker.prototype.id = async function (options) {
   const {
     inputId, defaultEntryType, filename,
   } = options;
+  let { pluginId } = options;
   if (!inputId) {
     throw new Error('id requires an inputId');
   }
-  const { data: inputData } = await this.query({ sql: 'select * from input where id=?', values: [inputId] });
-  const input = inputData[0];
-
-  if (!input) {
-    throw new Error(`Could not find input id ${inputId} in the database`);
+  if (!pluginId) {
+    const { data: inputData } = await this.query({ sql: 'select * from input where id=?', values: [inputId] });
+    const input = inputData[0];
+    if (!input) {
+      throw new Error(`No pluginId specified, and could not find input id ${inputId} in the database`);
+    }
+    pluginId = input.plugin_id;
   }
-
-  const pluginId = input.plugin_id;
 
   const processId = `.${new Date().getTime()}.processing`;
 
@@ -166,6 +167,9 @@ Worker.prototype.id = async function (options) {
         if (batch[0]?._is_placeholder) {
           return cb(null);
         }
+        /*
+        //Don't check against the database, trust the input id to be right, even
+        //with conflicting remote_input_ids -- not the responsibility here
         const invalidRemoteIds = batch
           .reduce((a, b) => {
             if (b.remote_input_id && b.remote_input_id !== input.remote_input_id) {
@@ -175,8 +179,13 @@ Worker.prototype.id = async function (options) {
           }, {});
         if (Object.keys(invalidRemoteIds).length > 0) {
           debug(`Invalid file:${filename}`, 'Invalid remote_input_id=', invalidRemoteIds);
-          throw new Error(`Error id'ing input ${inputId}: remote_input_id was specified in the incoming file (e.g. '${Object.keys(invalidRemoteIds)[0]}'), but the values do not match the expected input.remote_input_id=${input.remote_input_id}`);
+          throw new Error(`Error id'ing input ${inputId}:
+            remote_input_id was specified in the incoming file
+            (e.g. '${Object.keys(invalidRemoteIds)[0]}'),
+             but the values do not match the expected
+             input.remote_input_id=${input.remote_input_id}`);
         }
+          */
 
         batches += 1;
         records += batch.length;
