@@ -206,7 +206,12 @@ Worker.prototype.id = async function (options) {
           Object.entries(fieldMap).forEach(([name, { parquetMap }]) => {
             row[name] = parquetMap(b[name], b);
           });
-          await writer.appendRow(row);
+          try {
+            await writer.appendRow(row);
+          } catch (e) {
+            debug('Last entry:', row);
+            throw e;
+          }
         }
         debug(`Wrote ${records} records`);
 
