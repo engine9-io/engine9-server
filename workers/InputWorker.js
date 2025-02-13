@@ -350,6 +350,7 @@ fileArray: [
 
 */
 Worker.prototype.idAndLoadFiles = async function (options) {
+  const loadTimeline = bool(options.loadTimeline, false);
   let arr = options.fileArray;
   if (typeof arr === 'string') arr = JSON.parse(arr);
   if (!Array.isArray(arr))arr = [options];
@@ -359,19 +360,22 @@ Worker.prototype.idAndLoadFiles = async function (options) {
   for (const o of arr) {
     const { inputId, filename } = o;
     const { idFilename } = await this.id({ filename, inputId });
-    const timelineResults = await this.loadTimeline({ filename: idFilename, inputId });
+    let timelineResults = null;
+    if (loadTimeline) timelineResults = await this.loadTimeline({ filename: idFilename, inputId });
     let detailResults = null;
     if (options.detailsTable) {
       detailResults = await this.loadTimelineDetails({ filename, inputId });
     }
     directories[idFilename.split('/').slice(0, -1).join('/')] = true;
-    output.push({
+    const outputVals = {
       inputId,
-      timelineResults,
-      detailResults,
       idFilename,
       sourceFilename: filename,
-    });
+    };
+    if (timelineResults) outputVals.timelineResults = timelineResults;
+    if (detailResults) outputVals.detailResults = detailResults;
+
+    output.push(outputVals);
   }
 
   return {
@@ -384,7 +388,8 @@ Worker.prototype.idAndLoadFiles.metadata = {
     fileArray: {},
     filename: {},
     inputId: {},
-    detailsTable: {},
+    loadTimeline: { description: 'Whether to load the timeline table or not, default false' },
+    detailsTable: { description: 'Load this details table' },
   },
 };
 
