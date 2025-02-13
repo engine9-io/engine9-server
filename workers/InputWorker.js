@@ -127,13 +127,17 @@ Worker.prototype.id = async function (options) {
       type: b.type,
       parquetType: pq.type,
       parquetMap: pq.map,
+      compression: 'GZIP',
     };
     return a;
   }, initialSchema);
 
   const parquetSchemaDefinition = {};
   Object.entries(fieldMap).forEach(([name, obj]) => {
-    parquetSchemaDefinition[name] = { type: obj.parquetType };
+    parquetSchemaDefinition[name] = {
+      type: obj.parquetType,
+      compression: obj.compression || 'UNCOMPRESSED',
+    };
   });
 
   const parquetSchema = new parquet.ParquetSchema(parquetSchemaDefinition);
