@@ -15,15 +15,14 @@ const parquet = require('@dsnp/parquetjs');
 const csv = require('csv');
 const { mkdirp } = require('mkdirp');
 const debug = require('debug')('InputWorker');
-const { uuidRegex, getTempFilename } = require('@engine9/packet-tools');
-const { TIMELINE_ENTRY_TYPES } = require('@engine9/packet-tools');
+const { uuidRegex, getTempFilename, TIMELINE_ENTRY_TYPES } = require('@engine9/packet-tools');
 // const SQLWorker = require('./SQLWorker');
 const SQLiteWorker = require('./sql/SQLiteWorker');
 const PluginBaseWorker = require('./PluginBaseWorker');
 const FileWorker = require('./FileWorker');
 const S3Worker = require('./file/S3Worker');
 const PersonWorker = require('./PersonWorker');
-const { analyzeTypeToParquet } = require('../utilities');
+const { analyzeTypeToParquet, bool } = require('../utilities');
 
 function Worker(worker) {
   PluginBaseWorker.call(this, worker);
@@ -392,6 +391,8 @@ Worker.prototype.idAndLoadFiles.metadata = {
 */
 
 Worker.prototype.statistics = async function (options) {
+  const writeStatisticsFile = bool(options.writeStatisticsFile, false);
+  const fileWorker = new FileWorker(this);
   let arr = options.directoryArray;
   if (typeof arr === 'string') {
     if (arr.indexOf('[') === 0) arr = JSON.parse(arr);
@@ -428,7 +429,7 @@ Worker.prototype.statistics = async function (options) {
     // eslint-disable-next-line no-restricted-syntax
     for (const o of files) {
       const { idFilename } = o;
-      const { columns, ...timeline } = await sqliteWorker.loadTimeline({
+      const { columns, sqliteFile, ...timeline } = await sqliteWorker.loadTimeline({
         filename: idFilename,
         includeEmailDomain,
       });
@@ -488,8 +489,25 @@ Worker.prototype.statistics = async function (options) {
       sources,
       statistics,
     };
-    if (d.directory) result.directory = d.directory;
-    else if (d.idFilename) result.idFilename = d.idFilename;
+    if (d.directory) {
+      result.directory = d.directory;
+      if (writeStatisticsFile) {
+        result.statisticsFile = `${d.directory}/statistics.json`;
+        await fileWorker.write({
+          filename: result.statisticsFile,
+          content: JSON.stringify({ sources, statistics }, null, 4),
+        });
+      }
+    } else if (d.idFilename) {
+      result.idFilename = d.idFilename;
+      if (writeStatisticsFile) {
+        result.statisticsFile = `${d.idFilename}.statistics.json`;
+        await fileWorker.write({
+          filename: result.statisticsFile,
+          content: JSON.stringify({ sources, statistics }, null, 4),
+        });
+      }
+    }
     results.push(result);
   }
 
@@ -504,6 +522,9 @@ Worker.prototype.statistics.metadata = {
     directoryArray: {},
     directory: {},
     idFilename: {},
+    writeStatisticsFile: {
+      description: 'Write the statistics file back to the directory,default false',
+    },
   },
 };
 

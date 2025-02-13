@@ -97,7 +97,7 @@ Worker.prototype.put = async function (options) {
   const parts = directory.split('/');
   const Bucket = parts[2];
   const Key = parts.slice(3).filter(Boolean).concat(file).join('/');
-  const Body = fs.createReadStream('path/to/your/file');
+  const Body = fs.createReadStream(filename);
 
   debug(`Putting ${filename} to ${JSON.stringify({ Bucket, Key })}}`);
   const s3Client = new S3Client({});
@@ -111,6 +111,31 @@ Worker.prototype.put.metadata = {
     filename: {},
     directory: { description: 'Directory to put file, e.g. s3://foo-bar/dir/xyz' },
     file: { description: 'Name of file, defaults to the filename' },
+  },
+};
+
+Worker.prototype.write = async function (options) {
+  const { directory, file, content } = options;
+
+  if (!directory?.indexOf('s3://')) throw new Error('directory must start with s3://');
+  const parts = directory.split('/');
+
+  const Bucket = parts[2];
+  const Key = parts.slice(3).filter(Boolean).concat(file).join('/');
+  const Body = content;
+
+  debug(`Writing content of length ${content.length} to ${JSON.stringify({ Bucket, Key })}}`);
+  const s3Client = new S3Client({});
+
+  const command = new PutObjectCommand({ Bucket, Key, Body });
+
+  return s3Client.send(command);
+};
+Worker.prototype.write.metadata = {
+  options: {
+    directory: { description: 'Directory to put file, e.g. s3://foo-bar/dir/xyz' },
+    file: { description: 'Name of file, defaults to the filename' },
+    content: { description: 'Contents of file' },
   },
 };
 

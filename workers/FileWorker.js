@@ -379,4 +379,26 @@ Worker.prototype.analyze.metadata = {
   },
 };
 
+Worker.prototype.write = async function (opts) {
+  const { filename, content } = opts;
+  if (filename.indexOf('s3://') === 0) {
+    const s3Worker = new S3Worker(this);
+    const parts = filename.split('/');
+    await s3Worker.write({
+      directory: parts.slice(0, -1).join('/'),
+      file: parts.slice(-1)[0],
+      content,
+    });
+  } else {
+    await fsp.writeFile(filename, content);
+  }
+  return { success: true, filename };
+};
+Worker.prototype.write.metadata = {
+  options: {
+    filename: { description: 'Location to write content to, can be local or s3://' },
+    content: {},
+  },
+};
+
 module.exports = Worker;

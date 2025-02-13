@@ -39,14 +39,15 @@ describe('id and load multiple files', async () => {
   });
   it('Should be able to add standard identifiers to an array, then run stats per input on them', async () => {
     // make sure we use a fresh input
-    const rawFiles = await Promise.all([0, 1, 2].map(async (i) => {
-      const remoteInputId = `testTimelineEntries${i}`;// `Testing Input ${new Date().toISOString()}`;
+    const rawFiles = await Promise.all([0, 1, 2].map(async () => {
+      const remoteInputId = 'test';
+      // `testTimelineEntries${i}`;// `Testing Input ${new Date().toISOString()}`;
       const file = await createSampleActionFile(
         { remoteInputId },
       );
       const inputId = await inputWorker.getInputId({
         pluginId: process.env.testingPluginId,
-        remoteInputId: `testTimelineEntries${i}`,
+        remoteInputId,
       });
       const parts = file.split('/');
       const f = parts.pop();
@@ -70,6 +71,7 @@ describe('id and load multiple files', async () => {
     const directoryArray = Object.values(directoryMap);
     const statsArray = await inputWorker.statistics({
       directoryArray,
+      writeStatisticsFile: true,
       // idFilename: directoryArray[0]?.sources?.[0]?.idFilename,
     });
     statsArray.forEach((s) => {
