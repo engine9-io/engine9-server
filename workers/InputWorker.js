@@ -209,6 +209,10 @@ Worker.prototype.id = async function (options) {
           try {
             await writer.appendRow(row);
           } catch (e) {
+            await writer.close();
+            debug(`Error processing file ${filename}`);
+            debug(`Working on writing ${outputFile}`);
+            debug('Parquet definition:', JSON.stringify(parquetSchemaDefinition, null, 4));
             debug('Last entry:', row);
             throw e;
           }
