@@ -35,6 +35,10 @@ function Worker(worker) {
 
 util.inherits(Worker, PluginBaseWorker);
 
+Worker.metadata = {
+  alias: 'input',
+};
+
 /*
   Sometimes we like to use a SQLite DB for calculating stats
 */
