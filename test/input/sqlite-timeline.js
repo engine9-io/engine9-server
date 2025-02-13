@@ -41,7 +41,7 @@ describe('Insert File of people with options', async () => {
     const filename = await createSampleActionFile(
       { ts: new Date().toISOString(), remoteInputId: rid },
     );
-    const inputId = inputWorker.getInputId({
+    const inputId = await inputWorker.getInputId({
       pluginId: process.env.testingPluginId,
       remoteInputId: 'testActionIdentifiers',
     });

@@ -76,10 +76,8 @@ Worker.prototype.getInputId = async function (opts) {
   const {
     inputId, pluginId, remoteInputId, remoteInputName, inputType = 'unknown', inputMetadata = null,
   } = opts;
-
-  // We have to confirm it's in the database, so can't just return it
+  if (inputId) return inputId;
   if (!pluginId || !remoteInputId) throw new Error('pluginId and remoteInputId are both required to create one');
-  if (inputId && inputId !== getInputUUID(pluginId, remoteInputId)) throw new Error('An invalid inputId was specified -- it should be generated from pluginId=remoteInputId');
 
   return inputMutex.runExclusive(async () => {
     try {
@@ -88,7 +86,7 @@ Worker.prototype.getInputId = async function (opts) {
       if (data.length > 0) return data[0].id;
       const { data: plugin } = await this.query({ sql: 'select * from plugin where id=?', values: [pluginId] });
       if (plugin.length === 0) throw new Error(`No such plugin:${pluginId}`);
-      const id = inputId || getInputUUID(pluginId, remoteInputId);
+      const id = getInputUUID(pluginId, remoteInputId);
       await this.insertFromStream({
         table: 'input',
         upsert: true,
@@ -323,7 +321,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   let itemsWithNoIds = batch.filter((o) => {
     if (o[outputField]) return false;//
     // ensure the field exists, even if it doesn't have a value
-    o[outputField] = 0;
+    o[outputField] = null;
     if (!o[inputField]) { // if there's not an input field, check for defaults
       if (defaultInputFieldValue) {
         o[inputField] = defaultInputFieldValue;

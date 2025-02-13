@@ -359,9 +359,7 @@ Worker.prototype.idAndLoadFiles = async function (options) {
   const directories = {};
   // eslint-disable-next-line no-restricted-syntax
   for (const o of arr) {
-    // checks for the inputId, and makes sure it's in the DB
-    const inputId = await this.getInputId(o);
-    const { filename } = o;
+    const { inputId, filename } = o;
     const { idFilename } = await this.id({ filename, inputId });
 
     let timelineResults = null;

@@ -38,7 +38,7 @@ describe('Add ids', async () => {
       users: 300000,
     });
     debug('Completed generating large file:', filename);
-    const inputId = inputWorker.getInputId({
+    const inputId = await inputWorker.getInputId({
       pluginId: process.env.testingPluginId,
       remoteInputId: 'testActions',
     });

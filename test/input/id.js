@@ -102,7 +102,7 @@ describe('Add ids', async () => {
 
   it('Should be able to append identifiers to a file', async () => {
     const filename = await createSampleActionFile();
-    const inputId = inputWorker.getInputId({
+    const inputId = await inputWorker.getInputId({
       pluginId: process.env.testingPluginId,
       remoteInputId: 'testActions',
     });
