@@ -66,8 +66,8 @@ describe('id and load multiple files', async () => {
   });
   it('Should be able to add standard identifiers to an array', async () => {
     // make sure we use a fresh input
-    const fileArray = await Promise.all([0, 1, 2, 3, 4].map(async (i) => {
-      const remoteInputId = `Testing Input ${new Date().toISOString()}`;
+    const fileArray = await Promise.all([0, 1, 2].map(async (i) => {
+      const remoteInputId = `Testing Input ${i} ${new Date().toISOString()}`;
       const filename = await createSampleActionFile(
         { ts: new Date().toISOString(), remoteInputId },
       );

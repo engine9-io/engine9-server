@@ -14,6 +14,7 @@
     "@dsnp/parquetjs": "^1.8.5",
     "@engine9/packet-tools": "^1.1.8",
     "async": "^3.2.5",
+    "async-mutex": "^0.5.0",
     "better-sqlite3": "^11.7.0",
     "body-parser": "^1.20.2",
     "compression": "^1.7.4",

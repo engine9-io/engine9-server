@@ -9,6 +9,8 @@ const { v5: uuidv5 } = require('uuid');
 
 const PacketTools = require('@engine9/packet-tools');
 const { LRUCache } = require('lru-cache');
+const { Mutex } = require('async-mutex');
+
 const SchemaWorker = require('./SchemaWorker');
 
 function Worker(worker) {
@@ -68,30 +70,43 @@ Worker.prototype.compilePlugin = async function ({ extensionPath }) {
   The input id is either stored in the database, or generated and
 stored
 */
+const inputMutex = new Mutex();
 Worker.prototype.getInputId = async function (opts) {
   const {
     inputId, pluginId, remoteInputId, inputType = 'unknown', inputMetadata = null,
   } = opts;
   if (inputId) return inputId;
   if (!pluginId || !remoteInputId) throw new Error('Required inputId not specified, and pluginId and remoteInputId are both required to create one');
-  const { data } = await this.query({ sql: 'select * from input where plugin_id=? and remote_input_id=?', values: [pluginId, remoteInputId] });
-  if (data.length > 0) return data[0].id;
-  const { data: plugin } = await this.query({ sql: 'select * from plugin where id=?', values: [pluginId] });
-  if (plugin.length === 0) throw new Error(`No such plugin:${pluginId}`);
-  const id = getUUIDv7(new Date());
-  await this.insertFromStream({
-    table: 'input',
-    stream: [{
-      id,
-      plugin_id: pluginId,
-      remote_input_id: remoteInputId,
-      input_type: inputType,
-      metadata: inputMetadata || null,
-    },
-    ],
-  });
 
-  return id;
+  return inputMutex.runExclusive(async () => {
+    try {
+      await this.knex.raw('lock tables input write,plugin write');
+      const { data } = await this.query({ sql: 'select * from input where plugin_id=? and remote_input_id=?', values: [pluginId, remoteInputId] });
+      if (data.length > 0) return data[0].id;
+      const { data: plugin } = await this.query({ sql: 'select * from plugin where id=?', values: [pluginId] });
+      if (plugin.length === 0) throw new Error(`No such plugin:${pluginId}`);
+      const id = getUUIDv7(new Date());
+      await this.insertFromStream({
+        table: 'input',
+        upsert: true,
+        stream: [{
+          id,
+          plugin_id: pluginId,
+          remote_input_id: remoteInputId,
+          input_type: inputType,
+          metadata: inputMetadata || null,
+        },
+        ],
+      });
+
+      return id;
+    } catch (e) {
+      debug(e);
+      throw e;
+    } finally {
+      await this.knex.raw('unlock tables');
+    }
+  });
 };
 
 /* Compiles the transform exclusively, bindings are handled elsewhere */

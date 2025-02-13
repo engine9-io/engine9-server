@@ -7,6 +7,8 @@ const assert = require('node:assert');
 process.env.DEBUG = '*';
 const debug = require('debug')('test-framework');
 
+const fsp = require('node:fs/promises');
+const { mkdirp } = require('mkdirp');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const InputWorker = require('../../workers/InputWorker');
@@ -35,17 +37,24 @@ describe('id and load multiple files', async () => {
     await knex.destroy();
     await inputWorker.destroy();
   });
-  it('Should be able to add standard identifiers to an array', async () => {
+  it('Should be able to add standard identifiers to an array, then run stats per input on them', async () => {
     // make sure we use a fresh input
-    const rawFiles = await Promise.all([0, 1, 2, 3, 4].map(async (i) => {
-      const remoteInputId = `Testing Input ${new Date().toISOString()}`;
-      const filename = await createSampleActionFile(
+    const rawFiles = await Promise.all([0, 1, 2].map(async (i) => {
+      const remoteInputId = `testTimelineEntries${i}`;// `Testing Input ${new Date().toISOString()}`;
+      const file = await createSampleActionFile(
         { remoteInputId },
       );
       const inputId = await inputWorker.getInputId({
         pluginId: process.env.testingPluginId,
         remoteInputId: `testTimelineEntries${i}`,
       });
+      const parts = file.split('/');
+      const f = parts.pop();
+      const directory = parts.slice(0, -1).concat('stored_input').concat(inputId);
+      await mkdirp(directory.join('/'));
+      const filename = directory.concat(f).join('/');
+      await fsp.rename(file, filename);
+
       return { filename, inputId };
     }));
     const directoryMap = {};
@@ -59,14 +68,16 @@ describe('id and load multiple files', async () => {
       directoryMap[directory].sources.push({ idFilename, sourceFile: filename });
     }
     const directoryArray = Object.values(directoryMap);
-    const stats = await inputWorker.statistics({
-      // directoryArray,
-      idFilename: directoryArray[0]?.sources?.[0]?.idFilename,
+    const statsArray = await inputWorker.statistics({
+      directoryArray,
+      // idFilename: directoryArray[0]?.sources?.[0]?.idFilename,
     });
-    const { statistics } = stats;
-    const fileRecords = directoryArray[0]?.sources.reduce((a, b) => a + b.records, 0);
-    assert.equal(fileRecords, statistics.records, `File records don't match statistics records:${fileRecords}!=${statistics.records}`);
+    statsArray.forEach((s) => {
+      const { statistics, sources } = s;
+      const fileRecords = sources.reduce((a, b) => a + b.records, 0);
+      assert.equal(fileRecords, statistics.records, `File records don't match statistics records:${fileRecords}!=${statistics.records}`);
+    });
 
-    debug(JSON.stringify(statistics, null, 4));
+    debug(JSON.stringify(statsArray, null, 4));
   });
 });

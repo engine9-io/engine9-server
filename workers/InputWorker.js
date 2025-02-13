@@ -85,12 +85,14 @@ Worker.prototype.id = async function (options) {
   if (!inputId) {
     throw new Error('id requires an inputId');
   }
-  let { pluginId } = options;
-  if (!pluginId) {
-    const { data: plugin } = await this.query({ sql: 'select plugin_id from input where id=?', values: [inputId] });
-    pluginId = plugin?.[0]?.plugin_id;
-    if (!pluginId) throw new Error(`Could not find pluginId for inputId=${inputId}`);
+  const { data: inputData } = await this.query({ sql: 'select * from input where id=?', values: [inputId] });
+  const input = inputData[0];
+
+  if (!input) {
+    throw new Error(`Could not find input id ${inputId} in the database`);
   }
+
+  const pluginId = input.plugin_id;
 
   const processId = `.${new Date().getTime()}.processing`;
 
@@ -134,9 +136,9 @@ Worker.prototype.id = async function (options) {
 
   let outputFile;
   if (filename.indexOf('/') === 0) {
-    outputFile = `${filename}.with_ids.parquet`;
+    outputFile = `${filename}.id.parquet`;
   } else {
-    outputFile = await getTempFilename({ postfix: '.with_ids.parquet' });
+    outputFile = await getTempFilename({ postfix: '.id.parquet' });
   }
 
   const writer = await parquet.ParquetWriter.openFile(parquetSchema, `${outputFile}${processId}`, {
@@ -160,6 +162,17 @@ Worker.prototype.id = async function (options) {
         // eslint-disable-next-line no-underscore-dangle
         if (batch[0]?._is_placeholder) {
           return cb(null);
+        }
+        const invalidRemoteIds = batch
+          .reduce((a, b) => {
+            if (b.remote_input_id && b.remote_input_id !== input.remote_input_id) {
+              a[b.remote_input_id] = (a[b.remote_input_id] || 0) + 1;
+            }
+            return a;
+          }, {});
+        if (Object.keys(invalidRemoteIds).length > 0) {
+          debug(`Invalid file:${filename}`, 'Invalid remote_input_id=', invalidRemoteIds);
+          throw new Error(`Error id'ing input ${inputId}: remote_input_id was specified in the incoming file (e.g. '${Object.keys(invalidRemoteIds)[0]}'), but the values do not match the expected input.remote_input_id=${input.remote_input_id}`);
         }
 
         batches += 1;
@@ -234,9 +247,9 @@ Worker.prototype.idCSV = async function (options) {
   const idStream = csv.stringify({ header: true });
   let outputFile;
   if (filename.indexOf('/') === 0) {
-    outputFile = `${filename}.with_ids.csv.gz`;
+    outputFile = `${filename}.id.csv.gz`;
   } else {
-    outputFile = await getTempFilename({ postfix: '.with_ids.csv.gz' });
+    outputFile = await getTempFilename({ postfix: '.id.csv.gz' });
   }
 
   const idFileStream = fs.createWriteStream(`${outputFile}${processId}`);
@@ -387,12 +400,16 @@ Worker.prototype.statistics = async function (options) {
   if (!Array.isArray(arr))arr = [options];
   const results = [];
   for (const d of arr) {
-    const files = [];
+    let files = [];
 
     if (d.idFilename) {
       files.push(d);
+    } else if (d.directory) {
+      files = (await fsp.readdir(d.directory))
+        .filter((f) => f.endsWith('.id.parquet'))
+        .map((f) => ({ idFilename: `${d.directory}/${f}` }));
     } else {
-      // TODO get a list of files from the directory
+      throw new Error(`Invalid directory for statistics:${JSON.stringify(d)}`);
     }
     if (files.length === 0) {
       results.push({
@@ -467,11 +484,13 @@ Worker.prototype.statistics = async function (options) {
       }));
     }
     await sqliteWorker.destroy();
-    results.push({
-      directory: d.directory,
+    const result = {
       sources,
       statistics,
-    });
+    };
+    if (d.directory) result.directory = d.directory;
+    else if (d.idFilename) result.idFilename = d.idFilename;
+    results.push(result);
   }
 
   return results;
