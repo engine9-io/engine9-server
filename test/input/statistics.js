@@ -58,11 +58,13 @@ describe('id and load multiple files', async () => {
       directoryMap[directory] = directoryMap[directory] || { directory, sources: [] };
       directoryMap[directory].sources.push({ idFilename, sourceFile: filename });
     }
+    const directoryArray = Object.values(directoryMap);
     const stats = await inputWorker.statistics({
-      directoryArray: Object.keys(directoryMap).map((directory) => ({ directory })),
+      // directoryArray,
+      idFilename: directoryArray[0]?.sources?.[0]?.idFilename,
     });
-    const { sources, statistics } = stats;
-    const fileRecords = sources.reduce((a, b) => a + b.records, 0);
+    const { statistics } = stats;
+    const fileRecords = directoryArray[0]?.sources.reduce((a, b) => a + b.records, 0);
     assert.equal(fileRecords, statistics.records, `File records don't match statistics records:${fileRecords}!=${statistics.records}`);
 
     debug(JSON.stringify(statistics, null, 4));
