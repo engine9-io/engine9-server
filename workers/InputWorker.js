@@ -122,7 +122,7 @@ Worker.prototype.id = async function (options) {
     const pq = analyzeTypeToParquet(b.type);
     if (a[b.name]) return a;
     // ignore these, as they're specified by id, but keep the person info just in case
-    if (['identifiers', 'entry_type', 'source_code'].indexOf(b.name) >= 0) return a;
+    if (['input_id', 'identifiers', 'entry_type', 'source_code'].indexOf(b.name) >= 0) return a;
     a[b.name] = {
       type: b.type,
       parquetType: pq.type,
