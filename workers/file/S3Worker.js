@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const { getTempFilename } = require('@engine9/packet-tools');
 const {
   S3Client, GetObjectCommand, GetObjectAttributesCommand, PutObjectCommand,
+  ListObjectsV2Command,
 } = require('@aws-sdk/client-s3');
 
 const BaseWorker = require('../BaseWorker');
@@ -136,6 +137,23 @@ Worker.prototype.write.metadata = {
     directory: { description: 'Directory to put file, e.g. s3://foo-bar/dir/xyz' },
     file: { description: 'Name of file, defaults to the filename' },
     content: { description: 'Contents of file' },
+  },
+};
+
+Worker.prototype.list = async function ({ directory }) {
+  if (!directory) throw new Error('directory is required');
+  let dir = directory;
+  while (dir.slice(-1) === '/') dir = dir.slice(0, -1);
+  const { Bucket, Key: Prefix } = getParts(dir);
+  const s3Client = new S3Client({});
+  const command = new ListObjectsV2Command({ Bucket, Prefix });
+
+  const { Contents } = await s3Client.send(command);
+  return Contents.map(({ Key }) => Key.slice(Prefix.length + 1));
+};
+Worker.prototype.list.metadata = {
+  options: {
+    directory: { required: true },
   },
 };
 

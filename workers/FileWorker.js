@@ -401,4 +401,18 @@ Worker.prototype.write.metadata = {
   },
 };
 
+Worker.prototype.list = async function ({ directory }) {
+  if (!directory) throw new Error('directory is required');
+  if (directory.indexOf('s3://') === 0) {
+    const s3Worker = new S3Worker(this);
+    return s3Worker.list({ directory });
+  }
+  return fsp.readdir(directory);
+};
+Worker.prototype.list.metadata = {
+  options: {
+    directory: { required: true },
+  },
+};
+
 module.exports = Worker;
