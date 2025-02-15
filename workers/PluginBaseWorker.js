@@ -357,6 +357,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
       return a;
     }, new Set());
   const knex = await this.connect();
+  debug('valuesToLookup', Array.from(valuesToLookup));
 
   const existingIds = await knex.select([`${idColumn} as id`, `${inputField} as lookup`])
     .from(table)
