@@ -351,14 +351,17 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   if (itemsWithNoIds.length === 0) return batch;
 
   const valuesToLookup = itemsWithNoIds
-    .reduce((a, b) => { a.add(b[inputField]); return a; }, new Set());
+    .reduce((a, o) => {
+      debug(`'${o[inputField]}'`);
+      a.add(o[inputField]);
+      return a;
+    }, new Set());
   const knex = await this.connect();
 
   const existingIds = await knex.select([`${idColumn} as id`, `${inputField} as lookup`])
     .from(table)
     .where(inputField, 'in', Array.from(valuesToLookup))
     .andWhere(additionalWhere);
-  debug('loading ids for', itemsWithNoIds, Array.from(valuesToLookup), existingIds);
 
   // Populate the cache
   existingIds.forEach((r) => this.itemCaches[type].set(r.lookup, r.id));
