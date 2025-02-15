@@ -358,7 +358,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
     .from(table)
     .where(inputField, 'in', Array.from(valuesToLookup))
     .andWhere(additionalWhere);
-  // debug('loading ids for', itemsWithNoIds, Array.from(valuesToLookup), existingIds);
+  debug('loading ids for', itemsWithNoIds, Array.from(valuesToLookup), existingIds);
 
   // Populate the cache
   existingIds.forEach((r) => this.itemCaches[type].set(r.lookup, r.id));
