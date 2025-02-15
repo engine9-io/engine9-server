@@ -352,7 +352,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
 
   const valuesToLookup = itemsWithNoIds
     .reduce((a, o) => {
-      debug(`'${o[inputField]}'`);
+      debug(`Need to lookup:'${o[inputField]}'`);
       a.add(o[inputField]);
       return a;
     }, new Set());
@@ -364,7 +364,10 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
     .andWhere(additionalWhere);
 
   // Populate the cache
-  existingIds.forEach((r) => this.itemCaches[type].set(r.lookup, r.id));
+  existingIds.forEach((r) => {
+    debug(`Adding to cache:${type}`, r.lookup, r.id);
+    this.itemCaches[type].set(r.lookup, r.id);
+  });
 
   // Filter out ones in the database already
   itemsWithNoIds = itemsWithNoIds.filter((o) => {
@@ -390,6 +393,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
       [idColumn]: idType === 'id_uuid' ? getUUIDv7() : null,
       [inputField]: b[inputField],
     };
+    debug('Added to insert:', a[b[inputField]]);
     return a;
   }, {}));
   if (valuesToInsert.length > 0) { await knex.table(table).insert(valuesToInsert); }
