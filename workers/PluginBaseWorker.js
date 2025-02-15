@@ -367,7 +367,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   // Populate the cache
   existingIds.forEach((r) => {
     debug(`Adding to cache:${type} '${r.lookup}' '${r.id}'`);
-    this.itemCaches[type].set(r.lookup, r.id);
+    this.itemCaches[type].set(r.lookup.trim(), r.id);
   });
 
   // Filter out ones in the database already
