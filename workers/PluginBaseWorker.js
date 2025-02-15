@@ -352,12 +352,12 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
 
   const valuesToLookup = itemsWithNoIds
     .reduce((a, o) => {
-      debug(`Need to lookup:'${o[inputField]}'`);
+      // debug(`Need to lookup:'${o[inputField]}'`);
       a.add(o[inputField]);
       return a;
     }, new Set());
   const knex = await this.connect();
-  debug('valuesToLookup', Array.from(valuesToLookup));
+  // debug('valuesToLookup', Array.from(valuesToLookup));
 
   const existingIds = await knex.select([`${idColumn} as id`, `${inputField} as lookup`])
     .from(table)
@@ -366,7 +366,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
 
   // Populate the cache
   existingIds.forEach((r) => {
-    debug(`Adding to cache:${type} '${r.lookup}' '${r.id}'`);
+    // debug(`Adding to cache:${type} '${r.lookup}' '${r.id}'`);
     this.itemCaches[type].set(r.lookup.trim(), r.id);
   });
 
@@ -394,7 +394,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
       [idColumn]: idType === 'id_uuid' ? getUUIDv7() : null,
       [inputField]: b[inputField],
     };
-    debug('Added to insert:', a[b[inputField]]);
+    // debug('Added to insert:', a[b[inputField]]);
     return a;
   }, {}));
   if (valuesToInsert.length > 0) { await knex.table(table).insert(valuesToInsert); }
@@ -411,7 +411,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
     const id = this.itemCaches[type].get(o[inputField]);
     if (this.debugCounter < 5) {
       this.debugCounter += 1;
-      debug('Assigning Id', id, 'for', inputField, o[inputField]);
+      // debug('Assigning Id', id, 'for', inputField, o[inputField]);
     }
     o[outputField] = id;
     if (!o[outputField]) return true;
