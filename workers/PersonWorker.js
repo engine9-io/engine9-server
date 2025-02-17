@@ -253,11 +253,11 @@ Worker.prototype.loadPeople = async function (options) {
   const inputId = await this.getInputId(options);
   if (!inputId) throw new Error('Could not get a required inputId from options');
 
-  let { plugin_id } = options;
-  if (!plugin_id) {
+  let { pluginId } = options;
+  if (!pluginId) {
     const { data: plugin } = await this.query({ sql: 'select plugin_id from input where id=?', values: [inputId] });
-    plugin_id = plugin?.[0]?.plugin_id;
-    if (!plugin_id) throw new Error(`Could not find pluginId for inputId=${inputId}`);
+    pluginId = plugin?.[0]?.plugin_id;
+    if (!pluginId) throw new Error(`Could not find pluginId for inputId=${inputId}`);
   }
 
   const fileWorker = new FileWorker(this);
@@ -282,7 +282,7 @@ Worker.prototype.loadPeople = async function (options) {
         debug(`Processing batch of length ${batch.length} Total records:${records} Sample:`, batch[0]);
         batch.forEach((b) => { b.source_input_id = b.source_input_id || inputId; });
         const batchSummary = await worker.executeCompiledPipeline(
-          { pipeline: worker.compiledPipeline, batch, plugin_id },
+          { pipeline: worker.compiledPipeline, batch, pluginId },
         );
         Object.entries(batchSummary.executionTime).forEach(([path, val]) => {
           summary.executionTime[path] = (summary.executionTime[path] || 0) + val;

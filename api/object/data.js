@@ -10,6 +10,7 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 const Knex = require('knex');
 
 const { uuidRegex } = require('@engine9/packet-tools');
+const { v7: uuidv7 } = require('uuid');
 const ReportWorker = require('../../workers/ReportWorker');
 const SegmentWorker = require('../../workers/SegmentWorker');
 const PersonWorker = require('../../workers/PersonWorker');
@@ -394,6 +395,11 @@ router.post([
       body.id = id;
       debug('Updating ', { table, id, data: body });
       await req.databaseWorker.updateOne({ table, id, data: body });
+    } else if (table === 'plugin') {
+      id = uuidv7();
+      body.id = id;
+      debug(`Inserting a new plugin with uudId ${id}`, { table, id, data: body });
+      await req.databaseWorker.insertOne({ table, data: body });
     } else {
       debug('Inserting', { table, data: body });
       const response = await req.databaseWorker.insertOne({ table, data: body });

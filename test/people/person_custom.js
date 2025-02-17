@@ -14,7 +14,7 @@ require('../test_db_schema');
 
 describe('Insert a stream of people with custom fields', async () => {
   const accountId = 'test';
-  const plugin_id = uuidv7();
+  const pluginId = uuidv7();
   const runner = new WorkerRunner();
   const env = runner.getWorkerEnvironment({ accountId });
   debug('Using env:', env);
@@ -38,7 +38,7 @@ describe('Insert a stream of people with custom fields', async () => {
 
   it('Should be able to create a plugin with custom fields', async () => {
     const opts = {
-      plugin_id,
+      id: pluginId,
       type: 'local',
       name: 'Sample Custom Fields',
       path: '@engine9-interfaces/person_custom',
