@@ -375,9 +375,7 @@ fileArray: [
   ],
 
 */
-Worker.prototype.idAndLoadFiles = async function (options) {
-  const loadTimeline = bool(options.loadTimeline, false);
-  if (options.detailsTable && !loadTimeline) throw new Error('Cowardly refusing to load details table without loadTimeline as well');
+Worker.prototype.idFiles = async function (options) {
   let arr = options.fileArray;
   if (typeof arr === 'string') arr = JSON.parse(arr);
   if (!Array.isArray(arr))arr = [options];
@@ -389,31 +387,12 @@ Worker.prototype.idAndLoadFiles = async function (options) {
     const { idFilename } = await this.id({ filename, inputId, pluginId });
     // debug(`After id, idFilename=${idFilename}`);
 
-    let timelineResults = null;
-    if (loadTimeline) {
-      timelineResults = await this.loadTimeline({
-        filename: idFilename,
-        inputId,
-      });
-    }
-    let detailResults = null;
-    if (options.loadTimelineDetail) {
-      const { timelineDetailTable } = options;
-      if (!timelineDetailTable) throw new Error('loadTimelineDetail specified, but no timelineDetailTable');
-      detailResults = await this.loadTimelineDetails({
-        filename: idFilename,
-        table: timelineDetailTable,
-      });
-    }
     directories[idFilename.split('/').slice(0, -1).join('/')] = true;
     const outputVals = {
       inputId,
       idFilename,
       sourceFilename: filename,
     };
-    if (timelineResults) outputVals.timelineResults = timelineResults;
-    if (detailResults) outputVals.detailResults = detailResults;
-
     output.push(outputVals);
   }
 
@@ -422,15 +401,52 @@ Worker.prototype.idAndLoadFiles = async function (options) {
     directoryArray: Object.keys(directories).map((directory) => ({ directory })),
   };
 };
-Worker.prototype.idAndLoadFiles.metadata = {
+Worker.prototype.idFiles.metadata = {
   options: {
     fileArray: {},
     filename: {},
     inputId: {},
-    loadTimeline: { description: 'Whether to load the timeline table or not, default false' },
-    loadTimelineDetail: { description: 'Whether to load the timeline detail table or not, default false' },
-    timelineDetailTable: { description: 'Load this details table' },
   },
+};
+
+Worker.prototype.loadTimelineTables = async function (options) {
+  const loadTimeline = bool(options.loadTimeline, false);
+  const loadTimelineDetails = bool(options.loadTimelineDetails, false);
+  const { timelineDetailTable } = options;
+  if (loadTimelineDetails && !loadTimeline) throw new Error('Cowardly refusing to load details table without loadTimeline as well');
+  if (loadTimelineDetails && !timelineDetailTable) throw new Error('Cowardly refusing to load details table without timelineDetailTable as well');
+  if (!loadTimeline) return options;
+
+  let arr = options.fileArray;
+  if (typeof arr === 'string') arr = JSON.parse(arr);
+  if (!Array.isArray(arr))arr = [options];
+  const fileArray = [];
+  for (const o of arr) {
+    const { inputId, pluginId, idFilename } = o;
+    const output = {
+      inputId,
+      pluginId,
+      idFilename,
+    };
+    output.timelineResults = await this.loadTimeline({
+      filename: idFilename,
+      inputId,
+    });
+    if (options.loadTimelineDetail) {
+      output.detailResults = await this.loadTimelineDetails({
+        filename: idFilename,
+        table: timelineDetailTable,
+      });
+    }
+    fileArray.push(output);
+  }
+  return { fileArray };
+};
+
+Worker.prototype.loadTimelineTables.metadata = {
+  loadTimeline: { description: 'Whether to load the timeline table or not, default false' },
+  loadTimelineDetail: { description: 'Whether to load the timeline detail table or not, default false' },
+  timelineDetailTable: { description: 'Load this details table' },
 };
 
 /*

@@ -77,18 +77,24 @@ describe('id and load multiple files', async () => {
       });
       return { filename, inputId };
     }));
-    const output = await inputWorker.idAndLoadFiles({
+    const files = await inputWorker.idFiles({
       fileArray,
+    });
+
+    const output = await inputWorker.loadTimelineTables({
+      ...files,
       loadTimeline: true,
       loadTimelineDetail: true,
       timelineDetailTable,
     });
+
     const records = output.fileArray.reduce((a, b) => a + b.timelineResults.records, 0);
+
     const { data } = await sqlWorker.query('select count(*) as records from timeline');
     assert(data[0].records === records, `There were ${data[0].records} found, expected ${records}`);
     // try again, making sure it dedupes
-    await inputWorker.idAndLoadFiles({
-      fileArray,
+    await inputWorker.loadTimelineTables({
+      ...output,
       loadTimeline: true,
       loadTimelineDetail: true,
       timelineDetailTable,
