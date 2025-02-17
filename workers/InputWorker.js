@@ -444,9 +444,13 @@ Worker.prototype.loadTimelineTables = async function (options) {
 };
 
 Worker.prototype.loadTimelineTables.metadata = {
-  loadTimeline: { description: 'Whether to load the timeline table or not, default false' },
-  loadTimelineDetail: { description: 'Whether to load the timeline detail table or not, default false' },
-  timelineDetailTable: { description: 'Load this details table' },
+  options: {
+    fileArray: { description: 'Array of id filenames with other data' },
+    idFilename: {},
+    loadTimeline: { description: 'Whether to load the timeline table or not, default false' },
+    loadTimelineDetail: { description: 'Whether to load the timeline detail table or not, default false' },
+    timelineDetailTable: { description: 'Load this details table' },
+  },
 };
 
 /*
