@@ -24,12 +24,13 @@ describe('id and load multiple files', async () => {
   const inputWorker = new InputWorker({ accountId, knex });
   const prefix = await inputWorker.getNextTablePrefixCounter();
   const tablePrefix = `testing_${prefix}_`;
-  const detailsTable = `${tablePrefix}timeline_sample_details`;
+  const timelineDetailTable = `${tablePrefix}timeline_sample_details`;
 
   before(async () => {
     await deploy(env);
     await truncate(env);
     await insertDefaults();
+    await sqlWorker.drop({ table: timelineDetailTable });
     await sqlWorker.query('select 1');
     const opts = {
       id: process.env.testingPluginId,
@@ -40,13 +41,12 @@ describe('id and load multiple files', async () => {
       schema: {
         tables: [
           {
-            name: detailsTable,
+            name: timelineDetailTable,
             columns: {
               id: 'id_uuid',
               remote_input_id: 'string',
               remote_input_name: 'string',
               email: 'string',
-              source_code: 'string',
               action_target: 'string',
               action_content: 'string',
             },
@@ -57,7 +57,7 @@ describe('id and load multiple files', async () => {
         ],
       },
     };
-    inputWorker.ensurePlugin(opts);
+    await inputWorker.ensurePlugin(opts);
   });
 
   after(async () => {
@@ -77,14 +77,27 @@ describe('id and load multiple files', async () => {
       });
       return { filename, inputId };
     }));
-    const output = await inputWorker.idAndLoadFiles({ fileArray, detailsTable });
-    const records = output.reduce((a, b) => a + b.timeline.records, 0);
+    const output = await inputWorker.idAndLoadFiles({
+      fileArray,
+      loadTimeline: true,
+      loadTimelineDetail: true,
+      timelineDetailTable,
+    });
+    const records = output.fileArray.reduce((a, b) => a + b.timelineResults.records, 0);
     const { data } = await sqlWorker.query('select count(*) as records from timeline');
     assert(data[0].records === records, `There were ${data[0].records} found, expected ${records}`);
     // try again, making sure it dedupes
-    await inputWorker.idAndLoadFiles({ fileArray, detailsTable });
+    await inputWorker.idAndLoadFiles({
+      fileArray,
+      loadTimeline: true,
+      loadTimelineDetail: true,
+      timelineDetailTable,
+    });
     const { data: data2 } = await sqlWorker.query('select count(*) as records from timeline');
-    assert(data2[0].records === records, `There were ${data[0].records} found, expected ${records}`);
+    assert(data2[0].records === records, `There were ${data2[0].records} found, expected ${records}`);
+
+    const { data: data3 } = await sqlWorker.query(`select count(*) as records from ${timelineDetailTable}`);
+    assert(data3[0].records === records, `There were ${data3[0].records} details records found in table ${timelineDetailTable}, expected ${records}`);
 
     debug(output);
   });

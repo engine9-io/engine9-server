@@ -364,7 +364,7 @@ Worker.prototype.stream = async function ({
     });
     return { stream: packetStream };
   } else {
-    throw new Error('getStream must be passed a stream, filename, or packet');
+    throw new Error('stream must be passed a stream, filename, or packet');
   }
 };
 

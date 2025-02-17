@@ -144,6 +144,7 @@ module.exports = {
     if (nullable === undefined) {
       nullable = true;
     }
+    if (!version) throw new Error('version required for MySQL dialect');
     // MySQL version 8. doesn't support UUID type
     if (version.indexOf('8.') === 0 && typeDef.column_type === 'uuid') {
       typeDef.knex_args = (() => (['char(36)']));

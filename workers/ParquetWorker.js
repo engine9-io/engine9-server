@@ -61,7 +61,7 @@ Worker.prototype.stream = async function (options) {
   let columns;
   if (options.columns) {
     if (typeof options.columns === 'string') columns = options.columns.split(',').map((d) => d.trim());
-    else columns = options.columns.map((d) => d.trim());
+    else columns = options.columns.map((d) => (d.name ? d.name.trim() : d.trim()));
   }
   let limit = 0;
   if (parseInt(options.limit, 10) === options.limit) limit = parseInt(options.limit, 10);

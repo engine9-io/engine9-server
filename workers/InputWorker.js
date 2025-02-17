@@ -397,8 +397,13 @@ Worker.prototype.idAndLoadFiles = async function (options) {
       });
     }
     let detailResults = null;
-    if (options.detailsTable) {
-      detailResults = await this.loadTimelineDetails({ filename, inputId });
+    if (options.loadTimelineDetail) {
+      const { timelineDetailTable } = options;
+      if (!timelineDetailTable) throw new Error('loadTimelineDetail specified, but no timelineDetailTable');
+      detailResults = await this.loadTimelineDetails({
+        filename: idFilename,
+        table: timelineDetailTable,
+      });
     }
     directories[idFilename.split('/').slice(0, -1).join('/')] = true;
     const outputVals = {
@@ -423,7 +428,8 @@ Worker.prototype.idAndLoadFiles.metadata = {
     filename: {},
     inputId: {},
     loadTimeline: { description: 'Whether to load the timeline table or not, default false' },
-    detailsTable: { description: 'Load this details table' },
+    loadTimelineDetail: { description: 'Whether to load the timeline detail table or not, default false' },
+    timelineDetailTable: { description: 'Load this details table' },
   },
 };
 
@@ -618,13 +624,24 @@ Worker.prototype.loadTimeline.metadata = {
 };
 
 Worker.prototype.loadTimelineDetails = async function (options) {
-  const { columns } = await this.describe(options);
-
-  const columnNames = columns.map((d) => d.name);
-
+  const { table } = options;
   const fileWorker = new FileWorker(this);
-  const { stream } = await fileWorker.stream({ ...options, columns: columnNames });
-  return this.insertFromStream({ table: options.table, stream, upsert: true });
+
+  try {
+    const { columns } = await this.describe({ table });
+    if (!columns.find((c) => (c.name === 'id'
+        && (c.type === 'id_uuid')))) {
+      debug(`Existing columns:${JSON.stringify(columns, null, 4)}`);
+      throw new Error(`timeline detail table ${table} needs an id column of type uuid`);
+    }
+    const { stream } = await fileWorker.stream({ ...options, columns });
+    return this.insertFromStream({ table: options.table, stream, upsert: true });
+  } catch (e) {
+    if (e.code === 'DOES_NOT_EXIST') {
+      throw e;
+    }
+    throw e;
+  }
 };
 Worker.prototype.loadTimelineDetails.metadata = {
   options: {

@@ -65,7 +65,13 @@ Worker.prototype.info = function () {
 };
 
 Worker.prototype.connect = async function connect() {
-  if (this.knex) return this.knex;
+  if (this.knex) {
+    if (!this.version) {
+      const [[{ version }]] = await this.knex.raw('select version() as version');
+      this.version = version;
+    }
+    return this.knex;
+  }
   const { accountId } = this;
   if (!accountId) throw new Error('accountId is required for connect method');
 
@@ -80,6 +86,8 @@ Worker.prototype.connect = async function connect() {
   };
   debug(`***** new Knex instance for account ${accountId}`);
   this.knex = Knex(authConfig);
+  const [[{ version }]] = await this.knex.raw('select version() as version');
+  this.version = version;
   return this.knex;
 };
 Worker.prototype.ok = async function f() {
@@ -422,11 +430,23 @@ Worker.prototype.loadTableFromQuery.metadata = {
   },
 };
 
+Worker.prototype.deduceColumnDefinition = function (o) {
+  if (o.isKnexDefinition) return o;
+  return this.dialect.standardToKnex(o, this.version);
+};
+
 Worker.prototype.createTableFromAnalysis = async function ({
-  table, analysis, indexes, primary,
+  table, analysis, indexes, primary, initialColumns = [],
 }) {
   if (!analysis) throw new Error('analysis is required');
-  const columns = analysis.fields.map((f) => this.deduceColumnDefinition(f));
+  await this.connect();// set variables, etc
+  const columns = initialColumns.concat(
+    analysis.fields.map((f) => ({
+      isKnexDefinition: true,
+      name: f.name,
+      ...this.deduceColumnDefinition(f, this.version),
+    })),
+  );
   return this.createTable({
     table, columns, indexes, primary,
   });
@@ -436,20 +456,45 @@ Worker.prototype.createTableFromAnalysis.metadata = {
 };
 
 Worker.prototype.createAndLoadTable = async function (options) {
-  const fworker = new FileWorker(this);
-  const stream = await fworker.getStream(options);
-  const analysis = await analyzeStream(stream);
-  const table = options.table || `temp_${new Date().toISOString().replace(/[^0-9]/g, '_')}`.slice(0, -1);
-  await this.createTableFromAnalysis({ table, analysis, primary: options.primary });
-  const stream2 = await fworker.getStream(options);
+  try {
+    const fworker = new FileWorker(this);
+    const stream = await fworker.stream(options);
+    const analysis = await analyzeStream(stream);
+    const table = options.table || `temp_${new Date().toISOString().replace(/[^0-9]/g, '_')}`.slice(0, -1);
+    const indexes = options.indexes || [];
+    if (options.primary) {
+      indexes.push({
+        primary: true,
+        columns: options.primary.split(','),
+      });
+    }
 
-  return this.insertFromStream({ table, stream: stream2.stream });
+    await this.createTableFromAnalysis({
+      table,
+      analysis,
+      initialColumns: options.initialColumns,
+    });
+    const { columns } = await this.describe({ table });
+    const stream2 = await fworker.stream({ ...options, columns: columns.map((d) => d.name) });
+
+    const streamResults = await this.insertFromStream({
+      ...options,
+      table,
+      stream: stream2.stream,
+    });
+    return { ...streamResults, columns };
+  } catch (e) {
+    debug(`Error creating and loading table with options:${JSON.stringify(options, null, 4)}`);
+    throw e;
+  }
 };
 Worker.prototype.createAndLoadTable.metadata = {
   options: {
     table: {},
     filename: {},
     stream: {},
+    indexes: {},
+    primary: { description: 'In addition to indexes, specify a string primary key' },
   },
 };
 

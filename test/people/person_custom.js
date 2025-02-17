@@ -105,7 +105,7 @@ describe('Insert a stream of people with custom fields', async () => {
     assert.deepEqual(new Date(data[0][f]), new Date(d[f]), `Field ${f} input did not match output, table: ${table},input:${d[f]},output:${data[0][f]}`);
     f = 'custom_json';
     assert.deepEqual(data[0][f], d[f], `Field ${f} input did not match output, table: ${table},input:${d[f]},output:${data[0][f]}`);
-
+    // clean things up for the next run
     await sqlWorker.drop({ table });
   });
 });

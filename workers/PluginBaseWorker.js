@@ -558,8 +558,8 @@ Worker.prototype.ensurePlugin = async function ({
     };
     await this.knex.table('plugin').insert([plugin]);
   }
-  if (plugin.schema) {
-    await this.deploy({ schema: plugin.schema });
+  if (schema) {
+    await this.deploy({ schema });
   }
   return plugin;
 };

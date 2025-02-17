@@ -2,6 +2,7 @@ const { Transform } = require('node:stream');
 
 const { pipeline } = require('node:stream/promises');
 const { uuidRegex } = require('@engine9/packet-tools');
+const debug = require('debug')('analyze');
 
 module.exports = async function analyzeStream(options) {
   const {
@@ -15,6 +16,8 @@ module.exports = async function analyzeStream(options) {
     fields: {},
   };
   function isNumeric(str) {
+    if (typeof str === 'number'
+      || typeof str === 'bigint') return true;
     // eslint-disable-next-line no-restricted-globals
     return !isNaN(str) && !isNaN(parseFloat(str));
   }
@@ -42,9 +45,16 @@ module.exports = async function analyzeStream(options) {
         };
         const r = analysis.fields[key];
         const type = typeof value;
-        const isNumber = isNumeric(value);
-        if (isNumber) {
-          value = parseFloat(value);
+        let isNumber;
+        try {
+          isNumber = isNumeric(value);
+          if (isNumber) {
+            value = parseFloat(value);
+          }
+        } catch (e) {
+          debug(`Error checking value ${value}`);
+          debug(d);
+          throw e;
         }
 
         if (!r.min || value < r.min) r.min = value;

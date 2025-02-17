@@ -59,7 +59,7 @@ Worker.prototype.ensureDatabase.metadata = {
 /*
   Try to determine a viable database structure from an analysis.  This needs to be more specific
   than the normal schema work as it must have specific column details based on ranges,
-  whereas not every schema
+  whereas not every schema item does
 */
 
 const namedTypes = {
