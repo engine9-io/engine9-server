@@ -441,6 +441,8 @@ Worker.prototype.loadTimelineTables = async function (options) {
     fileArray.push(output);
   }
   const o = { fileArray };
+
+  // Pass through if there is a directory array
   if (options.directoryArray) o.directoryArray = options.directoryArray;
   return o;
 };
