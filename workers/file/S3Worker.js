@@ -52,10 +52,14 @@ Worker.prototype.stream = async function ({ filename }) {
   const s3Client = new S3Client({});
   const { Bucket, Key } = getParts(filename);
   const command = new GetObjectCommand({ Bucket, Key });
-  const response = await s3Client.send(command);
-  debug(`Streaming file ${Key}`);
-
-  return { stream: response.Body };
+  try {
+    debug(`Streaming file ${Key}`);
+    const response = await s3Client.send(command);
+    return { stream: response.Body };
+  } catch (e) {
+    debug(`Could not stream filename:${filename}`);
+    throw e;
+  }
 };
 Worker.prototype.stream.metadata = {
   options: {

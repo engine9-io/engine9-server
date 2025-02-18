@@ -220,6 +220,17 @@ Worker.prototype.escapeColumn = function (f) {
 Worker.prototype.escapeValue = function (t) {
   return this.dialect.escapeValue(t);
 };
+
+Worker.prototype.escapeDate = function (d) {
+  if (d && typeof d.toISOString === 'function') {
+    const s = d.toISOString();
+    if (!s) return this.escapeValue('1900-01-01'); // This is an invalid date, but to try to maximize compatibility set to 1900
+    return this.escapeValue(s.slice(0, -1));
+  }
+  if (d && typeof d === 'string' && d.slice(-1)[0] === 'Z') return this.escapeValue(d.slice(0, -1));
+  return this.escapeValue(d);
+};
+
 Worker.prototype.addLimit = function (sql, limit, offset) {
   return this.dialect.addLimit(sql, limit, offset);
 };

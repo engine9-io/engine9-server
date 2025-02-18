@@ -122,7 +122,7 @@ Worker.prototype.id = async function (options) {
     const pq = analyzeTypeToParquet(b.type);
     if (a[b.name]) return a;
     // ignore these, as they're specified by id, but keep the person info just in case
-    if (['input_id', 'identifiers', 'entry_type', 'source_code'].indexOf(b.name) >= 0) return a;
+    if (['remote_entry_uuid', 'input_id', 'identifiers', 'entry_type', 'source_code', 'remote_input_id', 'remote_input_name'].indexOf(b.name) >= 0) return a;
     a[b.name] = {
       type: b.type,
       parquetType: pq.type,
@@ -163,6 +163,10 @@ Worker.prototype.id = async function (options) {
   const batcher = this.getBatchTransform({ batchSize: 500 }).transform;
   let records = 0;
   let batches = 0;
+  let minTimestamp = null;
+  let maxTimestamp = null;
+  let remoteInputId = null;
+  let remoteInputName = null;
   await pipeline(
     (await fileWorker.fileToObjectStream({ filename })).stream,
     batcher,
@@ -212,6 +216,14 @@ Worker.prototype.id = async function (options) {
           Object.entries(fieldMap).forEach(([name, { parquetMap }]) => {
             row[name] = parquetMap(b[name], b);
           });
+          remoteInputId = b.remote_input_id || remoteInputId;
+          remoteInputName = b.remote_input_name || remoteInputName;
+          if (b.ts) {
+            const ts = new Date(b.ts).getTime();
+            if (!minTimestamp || ts < minTimestamp) minTimestamp = ts;
+            if (!maxTimestamp || ts > maxTimestamp) maxTimestamp = ts;
+          }
+
           try {
             await writer.appendRow(row);
           } catch (e) {
@@ -246,7 +258,17 @@ Worker.prototype.id = async function (options) {
       records, idFilename: `${directory}/${file}`, sourceIdFilename: outputFile, s3Results,
     };
   }
-  return { records, idFilename: outputFile, fields };
+  return {
+    originalFields: fields,
+    parquestSchema: parquetSchemaDefinition,
+    idFilename: outputFile,
+    records,
+    inputId,
+    remoteInputName,
+    remoteInputId,
+    minTimestamp,
+    maxTimestamp,
+  };
 };
 
 Worker.prototype.id.metadata = {
@@ -381,11 +403,39 @@ Worker.prototype.idFiles = async function (options) {
   if (!Array.isArray(arr))arr = [options];
   const output = [];
   const directories = {};
+  // check for the pluginId if not specified
+  for (const o of arr) {
+    const { inputId } = o;
+    if (!o.pluginId) {
+      const { data } = await this.query(`select plugin_id from input where id=${this.escapeValue(inputId)}`);
+      o.pluginId = data?.[0]?.plugin_id;
+      if (!o.pluginId) throw new Error(`pluginId must be specified, and cannot be found in the database for inputId${inputId}`);
+    }
+  }
+
   // eslint-disable-next-line no-restricted-syntax
   for (const o of arr) {
     const { inputId, pluginId, filename } = o;
-    const { idFilename } = await this.id({ filename, inputId, pluginId });
-    // debug(`After id, idFilename=${idFilename}`);
+
+    const {
+      idFilename, remoteInputId, remoteInputName, minTimestamp, maxTimestamp,
+    } = await this.id({
+      filename, inputId, pluginId,
+    });
+
+    await this.insertFromStream({
+      table: 'input',
+      stream: [
+        {
+          id: inputId,
+          plugin_id: pluginId,
+          remote_input_id: remoteInputId,
+          remote_input_name: remoteInputName,
+        },
+      ],
+      upsert: true,
+    });
+    await this.query(`update input set min_timeline_ts=LEAST(input.min_timeline_ts,${this.escapeDate(minTimestamp)}),max_timeline_ts=GREATEST(input.max_timeline_ts,${this.escapeDate(maxTimestamp)})`);
 
     directories[idFilename.split('/').slice(0, -1).join('/')] = true;
     const outputVals = {
@@ -406,6 +456,7 @@ Worker.prototype.idFiles.metadata = {
     fileArray: {},
     filename: {},
     inputId: {},
+    pluginId: {},
   },
 };
 

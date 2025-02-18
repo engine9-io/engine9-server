@@ -126,7 +126,7 @@ Worker.prototype.cli = async function (options) {
               return cb(null, await worker.databases({}));
             }
             if (cmd === 'show triggers') return cb(null, await worker.showTriggers({}));
-            if (cmd.toLowerCase() === 'drop temp tables') return cb(null, await worker.dropTempTables({}));
+            if (cmd.toLowerCase() === 'drop temp tables') return cb(null, await worker.dropTables({ filter: '/^temp_/' }));
             if (cmd.toLowerCase() === 'drop old temp tables') return cb(null, await worker.dropOldTempTables({}));
 
             if (cmd === 'show tables') {
