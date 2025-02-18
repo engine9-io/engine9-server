@@ -5,6 +5,7 @@
 const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
 const { Transform } = require('node:stream');
+const StreamConsumers = require('node:stream/consumers');
 const fs = require('node:fs');
 
 const fsp = fs.promises;
@@ -77,6 +78,31 @@ Worker.prototype.destroy = async function () {
   Object.entries(this.timelineSQLiteDBCache || {}).forEach(([, { sqliteWorker }]) => {
     sqliteWorker.destroy();
   });
+};
+
+Worker.prototype.getMetadata = async function ({ directory }) {
+  if (!directory) throw new Error('directory is required');
+  const fileWorker = new FileWorker(this);
+  try {
+    const filename = `${directory}${directory.endsWith('/') ? '' : '/'}metadata.json`;
+    if (filename.startsWith('/')) {
+      // see if it exists or fast fail
+      // The stream method below doesn't handle fast fails as well
+      // await fsp.stat(filename);
+    }
+    const { stream } = await fileWorker.stream({ filename });
+    const metadata = await StreamConsumers.json(stream);
+    return { metadata };
+  } catch (e) {
+    const s = e.toString();
+    if (s.indexOf('NoSuchKey') >= 0 || s.indexOf('ENOENT') >= 0) {
+      return { metadata: {}, noFile: true };
+    }
+    // throw e;
+    return { metadata: {} };
+  }
+};
+Worker.prototype.getMetadata.metadata = {
 };
 
 Worker.prototype.id = async function (options) {
@@ -165,8 +191,6 @@ Worker.prototype.id = async function (options) {
   let batches = 0;
   let minTimestamp = null;
   let maxTimestamp = null;
-  let remoteInputId = null;
-  let remoteInputName = null;
   await pipeline(
     (await fileWorker.fileToObjectStream({ filename })).stream,
     batcher,
@@ -216,8 +240,6 @@ Worker.prototype.id = async function (options) {
           Object.entries(fieldMap).forEach(([name, { parquetMap }]) => {
             row[name] = parquetMap(b[name], b);
           });
-          remoteInputId = b.remote_input_id || remoteInputId;
-          remoteInputName = b.remote_input_name || remoteInputName;
           if (b.ts) {
             const ts = new Date(b.ts).getTime();
             if (!minTimestamp || ts < minTimestamp) minTimestamp = ts;
@@ -261,8 +283,6 @@ Worker.prototype.id = async function (options) {
       sourceIdFilename: outputFile,
       records,
       inputId,
-      remoteInputName,
-      remoteInputId,
       minTimestamp,
       maxTimestamp,
     };
@@ -273,8 +293,6 @@ Worker.prototype.id = async function (options) {
     idFilename: outputFile,
     records,
     inputId,
-    remoteInputName,
-    remoteInputId,
     minTimestamp,
     maxTimestamp,
   };
@@ -425,8 +443,17 @@ Worker.prototype.idFiles = async function (options) {
   // eslint-disable-next-line no-restricted-syntax
   for (const o of arr) {
     const {
-      inputId, remoteInputId, remoteInputName, pluginId, filename,
+      inputId, pluginId, filename,
     } = o;
+    const directory = filename.split('/').slice(0, -1).join('/');
+    let metadata = {};
+    try {
+      metadata = (await this.getMetadata({ directory })).metadata;
+    } catch (e) {
+      debug(e);
+    }
+
+    const { inputType, remoteInputId, remoteInputName } = metadata;
 
     const {
       idFilename, minTimestamp, maxTimestamp,
@@ -437,6 +464,7 @@ Worker.prototype.idFiles = async function (options) {
     const x = {
       id: inputId,
       plugin_id: pluginId,
+      input_type: inputType,
       remote_input_id: remoteInputId,
       remote_input_name: remoteInputName,
     };
@@ -683,7 +711,7 @@ Worker.prototype.loadTimeline = async function (options) {
   if (!options.inputId) throw new Error('loadTimeline requires an inputId');
   const fileWorker = new FileWorker(this);
   const columns = ['id', 'ts', 'person_id', 'entry_type_id', 'source_code_id'];
-  const { stream: inputStream } = await fileWorker.stream({ ...options, columns });
+  const { stream: inputStream } = await fileWorker.fileToObjectStream({ ...options, columns });
 
   const stream = inputStream.pipe(
     new Transform({
@@ -721,7 +749,7 @@ Worker.prototype.loadTimelineDetails = async function (options) {
       debug(`Existing columns:${JSON.stringify(columns, null, 4)}`);
       throw new Error(`timeline detail table ${table} needs an id column of type uuid`);
     }
-    const { stream } = await fileWorker.stream({ ...options, columns });
+    const { stream } = await fileWorker.fileToObjectStream({ ...options, columns });
     return this.insertFromStream({ table: options.table, stream, upsert: true });
   } catch (e) {
     if (e.code === 'DOES_NOT_EXIST') {

@@ -8,7 +8,7 @@ const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-const { insertDefaults } = require('../test_db_schema');
+const { run, insertDefaults } = require('../test_db_schema');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'test';
@@ -22,6 +22,7 @@ describe('Insert File of people with options', async () => {
   const personWorker = new PersonWorker({ accountId, knex });
 
   before(async () => {
+    await run();
     await insertDefaults();
   });
 
@@ -46,8 +47,9 @@ describe('Insert File of people with options', async () => {
 
     await personWorker.loadPeople({ stream, inputId: process.env.testingInputId });
     const { data } = await sqlWorker.query('select * from person_email');
+    const dupeEmail = data.filter((d) => d.email === 'dupe_email@y.com');
     assert.equal(data.filter((d) => d.email === 'x@y.com').length, 1, 'Did not deduplicate on just email address');
-    assert.equal(data.filter((d) => d.email === 'dupe_email@y.com').length, 2, 'Mistakenly deduplicated when there was a person_id');
+    assert.equal(dupeEmail.length, 2, `There were ${dupeEmail.length} dupe_email@y.com addresses, should be 2 -- did not deduplicate correctly when there was a person_id`);
     assert.equal(data.filter((d) => d.email === 'dupe_email@y.com' && d.subscription_status === 'Unsubscribed').length, 2, 'Did not unsubscribe two email addresses');
     assert(data[0].email_hash_v1.length > 0, 'Did not hash the email');
   });

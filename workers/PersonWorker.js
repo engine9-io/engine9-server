@@ -264,7 +264,7 @@ Worker.prototype.loadPeople = async function (options) {
   }
 
   const fileWorker = new FileWorker(this);
-  const inStream = await fileWorker.stream({
+  const inStream = await fileWorker.fileToObjectStream({
     stream, filename, packet, type: 'person',
   });
   let pipelineConfig = null;

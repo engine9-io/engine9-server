@@ -15,9 +15,41 @@ describe('Test stream analysis', async () => {
     ];
     const analysis = await analyze({ stream });
     const correct = {
+      records: 3,
+      fields: [
+        {
+          name: 'a',
+          type: 'string',
+          empty: 0,
+          min: 'bar',
+          max: 'test',
+          min_length: 3,
+          max_length: 4,
+          distinct: 3,
+          sample: [
+            'foo',
+            'bar',
+            'test',
+          ],
+        },
+        {
+          name: 'b',
+          type: 'int',
+          empty: 0,
+          min: 1,
+          max: 3,
+          isNumber: true,
+          distinct: 3,
+          sample: [
+            '1',
+            '2',
+            '3',
+          ],
+        },
+      ],
     };
 
     debug(analysis);
-    assert.deepEqual(analysis, correct, `Analysis statistics not correct, ${JSON.stringify(analysis)}!= ${JSON.stringify(correct)}`);
+    assert.equal(JSON.stringify(analysis), JSON.stringify(correct), `Analysis statistics not correct, ${JSON.stringify(analysis, null, 4)}!= ${JSON.stringify(correct, null, 4)}`);
   });
 });

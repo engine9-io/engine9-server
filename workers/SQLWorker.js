@@ -469,7 +469,7 @@ Worker.prototype.createTableFromAnalysis.metadata = {
 Worker.prototype.createAndLoadTable = async function (options) {
   try {
     const fworker = new FileWorker(this);
-    const stream = await fworker.stream(options);
+    const stream = await fworker.fileToObjectStream(options);
     const analysis = await analyzeStream(stream);
     const table = options.table || `temp_${new Date().toISOString().replace(/[^0-9]/g, '_')}`.slice(0, -1);
     const indexes = options.indexes || [];
@@ -486,7 +486,10 @@ Worker.prototype.createAndLoadTable = async function (options) {
       initialColumns: options.initialColumns,
     });
     const { columns } = await this.describe({ table });
-    const stream2 = await fworker.stream({ ...options, columns: columns.map((d) => d.name) });
+    const stream2 = await fworker.fileToObjectStream({
+      ...options,
+      columns: columns.map((d) => d.name),
+    });
 
     const streamResults = await this.insertFromStream({
       ...options,

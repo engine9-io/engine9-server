@@ -70,8 +70,7 @@ async function run() {
     await insertDefaults(env);
   }
 }
-run();
 
 module.exports = {
-  drop, deploy, truncate, insertDefaults,
+  run, drop, deploy, truncate, insertDefaults,
 };

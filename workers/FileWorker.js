@@ -131,6 +131,16 @@ Internal method to transform a file into a stream of objects.
 */
 Worker.prototype.fileToObjectStream = async function (options) {
   const { filename, columns, limit: limitOption } = options;
+
+  // handle stream item
+  if (options.stream) {
+    if (Array.isArray(options.stream)) {
+      return { stream: Readable.from(options.stream) };
+    }
+    // probably already a stream
+    if (typeof options.stream === 'object') return { stream: options.stream };
+    throw new Error(`Invalid stream type:${typeof options.stream}`);
+  }
   let limit;
   if (limitOption) limit = parseInt(limitOption, 10);
   if (!filename) throw new Error('fileToObjectStream: filename is required');
@@ -139,17 +149,18 @@ Worker.prototype.fileToObjectStream = async function (options) {
     debug('Invalid filename:', { filename });
     throw new Error('Cowardly refusing to turn a .zip file into an object stream, turn into a csv first');
   }
-  let encoding; let stream;
-  if (filename.slice(-8) === '.parquet') {
-    const pq = new ParquetWorker(this);
-    return pq.stream({ filename, columns, limit });
-  } if (filename.indexOf('s3://') === 0) {
-    const s3Worker = new S3Worker(this);
-    stream = (await s3Worker.stream({ filename, columns, limit })).stream;
-    encoding = 'UTF-8';
-  } else {
-    stream = fs.createReadStream(filename);
-    encoding = (await this.detectEncoding(options)).encoding;
+
+  const streamInfo = await this.stream({
+    filename,
+    columns,
+    limit,
+  });
+  const { encoding } = streamInfo;
+  let { stream } = streamInfo;
+  if (!stream) throw new Error(`No stream found in fileToObjectStream from filename ${filename}`);
+  if (encoding === 'object') {
+    // already an object
+    return { stream };
   }
 
   let count = 0;
@@ -344,18 +355,38 @@ Worker.prototype.testTransform.metadata = {
 };
 
 /* Get a stream from an actual stream, or an array, or a file, or a packet */
-Worker.prototype.stream = async function ({
-  stream, filename, packet, type, columns, limit,
-} = {}) {
-  if (stream) {
-    if (Array.isArray(stream)) {
-      return { stream: Readable.from(stream) };
+Worker.prototype.stream = async function (
+  options,
+) {
+  const {
+    stream: inputStream, filename, packet, type, columns, limit,
+  } = options;
+
+  if (inputStream) {
+    if (Array.isArray(inputStream)) {
+      return { stream: Readable.from(inputStream) };
     }
     // probably already a stream
-    if (typeof stream === 'object') return { stream };
-    throw new Error(`Invalid stream type:${typeof stream}`);
+    if (typeof inputStream === 'object') return { stream: inputStream, encoding: 'object' };
+    throw new Error(`Invalid stream type:${typeof inputStream}`);
   } else if (filename) {
-    return this.fileToObjectStream({ filename, columns, limit });
+    let encoding; let stream;
+    if (filename.slice(-8) === '.parquet') {
+      const pq = new ParquetWorker(this);
+      stream = (await pq.stream({ filename, columns, limit })).stream;
+      encoding = 'object';
+    } else if (filename.indexOf('s3://') === 0) {
+      const s3Worker = new S3Worker(this);
+      stream = (await s3Worker.stream({ filename, columns, limit })).stream;
+      encoding = 'UTF-8';
+    } else {
+      // Check if the file exists, and fast fail if not
+      // Otherwise the stream hangs out as a handle
+      await fsp.stat(filename);
+      stream = fs.createReadStream(filename);
+      encoding = (await this.detectEncoding(options)).encoding;
+    }
+    return { stream, encoding };
   } else if (packet) {
     let { stream: packetStream } = await PacketTools.stream({ packet, type, limit });
     const { transforms } = this.csvToObjectTransforms({});
@@ -369,7 +400,7 @@ Worker.prototype.stream = async function ({
 };
 
 Worker.prototype.analyze = async function (opts) {
-  const { stream } = await this.stream(opts);
+  const { stream } = await this.fileToObjectStream(opts);
   return analyzeStream({ stream });
 };
 Worker.prototype.analyze.metadata = {
