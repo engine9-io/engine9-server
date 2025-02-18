@@ -452,12 +452,17 @@ Worker.prototype.createTableFromAnalysis = async function ({
   if (!analysis) throw new Error('analysis is required');
   await this.connect();// set variables, etc
   const columns = initialColumns.concat(
-    analysis.fields.map((f) => ({
-      isKnexDefinition: true,
-      name: f.name,
-      ...this.deduceColumnDefinition(f, this.version),
-    })),
+    analysis.fields.map((f) => {
+      let { name } = f;
+      name = name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      return {
+        isKnexDefinition: true,
+        name,
+        ...this.deduceColumnDefinition(f, this.version),
+      };
+    }),
   );
+  debug(columns);
   return this.createTable({
     table, columns, indexes, primary,
   });
