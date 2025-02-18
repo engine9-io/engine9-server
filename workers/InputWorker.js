@@ -252,10 +252,19 @@ Worker.prototype.id = async function (options) {
     const s3 = new S3Worker(this);
 
     const directory = filename.split('/').slice(0, -1).join('/');
-    const s3Results = await s3.put({ filename: outputFile, directory });
+    await s3.put({ filename: outputFile, directory });
     const file = outputFile.split('/').pop();
     return {
-      records, idFilename: `${directory}/${file}`, sourceIdFilename: outputFile, s3Results,
+      originalFields: fields,
+      parquestSchema: parquetSchemaDefinition,
+      idFilename: `${directory}/${file}`,
+      sourceIdFilename: outputFile,
+      records,
+      inputId,
+      remoteInputName,
+      remoteInputId,
+      minTimestamp,
+      maxTimestamp,
     };
   }
   return {
@@ -431,13 +440,14 @@ Worker.prototype.idFiles = async function (options) {
       remote_input_id: remoteInputId,
       remote_input_name: remoteInputName,
     };
-    debug('Upserting input with', x);
+    const sql = `update input set min_timeline_ts=LEAST(input.min_timeline_ts,${this.escapeDate(minTimestamp)}),max_timeline_ts=GREATEST(input.max_timeline_ts,${this.escapeDate(maxTimestamp)}) where id=${this.escapeValue(inputId)}`;
+    debug('Upserting input with', x, 'then updating with ', sql);
     await this.insertFromStream({
       table: 'input',
       stream: [x],
       upsert: true,
     });
-    await this.query(`update input set min_timeline_ts=LEAST(input.min_timeline_ts,${this.escapeDate(minTimestamp)}),max_timeline_ts=GREATEST(input.max_timeline_ts,${this.escapeDate(maxTimestamp)}) where id=${this.escapeValue(inputId)}`);
+    await this.query(sql);
 
     directories[idFilename.split('/').slice(0, -1).join('/')] = true;
     const outputVals = {
