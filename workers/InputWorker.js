@@ -433,6 +433,7 @@ Worker.prototype.idFiles = async function (options) {
   // check for the pluginId if not specified
   for (const o of arr) {
     const { inputId } = o;
+    if (!inputId) throw new Error('inputId must be specified');
     if (!o.pluginId) {
       const { data } = await this.query(`select plugin_id from input where id=${this.escapeValue(inputId)}`);
       o.pluginId = data?.[0]?.plugin_id;
