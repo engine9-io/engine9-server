@@ -437,7 +437,7 @@ Worker.prototype.idFiles = async function (options) {
       stream: [x],
       upsert: true,
     });
-    await this.query(`update input set min_timeline_ts=LEAST(input.min_timeline_ts,${this.escapeDate(minTimestamp)}),max_timeline_ts=GREATEST(input.max_timeline_ts,${this.escapeDate(maxTimestamp)})`);
+    await this.query(`update input set min_timeline_ts=LEAST(input.min_timeline_ts,${this.escapeDate(minTimestamp)}),max_timeline_ts=GREATEST(input.max_timeline_ts,${this.escapeDate(maxTimestamp)}) where id=${this.escapeValue(inputId)}`);
 
     directories[idFilename.split('/').slice(0, -1).join('/')] = true;
     const outputVals = {
