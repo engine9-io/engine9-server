@@ -118,7 +118,7 @@ Worker.prototype.put.metadata = {
 Worker.prototype.write = async function (options) {
   const { directory, file, content } = options;
 
-  if (!directory?.indexOf('s3://')) throw new Error('directory must start with s3://');
+  if (!directory?.indexOf('s3://') === 0) throw new Error('directory must start with s3://');
   const parts = directory.split('/');
 
   const Bucket = parts[2];

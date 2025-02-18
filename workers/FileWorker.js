@@ -386,7 +386,7 @@ Worker.prototype.write = async function (opts) {
     const parts = filename.split('/');
     const directory = parts.slice(0, -1).join('/');
     const file = parts.slice(-1)[0];
-    debug(JSON.stringify({ parts, directory, file }));
+    // debug(JSON.stringify({ parts, directory, file }));
     await s3Worker.write({
       directory,
       file,
