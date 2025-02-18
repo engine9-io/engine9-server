@@ -415,24 +415,26 @@ Worker.prototype.idFiles = async function (options) {
 
   // eslint-disable-next-line no-restricted-syntax
   for (const o of arr) {
-    const { inputId, pluginId, filename } = o;
+    const {
+      inputId, remoteInputId, remoteInputName, pluginId, filename,
+    } = o;
 
     const {
-      idFilename, remoteInputId, remoteInputName, minTimestamp, maxTimestamp,
+      idFilename, minTimestamp, maxTimestamp,
     } = await this.id({
       filename, inputId, pluginId,
     });
 
+    const x = {
+      id: inputId,
+      plugin_id: pluginId,
+      remote_input_id: remoteInputId,
+      remote_input_name: remoteInputName,
+    };
+    debug('Upserting input with', x);
     await this.insertFromStream({
       table: 'input',
-      stream: [
-        {
-          id: inputId,
-          plugin_id: pluginId,
-          remote_input_id: remoteInputId,
-          remote_input_name: remoteInputName,
-        },
-      ],
+      stream: [x],
       upsert: true,
     });
     await this.query(`update input set min_timeline_ts=LEAST(input.min_timeline_ts,${this.escapeDate(minTimestamp)}),max_timeline_ts=GREATEST(input.max_timeline_ts,${this.escapeDate(maxTimestamp)})`);
