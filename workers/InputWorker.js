@@ -440,7 +440,9 @@ Worker.prototype.loadTimelineTables = async function (options) {
     }
     fileArray.push(output);
   }
-  return { fileArray };
+  const o = { fileArray };
+  if (options.directoryArray) o.directoryArray = options.directoryArray;
+  return o;
 };
 
 Worker.prototype.loadTimelineTables.metadata = {
