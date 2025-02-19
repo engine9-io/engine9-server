@@ -297,6 +297,7 @@ Worker.prototype.deployStandard = async function deploy() {
   await schemaWorker.deploy({ schema: 'engine9-interfaces/timeline' });
   await schemaWorker.deploy({ schema: 'engine9-interfaces/source_code' });
   await schemaWorker.deploy({ schema: 'engine9-interfaces/transaction' });
+  await schemaWorker.deploy({ schema: 'engine9-interfaces/message' });
   debug('Deployed all schemas');
 
   schemaWorker.destroy();
