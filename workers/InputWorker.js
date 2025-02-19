@@ -24,6 +24,7 @@ const FileWorker = require('./FileWorker');
 const S3Worker = require('./file/S3Worker');
 const PersonWorker = require('./PersonWorker');
 const { analyzeTypeToParquet, bool } = require('../utilities');
+const analyzeStream = require('../utilities/analyze');
 
 function Worker(worker) {
   PluginBaseWorker.call(this, worker);
@@ -78,6 +79,7 @@ Worker.prototype.destroy = async function () {
   Object.entries(this.timelineSQLiteDBCache || {}).forEach(([, { sqliteWorker }]) => {
     sqliteWorker.destroy();
   });
+  if (this.knex) this.knex.destroy();
 };
 
 Worker.prototype.getMetadata = async function ({ directory }) {
@@ -503,6 +505,58 @@ Worker.prototype.idFiles.metadata = {
     filename: {},
     inputId: {},
     pluginId: {},
+  },
+};
+
+Worker.prototype.createDetailTable = async function (options) {
+  await this.connect();
+  const fworker = new FileWorker(this);
+  const stream = await fworker.fileToObjectStream(options);
+  const analysis = await analyzeStream(stream);
+  const table = options.table || `temp_${new Date().toISOString().replace(/[^0-9]/g, '_')}`.slice(0, -1);
+
+  const indexes = [{
+    primary: true,
+    columns: 'id',
+  }];
+
+  const columns = [
+    {
+      name: 'id',
+      type: 'id_uuid',
+    },
+  ].concat(
+    analysis.fields.map((f) => {
+      let { name } = f;
+      if (['id',
+        'ts',
+        'remote_person_id',
+        'source_code',
+        'input_id',
+        'remote_input_id',
+        'remote_input_name',
+        'entry_type',
+        'remote_entry_uuid'].indexOf(name) >= 0) {
+        return false;
+      }
+
+      name = name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      return {
+        isKnexDefinition: true,
+        name,
+        ...this.deduceColumnDefinition(f, this.version),
+      };
+    }).filter(Boolean),
+  );
+  debug(columns);
+  return this.createTable({
+    table, columns, indexes,
+  });
+};
+Worker.prototype.createDetailTable.metadata = {
+  options: {
+    filename: {},
+    table: {},
   },
 };
 
