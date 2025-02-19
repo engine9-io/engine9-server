@@ -1,5 +1,6 @@
 const debug = require('debug')('S3Worker');
 const fs = require('node:fs');
+const mime = require('mime');
 const { getTempFilename } = require('@engine9/packet-tools');
 const {
   S3Client, GetObjectCommand, GetObjectAttributesCommand, PutObjectCommand,
@@ -104,10 +105,14 @@ Worker.prototype.put = async function (options) {
   const Key = parts.slice(3).filter(Boolean).concat(file).join('/');
   const Body = fs.createReadStream(filename);
 
-  debug(`Putting ${filename} to ${JSON.stringify({ Bucket, Key })}}`);
+  const ContentType = mime.getType(file.split('.').pop());
+
+  debug(`Putting ${filename} to ${JSON.stringify({ Bucket, Key, ContentType })}}`);
   const s3Client = new S3Client({});
 
-  const command = new PutObjectCommand({ Bucket, Key, Body });
+  const command = new PutObjectCommand({
+    Bucket, Key, Body, ContentType,
+  });
 
   return s3Client.send(command);
 };
@@ -131,8 +136,11 @@ Worker.prototype.write = async function (options) {
 
   debug(`Writing content of length ${content.length} to ${JSON.stringify({ Bucket, Key })}}`);
   const s3Client = new S3Client({});
+  const ContentType = mime.getType(file.split('.').pop());
 
-  const command = new PutObjectCommand({ Bucket, Key, Body });
+  const command = new PutObjectCommand({
+    Bucket, Key, Body, ContentType,
+  });
 
   return s3Client.send(command);
 };

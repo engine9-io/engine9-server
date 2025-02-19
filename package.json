@@ -34,6 +34,7 @@
     "knex-schema-inspector": "^3.1.0",
     "limiter": "^2.1.0",
     "lru-cache": "^11.0.2",
+    "mime": "^4.0.6",
     "minimist": "^1.2.8",
     "mkdirp": "^3.0.1",
     "mysql2": "^3.6.2",
