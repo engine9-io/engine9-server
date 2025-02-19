@@ -711,10 +711,7 @@ Worker.prototype.statistics = async function (options) {
       }));
     }
     await sqliteWorker.destroy();
-    const result = {
-      sources,
-      statistics,
-    };
+    const result = {};
     if (d.directory) {
       result.directory = d.directory;
       if (writeStatisticsFile) {
@@ -726,6 +723,7 @@ Worker.prototype.statistics = async function (options) {
       }
     } else if (d.idFilename) {
       result.idFilename = d.idFilename;
+      result.statistics = statistics;
       if (writeStatisticsFile) {
         result.statisticsFile = `${d.idFilename}.statistics.json`;
         await fileWorker.write({
