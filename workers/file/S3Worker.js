@@ -1,6 +1,7 @@
 const debug = require('debug')('S3Worker');
 const fs = require('node:fs');
-const mime = require('mime-type');
+// eslint-disable-next-line import/no-unresolved
+const mime = require('mime-type/with-db');
 const { getTempFilename } = require('@engine9/packet-tools');
 const {
   S3Client, GetObjectCommand, GetObjectAttributesCommand, PutObjectCommand,
@@ -136,7 +137,7 @@ Worker.prototype.write = async function (options) {
 
   debug(`Writing content of length ${content.length} to ${JSON.stringify({ Bucket, Key })}}`);
   const s3Client = new S3Client({});
-  const ContentType = mime.getType(file.split('.').pop());
+  const ContentType = mime.lookup(file);
 
   const command = new PutObjectCommand({
     Bucket, Key, Body, ContentType,
