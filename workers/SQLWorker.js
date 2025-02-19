@@ -517,6 +517,19 @@ Worker.prototype.createAndLoadTable.metadata = {
   },
 };
 
+Worker.prototype.loadTable = async function (options) {
+  const fworker = new FileWorker(this);
+  const { columns } = await this.describe(options);
+  const stream = await fworker.fileToObjectStream({ columns, ...options });
+  return this.insertFromStream({
+    ...options,
+    stream: stream.stream,
+  });
+};
+Worker.prototype.loadTable.metadata = {
+  options: {},
+};
+
 Worker.prototype.insertOne = async function ({ table, data }) {
   const knex = await this.connect();
   return knex.table(table).insert(data);
@@ -701,7 +714,15 @@ Worker.prototype.stringToType = function (_v, _t, length, nullable, nullAsString
       if (v === '' || v === undefined || (v === 'NULL' && !nullAsString)) {
         if (!nullable) { v = ''; } else v = null;
       } else if (v && length) {
-        if (typeof v !== 'string') v = JSON.stringify(v);
+        const type = typeof v;
+        if (type === 'object') {
+          v = JSON.stringify(v);
+        } else if (type === 'string') {
+          // it's fine
+        } else {
+          v = String(v);
+        }
+
         if (v.length > length) {
           if (worker.do_not_slice) {
             /*
@@ -1074,6 +1095,7 @@ Worker.prototype.insertFromStream = async function (options) {
         try {
           v = worker.stringToType(val, def.column_type, def.length, def.nullable, nullAsString);
         } catch (e) {
+          debug({ val, o }, def);
           throw new Error(`Error with column ${def.name}: ${e}`);
         }
 
@@ -1129,6 +1151,7 @@ Worker.prototype.insertFromStream.metadata = {
   options: {
     table: {},
     stream: {},
+    batchSize: {},
   },
 };
 

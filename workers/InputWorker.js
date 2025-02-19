@@ -751,7 +751,9 @@ Worker.prototype.loadTimelineDetails = async function (options) {
       throw new Error(`timeline detail table ${table} needs an id column of type uuid`);
     }
     const { stream } = await fileWorker.fileToObjectStream({ ...options, columns });
-    return this.insertFromStream({ table: options.table, stream, upsert: true });
+    return this.insertFromStream({
+      table: options.table, stream, upsert: true,
+    });
   } catch (e) {
     if (e.code === 'DOES_NOT_EXIST') {
       throw e;
