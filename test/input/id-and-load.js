@@ -69,7 +69,7 @@ describe('id and load multiple files', async () => {
     const fileArray = await Promise.all([0, 1, 2].map(async (i) => {
       const remoteInputId = `Testing Input ${i} ${new Date().toISOString()}`;
       const filename = await createSampleActionFile(
-        { ts: new Date().toISOString(), remoteInputId },
+        { remoteInputId },
       );
       const inputId = await inputWorker.getInputId({
         pluginId: process.env.testingPluginId,

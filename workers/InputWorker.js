@@ -469,8 +469,13 @@ Worker.prototype.idFiles = async function (options) {
       remote_input_id: remoteInputId,
       remote_input_name: remoteInputName,
     };
-    const sql = `update input set min_timeline_ts=LEAST(input.min_timeline_ts,${this.escapeDate(minTimestamp)}),max_timeline_ts=GREATEST(input.max_timeline_ts,${this.escapeDate(maxTimestamp)}) where id=${this.escapeValue(inputId)}`;
-    debug('Upserting input with', x, 'then updating with ', sql);
+    const sql = `update input set 
+    min_timeline_ts=CASE WHEN min_timeline_ts is null then ${this.escapeDate(minTimestamp)}
+    else LEAST(input.min_timeline_ts,${this.escapeDate(minTimestamp)}) end,
+    max_timeline_ts=CASE WHEN max_timeline_ts is null then ${this.escapeDate(maxTimestamp)}
+    else GREATEST(input.max_timeline_ts,${this.escapeDate(maxTimestamp)}) end
+    WHERE id=${this.escapeValue(inputId)}`;
+    // debug('Upserting input with', x, 'then updating with ', sql);
     await this.insertFromStream({
       table: 'input',
       stream: [x],

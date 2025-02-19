@@ -1,6 +1,6 @@
 const debug = require('debug')('S3Worker');
 const fs = require('node:fs');
-const mime = require('mime');
+const mime = require('mime-type');
 const { getTempFilename } = require('@engine9/packet-tools');
 const {
   S3Client, GetObjectCommand, GetObjectAttributesCommand, PutObjectCommand,
@@ -105,7 +105,7 @@ Worker.prototype.put = async function (options) {
   const Key = parts.slice(3).filter(Boolean).concat(file).join('/');
   const Body = fs.createReadStream(filename);
 
-  const ContentType = mime.getType(file.split('.').pop());
+  const ContentType = mime.lookup(file);
 
   debug(`Putting ${filename} to ${JSON.stringify({ Bucket, Key, ContentType })}}`);
   const s3Client = new S3Client({});

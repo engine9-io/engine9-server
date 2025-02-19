@@ -221,13 +221,16 @@ Worker.prototype.escapeValue = function (t) {
   return this.dialect.escapeValue(t);
 };
 
-Worker.prototype.escapeDate = function (d) {
+Worker.prototype.escapeDate = function (_d) {
+  let d = _d;
+  const type = typeof d;
+  if (type === 'number' || type === 'bigint') d = new Date(d);
   if (d && typeof d.toISOString === 'function') {
     const s = d.toISOString();
     if (!s) return this.escapeValue('1900-01-01'); // This is an invalid date, but to try to maximize compatibility set to 1900
     return this.escapeValue(s.slice(0, -1));
   }
-  if (d && typeof d === 'string' && d.slice(-1)[0] === 'Z') return this.escapeValue(d.slice(0, -1));
+  if (d && type === 'string' && d.slice(-1)[0] === 'Z') return this.escapeValue(d.slice(0, -1));
   return this.escapeValue(d);
 };
 
