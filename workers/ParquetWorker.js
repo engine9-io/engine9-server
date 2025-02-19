@@ -66,7 +66,7 @@ Worker.prototype.stream = async function (options) {
   let limit = 0;
   if (parseInt(options.limit, 10) === options.limit) limit = parseInt(options.limit, 10);
   // create a new cursor
-  debug(`Reading parquet file with columns ${columns?.join(',')} and limit ${limit}`);
+  debug(`Reading parquet file ${options.filename} with columns ${columns?.join(',')} and limit ${limit}`);
   const cursor = reader.getCursor(columns);
 
   // read all records from the file and print them
