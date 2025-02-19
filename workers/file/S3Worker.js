@@ -1,7 +1,7 @@
 const debug = require('debug')('S3Worker');
 const fs = require('node:fs');
 // eslint-disable-next-line import/no-unresolved
-const mime = require('mime-type/with-db');
+const { mimeType: mime } = require('mime-type/with-db');
 const { getTempFilename } = require('@engine9/packet-tools');
 const {
   S3Client, GetObjectCommand, GetObjectAttributesCommand, PutObjectCommand,
