@@ -684,8 +684,8 @@ Worker.prototype.statistics = async function (options) {
       entry_type: TIMELINE_ENTRY_TYPES[entry_type_id],
       ...rest,
     }));
-    statistics.byTypeByHour = (await sqliteWorker.query(`
-        select strftime('%Y-%m-%d %H:00:00', ts/1000, 'unixepoch') as date,
+    statistics.byTypeByDate = (await sqliteWorker.query(`
+        select strftime('%Y-%m-%d', ts/1000, 'unixepoch') as date,
         entry_type_id,
         count(*) as records,count(distinct person_id) as distinct_people 
         from timeline group by 1,2 order by 1,2`)).data?.map(({ entry_type_id, ...rest }) => ({
