@@ -661,6 +661,7 @@ Worker.prototype.stringToType = function (_v, _t, length, nullable, nullAsString
     case 'timestamp_ntz':
     case 'timestamp without time zone':
       if (v === null && nullable) return null;
+      if (v === '' && nullable) return null;
       // this is commented because an undefined date or time is usually a bug on the input
       // if (v === undefined && nullable) return null;
       dt = new Date(v);
