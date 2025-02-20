@@ -1005,8 +1005,10 @@ Worker.prototype.insertFromStream = async function (options) {
     let columns = null;
     let rows = [];
     this.sqlCounter = this.sqlCounter || 0;
+    const ignore = ['created_at', 'modified_at'];// these are 100% handled by the database
     function getIncludedObjectColumns(o) {
       return desc.columns.filter((f) => {
+        if (ignore.indexOf(f.name) >= 0) return false;
         // set the database appropriate name as well
         const sqlName = worker.getSQLName(f.name);
         if (o[f.name] !== undefined) {
