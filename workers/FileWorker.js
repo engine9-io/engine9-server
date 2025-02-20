@@ -409,6 +409,17 @@ Worker.prototype.analyze.metadata = {
 
   },
 };
+Worker.prototype.sample = async function (opts) {
+  opts.limit = opts.limit || 10;
+  const { stream } = await this.fileToObjectStream(opts);
+  return stream.toArray();
+};
+Worker.prototype.sample.metadata = {
+  options: {
+    filename: {},
+
+  },
+};
 
 Worker.prototype.write = async function (opts) {
   const { filename, content } = opts;
