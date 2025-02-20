@@ -23,7 +23,7 @@ const PluginBaseWorker = require('./PluginBaseWorker');
 const FileWorker = require('./FileWorker');
 const S3Worker = require('./file/S3Worker');
 const PersonWorker = require('./PersonWorker');
-const { analyzeTypeToParquet, bool } = require('../utilities');
+const { analyzeTypeToParquet, cleanColumnName, bool } = require('../utilities');
 const analyzeStream = require('../utilities/analyze');
 
 function Worker(worker) {
@@ -540,7 +540,7 @@ Worker.prototype.createDetailTable = async function (options) {
         return false;
       }
 
-      name = name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      name = cleanColumnName(name);
       return {
         isKnexDefinition: true,
         name,

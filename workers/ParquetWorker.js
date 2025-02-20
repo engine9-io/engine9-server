@@ -6,6 +6,7 @@ const debug = require('debug')('ParquetWorker');
 const { S3Client } = require('@aws-sdk/client-s3');
 const BaseWorker = require('./BaseWorker');
 const FileWorker = require('./FileWorker');
+const { cleanColumnName } = require('../utilities');
 
 function Worker(worker) {
   BaseWorker.call(this, worker);
@@ -60,8 +61,18 @@ Worker.prototype.stream = async function (options) {
   const reader = await getReader(options);
   let columns;
   if (options.columns) {
-    if (typeof options.columns === 'string') columns = options.columns.split(',').map((d) => d.trim());
-    else columns = options.columns.map((d) => (d.name ? d.name.trim() : d.trim()));
+    const { fieldList } = await this.schema(options);
+    columns = [];
+    let requestedColumns = options.columns;
+    if (typeof options.columns === 'string') requestedColumns = options.columns.split(',').map((d) => d.trim());
+    else requestedColumns = options.columns.map((d) => (d.name ? d.name.trim() : d.trim()));
+    requestedColumns.forEach((c) => {
+      columns = columns.concat(
+        fieldList.filter((f) => (
+          f.name === c || cleanColumnName(f.name) === cleanColumnName(c)
+        )).map((f) => f.name),
+      );
+    });
   }
   let limit = 0;
   if (parseInt(options.limit, 10) === options.limit) limit = parseInt(options.limit, 10);

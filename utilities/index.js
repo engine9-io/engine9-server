@@ -194,6 +194,10 @@ function generateUniqueKey(_opts) {
   return crypto.createHash(method).update(crypto.randomBytes(bytes)).digest(encoding);
 }
 
+function cleanColumnName(name) {
+  return name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+}
+
 /*
 An error that can take an object as a constructor, that can be dereferenced later.
 The object should have a 'message' property for the parent error.
@@ -316,6 +320,7 @@ module.exports = {
   getIntArray,
   getStringArray,
   generateUniqueKey,
+  cleanColumnName,
   ObjectError,
   deepMerge,
   analyzeTypeToParquet,

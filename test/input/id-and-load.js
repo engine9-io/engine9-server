@@ -49,6 +49,7 @@ describe('id and load multiple files', async () => {
               email: 'string',
               action_target: 'string',
               action_content: 'string',
+              sample_uppercase_content: 'string',
             },
             indexes: [
               { columns: 'id', primary: true },
@@ -104,6 +105,9 @@ describe('id and load multiple files', async () => {
 
     const { data: data3 } = await sqlWorker.query(`select count(*) as records from ${timelineDetailTable}`);
     assert(data3[0].records === records, `There were ${data3[0].records} details records found in table ${timelineDetailTable}, expected ${records}`);
+
+    const { data: data4 } = await sqlWorker.query(`select count(*) as records from ${timelineDetailTable} where length(sample_uppercase_content)>0`);
+    assert(data4[0].records === records, `There were ${data4[0].records} details records found in table ${timelineDetailTable} with sample_uppercase_content, expected ${records}`);
 
     debug(output);
   });

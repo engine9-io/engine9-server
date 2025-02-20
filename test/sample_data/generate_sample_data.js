@@ -116,6 +116,7 @@ async function createSampleActionFile(opts) {
         source_code: pick(sourceCodes),
         action_target: pick(actionTargets),
         action_content: faker.lorem.lines(),
+        'Sample Uppercase Content': faker.lorem.lines(),
       });
     }
   }

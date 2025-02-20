@@ -12,7 +12,7 @@ const JSON5 = require('json5');
 const config = require('../account-config.json');
 const {
   ObjectError,
-  bool, toCharCodes, parseRegExp, parseJSON5,
+  bool, toCharCodes, parseRegExp, parseJSON5, cleanColumnName,
 } = require('../utilities');
 const analyzeStream = require('../utilities/analyze');
 const mysqlDialect = require('./sql/dialects/MySQL');
@@ -457,7 +457,7 @@ Worker.prototype.createTableFromAnalysis = async function ({
   const columns = initialColumns.concat(
     analysis.fields.map((f) => {
       let { name } = f;
-      name = name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      name = cleanColumnName(name);
       return {
         isKnexDefinition: true,
         name,
