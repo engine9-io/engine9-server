@@ -536,6 +536,7 @@ Worker.prototype.createDetailTable = async function (options) {
         'remote_input_id',
         'remote_input_name',
         'entry_type',
+        'remote_entry_id',
         'remote_entry_uuid',
         'created_at', // standard field names
         'modified_at', // standard field names

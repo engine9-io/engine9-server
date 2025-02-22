@@ -496,11 +496,27 @@ Worker.prototype.appendEntryId = async function ({
       b.id = b.remote_entry_uuid;
       return;
     }
+    /*
+      Outside systems CAN specify a unique remote_entry_id
+      If not, it will be generated using whatever info we have
+    */
+
+    const inId = b.input_id || inputId;
+    if (!inId) throw new Error('Error appending entry id, no input_id in the file, and no default inputId');
+
+    if (b.remote_entry_id) {
+    // get a temp ID
+      const uuid = uuidv5(b.remote_entry_id, inId);
+      // Change out the ts to match the v7 sorting.
+      // But because outside specified remote_entry_id
+      // may not match this standard, uuid sorting isn't guaranteed
+      b.id = getUUIDv7(b.ts, uuid);
+      return;
+    }
+
     const missing = req.filter((d) => b[d] === undefined);// 0 could be an entry type value
     if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
     const idString = `${b.ts}-${b.person_id}-${b.entry_type_id}-${b.source_code_id}`;
-    const inId = b.input_id || inputId;
-    if (!inId) throw new Error('Error appending entry id, no input_id in the file, and no default inputId');
     // get a temp ID
     const uuid = uuidv5(idString, inId);
     // Change out the ts to match the v7 sorting.
