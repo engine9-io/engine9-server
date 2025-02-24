@@ -78,4 +78,9 @@ Worker.prototype.importPhones = async function (options) {
 };
 Worker.prototype.importPhones.metadata = internalMeta;
 
+Worker.prototype.importAddresses = async function (options) {
+  return this.internalLoadFromTable({ table: 'person_address', ...options });
+};
+Worker.prototype.importAddresses.metadata = internalMeta;
+
 module.exports = Worker;
