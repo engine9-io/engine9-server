@@ -33,6 +33,7 @@ Worker.metadata = {
 
 Worker.prototype.csvToObjectTransforms = function (options) {
   const transforms = [];
+  const delimiter = options.delimiter || ',';
 
   const headerMapping = options.headerMapping || function (d) { return d; };
   let lastLine = null;
@@ -40,7 +41,11 @@ Worker.prototype.csvToObjectTransforms = function (options) {
 
   const skipLinesWithError = bool(options.skip_lines_with_error, false);
   const parserOptions = {
-    relax: true, skip_empty_lines: true, delimiter: ',', max_limit_on_data_read: 10000000, skip_lines_with_error: skipLinesWithError,
+    relax: true,
+    skip_empty_lines: true,
+    delimiter,
+    max_limit_on_data_read: 10000000,
+    skip_lines_with_error: skipLinesWithError,
   };
   if (options.skip) parserOptions.from_line = options.skip;
   if (options.relax_column_count) parserOptions.relax_column_count = true;
@@ -76,7 +81,7 @@ Worker.prototype.csvToObjectTransforms = function (options) {
         }
       });
 
-      lastLine = row.join(',');
+      lastLine = row.join(delimiter);
       return cb(null, o);
     },
   });
@@ -184,6 +189,9 @@ Worker.prototype.fileToObjectStream = async function (options) {
 
   if (postfix === 'csv') {
     const csvTransforms = this.csvToObjectTransforms({ ...options });
+    transforms = transforms.concat(csvTransforms.transforms);
+  } else if (postfix === 'txt') {
+    const csvTransforms = this.csvToObjectTransforms({ ...options, delimiter: '\t' });
     transforms = transforms.concat(csvTransforms.transforms);
   } else if (postfix === 'jsonl') {
     /* Type of JSON that has the names in an array in the first record,

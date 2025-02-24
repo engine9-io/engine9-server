@@ -629,11 +629,12 @@ WorkerRunner.prototype.runAccount = function runAccount(accountId, callback) {
               timeout = (new Date(relativeDate(modify.start_after_timestamp)).getTime()
                 - new Date().getTime());
             }
-            if (modify.options) options = Object.extend({}, options, modify.options);
+            if (modify.options) options = { ...options, ...modify.options };
 
             setTimeout(runOnce, timeout);
           }
-          return callback();
+          return null;
+          // return callback();
         }
         // Try to parse the output, looking for circular structure
         try {

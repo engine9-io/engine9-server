@@ -117,12 +117,13 @@ Worker.prototype.getTempDir = async function () {
 };
 
 Worker.prototype.getFileWriterStream = async function (options = {}) {
+  if (!this.accountId) throw new Error('getFileWriterStream has no accountId');
   const targetFormat = options.targetFormat || 'csv';
   const tempDir = await this.getTempDir();
   let filename = `${tempDir}${path.sep}${this.accountId}_${new Date().getTime()}.${targetFormat}`;
   if (bool(options.gzip, false)) filename += '.gz';
   const stream = fs.createWriteStream(filename);
-  debug('Writing to file ', filename);
+  debug('FileWriterStream writing to file ', filename);
 
   return { filename, stream };
 };

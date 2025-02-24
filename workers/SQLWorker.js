@@ -521,6 +521,7 @@ Worker.prototype.createAndLoadTable.metadata = {
 };
 
 Worker.prototype.loadTable = async function (options) {
+  if (!options.table) return this.createAndLoadTable(options);
   const fworker = new FileWorker(this);
   const { columns } = await this.describe(options);
   const stream = await fworker.fileToObjectStream({ columns, ...options });

@@ -229,26 +229,50 @@ Worker.prototype.errorThenSuccess.metadata = {
   },
 };
 
-Worker.prototype.modify = function modify(options, callback) {
+Worker.prototype.modify = async function modify(options) {
   const delay = parseInt(options.delay, 10) || 0;
   const counter = (parseInt(options.counter, 10) || 0) + 1;
+  if (counter > 5) return { completed: true };
 
   debug(`Delaying ${delay} milliseconds, then modifying with counter ${counter}`);
-  setTimeout(() => {
+  const m = {
+    status: 'pending',
+    options: {
+      counter,
+    },
+    progress: `Progress message ${counter}`,
+    start_after_timestamp: relativeDate('+2s'),
+  };
+
+  return { modify: m };
+};
+
+Worker.prototype.modify.metadata = {
+  options: {
+    delay: {},
+  },
+};
+Worker.prototype.modifyCallback = function modify(options, callback) {
+  const delay = parseInt(options.delay, 10) || 0;
+  const counter = (parseInt(options.counter, 10) || 0) + 1;
+  if (counter > 10) return callback(null, { completed: true });
+
+  debug(`Delaying ${delay} milliseconds, then modifying with counter ${counter}`);
+  return setTimeout(() => {
     const m = {
       status: 'pending',
       options: {
         counter,
       },
       progress: `Progress message ${counter}`,
-      start_after_timestamp: relativeDate('+5s'),
+      start_after_timestamp: relativeDate('+2s'),
     };
 
     return callback(null, null, m);
   }, delay);
 };
 
-Worker.prototype.modify.metadata = {
+Worker.prototype.modifyCallback.metadata = {
   options: {
     delay: {},
   },
