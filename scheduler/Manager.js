@@ -184,7 +184,7 @@ Manager.prototype.forkJob = function (_job, callback) {
     };
 
     manager.toSchedulerQueue.add(ack);
-    debug(`${new Date().toISOString()}\tSent ack for job ${job.jobId} from account ${job.accountId}`);
+    debug(`${new Date().toISOString()}\tSent ack for job ${job.jobId} from account ${job.accountId}`, ack);
 
     const logger = manager.getLogger(job);
 
