@@ -85,9 +85,11 @@ Manager.prototype.handleEvent = async function (event) {
         });
         break;
       default:
-        manager.forkJob(event.job, (e) => {
-          if (e) throw e;
-        });
+        setTimeout(() => {
+          manager.forkJob(event.job, (e) => {
+            if (e) throw e;
+          });
+        }, 3000);// no idea why this is necessary, but the scheduler is losing some events
     }
   } catch (error) {
     debug('Caught handle event error:', error);
