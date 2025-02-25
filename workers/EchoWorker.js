@@ -2,6 +2,7 @@
  Do nothing but echo back the input options, except the 'auth' options
 */
 const debug = require('debug')('EchoWorker');
+const { setTimeout: asyncSetTimeout } = require('node:timers/promises');
 const { relativeDate } = require('../utilities');
 
 const BaseWorker = require('./BaseWorker');
@@ -235,6 +236,7 @@ Worker.prototype.modify = async function modify(options) {
   if (counter > 5) return { completed: true };
 
   debug(`Delaying ${delay} milliseconds, then modifying with counter ${counter}`);
+  await asyncSetTimeout(delay);
   const m = {
     status: 'pending',
     options: {
