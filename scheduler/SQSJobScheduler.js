@@ -1,5 +1,5 @@
 require('dotenv').config({ path: `${__dirname}/../../.env` });
-const debug = require('debug')('SQLJobScheduler');
+const debug = require('debug')('SQSJobScheduler');
 
 debug('Debug settings:', process.env.DEBUG);
 
