@@ -89,7 +89,7 @@ Manager.prototype.handleEvent = async function (event) {
           manager.forkJob(event.job, (e) => {
             if (e) throw e;
           });
-        }, 0);// no idea why this is necessary, but the scheduler is losing some events
+        }, 500);// no idea why this is necessary, but the scheduler is losing some events
     }
   } catch (error) {
     debug('Caught handle event error:', error);
@@ -377,7 +377,6 @@ Manager.prototype.forkJob = function (_job, callback) {
           job: { ...modify, jobId: job.jobId, accountId: job.accountId },
         });
       } else {
-        debug(`Successfully completed job ${job.accountId}:${job.jobId}`, job.options, out);
         manager.toSchedulerQueue.add({
           eventType: 'job_complete',
           job: {
@@ -386,6 +385,7 @@ Manager.prototype.forkJob = function (_job, callback) {
             output: out,
           },
         });
+        debug(`Successfully completed and sent job_complete for job ${job.accountId}:${job.jobId}`, job.options, out);
       }
       return callback();
     });
