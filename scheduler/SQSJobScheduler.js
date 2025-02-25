@@ -161,6 +161,7 @@ Scheduler.prototype.handleEvent = async function (event) {
         groupId: job.accountId || 'group',
         body: JSON.stringify({ event_type: eventType, ...job }),
       }]);
+
       debug('Sent queue item for id', id, queueItem);
       break;
     }
