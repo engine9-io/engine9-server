@@ -162,7 +162,7 @@ Scheduler.prototype.handleEvent = async function (event) {
         body: JSON.stringify({ event_type: eventType, ...job }),
       }]);
 
-      debug('Sent queue item for id', id, queueItem);
+      debug(`Sent queue item ${eventType} for unique id`, id, queueItem);
       break;
     }
     default:
