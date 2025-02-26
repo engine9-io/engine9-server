@@ -149,7 +149,11 @@ Scheduler.prototype.handleEvent = async function (event) {
       this.toManagerQueue.push({ eventType: 'job_start', job });
       break;
     }
-    /* these return from the manager to the queue */
+    /*
+      these return from the manager to the queue
+      FIFO seems to have deduplication issues,
+      doesn't use one for now
+    */
     case 'job_modify':
     case 'job_error':
     case 'job_complete': {
