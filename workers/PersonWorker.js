@@ -255,12 +255,13 @@ Worker.prototype.loadPeople = async function (options) {
   const fileWorker = new FileWorker(this);
 
   let fileMetadata = {};
+  const metaPath = filename.split('/').slice(0, -1).concat('metadata.json').join('/');
   if (filename) {
     try {
-      const path = filename.split('/').slice(0, -1).concat('metadata.json');
-      fileMetadata = await fileWorker.json({ filename: path });
-      debug('Retrieved metadata from :', path, fileMetadata);
+      fileMetadata = await fileWorker.json({ filename: metaPath });
+      debug('Retrieved metadata from :', metaPath, fileMetadata);
     } catch (e) {
+      debug(`Could not get medata from ${metaPath}`);
       debug(e);
     }
   }
