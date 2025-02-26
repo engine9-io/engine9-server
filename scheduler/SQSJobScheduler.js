@@ -160,10 +160,12 @@ Scheduler.prototype.handleEvent = async function (event) {
       const id = uuidv7();
       job.job_id = job.job_id || job.jobId;
       job.account_id = job.account_id || job.accountId;
+      const body = JSON.stringify({ event_type: eventType, ...job });
       await this.sqsToScheduler.send([{
         id,
         groupId: job.accountId || 'group',
-        body: JSON.stringify({ event_type: eventType, ...job }),
+        deduplicationId: id, // trying some different ids for this, other than the content hash
+        body,
       }]);
 
       debug(`Sent queue item ${eventType} for job ${job.job_id}`);
