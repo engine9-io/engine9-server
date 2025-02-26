@@ -77,7 +77,7 @@ Worker.prototype.getInputId = async function (opts) {
     inputId, pluginId, remoteInputId, remoteInputName, inputType = 'unknown', inputMetadata = null,
   } = opts;
   if (inputId) return inputId;
-  if (!pluginId || !remoteInputId) throw new Error(`getInputId: pluginId and remoteInputId are both required to create an inputId, no specified in ${JSON5.stringify(opts)}`);
+  if (!pluginId || !remoteInputId) throw new Error(`getInputId: pluginId and remoteInputId are both required to create an inputId, not specified in ${JSON5.stringify(opts)}`);
 
   return inputMutex.runExclusive(async () => {
     try {

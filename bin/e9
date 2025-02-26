@@ -4,7 +4,7 @@ export ENGINE9_PARENT_PID=$PPID
 RUNNER_PATH=$ENGINE9_SERVER_DIR/scheduler/WorkerRunner.js
 >&2 echo Engine9 Worker CLI - PID $ENGINE9_PARENT_PID running $RUNNER_PATH
 if [ -z "${DEBUG}" ]; then
-export DEBUG=info:*,ClickHouseWorker,EchoWorker,SQLWorker,InputWorker,PluginBaseWorker,UIWorker,WorkerRunner,SchemaWorker,-knex:query,-knex:client,-knex:bindings;
+export DEBUG=info:*,ClickHouseWorker,EchoWorker,PersonWorker,SQLWorker,InputWorker,PluginBaseWorker,UIWorker,WorkerRunner,SchemaWorker,-knex:query,-knex:client,-knex:bindings;
 fi
 #.e9_parameters, if any, are appended to the node command, letting you prefill things like account, worker, method, etc
 node --unhandled-rejections=strict $RUNNER_PATH `cat ./.e9_parameters` "$@"
