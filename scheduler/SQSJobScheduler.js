@@ -162,7 +162,7 @@ Scheduler.prototype.handleEvent = async function (event) {
       job.account_id = job.account_id || job.accountId;
       await this.sqsToScheduler.send([{
         id,
-        // groupId: job.accountId || 'group',
+        groupId: job.accountId || 'group',
         body: JSON.stringify({ event_type: eventType, ...job }),
       }]);
 
