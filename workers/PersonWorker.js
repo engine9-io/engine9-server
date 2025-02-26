@@ -28,6 +28,8 @@ function Worker(worker) {
 
 util.inherits(Worker, PluginBaseWorker);
 
+Worker.metadata = {};
+
 /*
   Okay, assigning ids is the one thing that may happen in parallel, so we
   need to do some blocking.
