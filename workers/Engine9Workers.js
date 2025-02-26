@@ -7,8 +7,9 @@ Worker.metadata = {
 
 Worker.EchoWorker = require('./EchoWorker');
 Worker.FileWorker = require('./FileWorker');
-Worker.SQLWorker = require('./SQLWorker');
 Worker.InputWorker = require('./InputWorker');
+Worker.PersonWorker = require('./PersonWorker');
+Worker.SQLWorker = require('./SQLWorker');
 Worker.LocalPluginPersonWorker = require('./LocalPluginPersonWorker');
 
 module.exports = Worker;
