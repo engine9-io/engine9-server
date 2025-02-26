@@ -252,18 +252,32 @@ Worker.prototype.loadPeople = async function (options) {
     stream, filename, packet, batchSize = 500,
   } = options;
 
+  const fileWorker = new FileWorker(this);
+
+  let fileMetadata = {};
+  if (filename) {
+    try {
+      const path = filename.split('/').slice(0, -1).concat('metadata.json');
+      fileMetadata = await fileWorker.json({ filename: path });
+      debug('Retrieved metadata from :', path, fileMetadata);
+    } catch (e) {
+      debug(e);
+    }
+  }
+
   // inputId, pluginId, remoteInputId, inputType = 'unknown',
-  const inputId = await this.getInputId(options);
+  let inputId = options.inputId || fileMetadata.inputId;
+
+  if (!inputId) inputId = await this.getInputId(options);
   if (!inputId) throw new Error('Could not get a required inputId from options');
 
-  let { pluginId } = options;
+  let pluginId = options.pluginId || fileMetadata.pluginId;
   if (!pluginId) {
     const { data: plugin } = await this.query({ sql: 'select plugin_id from input where id=?', values: [inputId] });
     pluginId = plugin?.[0]?.plugin_id;
     if (!pluginId) throw new Error(`Could not find pluginId for inputId=${inputId}`);
   }
 
-  const fileWorker = new FileWorker(this);
   const inStream = await fileWorker.fileToObjectStream({
     stream, filename, packet, type: 'person',
   });

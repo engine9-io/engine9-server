@@ -454,6 +454,36 @@ Worker.prototype.write.metadata = {
   },
 };
 
+async function streamToString(stream) {
+  // lets have a ReadableStream as a stream variable
+  const chunks = [];
+
+  // eslint-disable-next-line no-restricted-syntax
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks).toString('utf-8');
+}
+/*
+Retrieves and parsed
+*/
+Worker.prototype.json = async function (opts) {
+  const { stream } = await this.stream(opts);
+  const str = await streamToString(stream);
+  try {
+    return JSON5.parse(str);
+  } catch (e) {
+    debug(e);
+    throw new Error(`Unparseable JSON received: ${opts.filename || '(native stream)'}`);
+  }
+};
+Worker.prototype.json.metadata = {
+  options: {
+    filename: { description: 'Get a javascript object from a file' },
+  },
+};
+
 Worker.prototype.list = async function ({ directory }) {
   if (!directory) throw new Error('directory is required');
   if (directory.indexOf('s3://') === 0) {
