@@ -84,8 +84,8 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   } catch (e) {
   // we may not have permissions here
   }
-  /* First check to see if any new IDS have slotted in here */
-  const existingIds = await knex.select(['id_value', 'person_id'])
+  /* Find all matching ids */
+  const existingIds = await knex.select(['id_value', 'id_type', 'person_id'])
     .from('person_identifier')
     .where('id_value', 'in', Object.keys(identifierMap));
   // debug('Found ', existingIds, '.... sleeping');
@@ -93,14 +93,29 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   for the conflicting thread to catch up to the problem zone
   */
   // await sleep(5000);
-  const existingIdLookup = {};
-  existingIds.forEach((row) => {
-    existingIdLookup[row.id_value] = true;
+  const existsAlreadyInTableIdLookup = {};
+  // So, this is where we prefer one type of id over others
+  // If, say, a remote_person_id matches AND a email_hash_v1 matches
+  // we need to prefer the remote_person_id
+  existingIds.filter((row) => row.id_type === 'remote_person_id').forEach((row) => {
+    // Indicate that this already is in the table for future inserts
+    existsAlreadyInTableIdLookup[row.id_value] = true;
+
     (identifierMap[row.id_value] || []).forEach((item) => {
-      item.person_id = row.person_id;
+      if (!item.person_id) item.person_id = row.person_id;
       delete item.temp_id;
     });
   });
+  existingIds.filter((row) => row.id_type !== 'remote_person_id').forEach((row) => {
+    // Indicate that this already is in the table for future inserts
+    existsAlreadyInTableIdLookup[row.id_value] = true;
+
+    (identifierMap[row.id_value] || []).forEach((item) => {
+      if (!item.person_id) item.person_id = row.person_id;
+      delete item.temp_id;
+    });
+  });
+
   /* Now find the deduplicated list of items that still need an ID */
   const lookupByTempId = batch.filter((item) => item.temp_id)
     .reduce((a, b) => { a[b.temp_id] = b; return a; }, {});
@@ -138,7 +153,7 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
       delete item.temp_id;
     }
     (item.identifiers || []).forEach((id) => {
-      if (existingIdLookup[id.value]) return;
+      if (existsAlreadyInTableIdLookup[id.value]) return; // already exists in the table
       personIdentifersToInsert[id.value] = {
         person_id: item.person_id,
         // source_input_id is the connection this record first came from.  It
@@ -257,8 +272,8 @@ Worker.prototype.loadPeople = async function (options) {
   const fileWorker = new FileWorker(this);
 
   let fileMetadata = {};
-  const metaPath = filename.split('/').slice(0, -1).concat('metadata.json').join('/');
   if (filename) {
+    const metaPath = filename.split('/').slice(0, -1).concat('metadata.json').join('/');
     try {
       fileMetadata = await fileWorker.json({ filename: metaPath });
       debug('Retrieved metadata from :', metaPath, fileMetadata);
