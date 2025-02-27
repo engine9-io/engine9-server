@@ -28,6 +28,7 @@ Worker.prototype.internalLoadFromTable = async function (options) {
   }
   const dateColumn = [
     'frakture_last_modified',
+    'ts',
     'remote_last_modified',
     'last_modified', 'frakture_date_created', 'date_created']
     .find((d) => desc.columns.find((c) => c.name === d));
