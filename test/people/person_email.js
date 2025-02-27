@@ -8,7 +8,9 @@ const assert = require('node:assert');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-const { run, insertDefaults } = require('../test_db_schema');
+const {
+  run, deploy, truncate, insertDefaults,
+} = require('../test_db_schema');
 
 describe('Insert File of people with options', async () => {
   const accountId = 'test';
@@ -23,6 +25,9 @@ describe('Insert File of people with options', async () => {
 
   before(async () => {
     await run();
+    await deploy(env);
+    await truncate(env);
+
     await insertDefaults();
   });
 
