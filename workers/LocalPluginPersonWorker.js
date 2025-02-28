@@ -1,4 +1,5 @@
 const util = require('node:util');
+const debug = require('debug')('LocalPluginPersonWorker');
 const { relativeDate } = require('../utilities');
 const PersonWorker = require('./PersonWorker');
 
@@ -118,6 +119,7 @@ Worker.prototype.importTransactions = async function (options) {
       on (t.remote_transaction_id=m.remote_transaction_id and
         m.transaction_bot_id='${plugin.remote_plugin_id}')
        ${conditions.length > 0 ? `where ${conditions.join(' AND ')}` : ''}`;
+  debug('importTransactions SQL:', sql);
 
   return this.internalLoadPeopleFromDatabase({
     sql,
