@@ -85,7 +85,44 @@ Worker.prototype.importAddresses = async function (options) {
 Worker.prototype.importAddresses.metadata = internalMeta;
 
 Worker.prototype.importTransactions = async function (options) {
-  return this.internalLoadFromTable({ table: 'transaction', ...options });
+  const { table: inTable, start, end } = options;
+
+  const dbPlugin = await this.getPlugin({ path: 'workerbots.DBBot' });
+  const globalPrefix = dbPlugin?.table_prefix || '';
+
+  const plugin = await this.getPlugin(options);
+  const table = `${plugin.table_prefix || ''}${inTable}`;
+  let desc;
+  try {
+    desc = await this.describe({ table });
+    if (!desc.columns) throw new Error('No columns');
+  } catch (e) {
+    return { no_data: true, does_not_exist: table };
+  }
+  const dateColumn = 'ts';
+
+  const conditions = [];
+  if (start || end) {
+    if (!dateColumn) throw new Error(`start/end specified, but no date column for table ${table}`);
+    if (start) conditions.push(`${dateColumn}>=${this.escapeDate(relativeDate(start))}`);
+    if (end) conditions.push(`${dateColumn}<${this.escapeDate(relativeDate(end))}`);
+  }
+  const ignore = ['id', 'person_id'];
+  const includes = ['m.person_id_int as person_id'].concat(desc.columns.map((d) => {
+    if (ignore.indexOf(d.name) < 0) return `t.${d.name}`;
+    return null;
+  }).filter(Boolean));
+
+  return this.internalLoadPeopleFromDatabase({
+    sql: `select ${includes.map((d) => this.escapeColumn(d)).join(',')},
+      '${plugin.id}' as plugin_id from ${table} t
+      left join ${globalPrefix}transaction_metadata m
+      on (t.remote_transaction_id=m.remote_transaction_id and
+        m.transaction_bot_id='${plugin.remote_plugin_id}')
+       ${conditions.length > 0 ? `where ${conditions.join(' AND ')}` : ''}`,
+    pluginId: plugin.id,
+    remoteInputId: `${(options.remotePluginId || plugin.id)}.${table}`,
+  });
 };
 Worker.prototype.importTransactions.metadata = internalMeta;
 
