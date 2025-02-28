@@ -498,4 +498,26 @@ Worker.prototype.list.metadata = {
   },
 };
 
+Worker.prototype.head = async function (options) {
+  const { stream } = await this.fileToObjectStream(options);
+  const chunks = [];
+
+  const limit = options.limit || 3;
+  let counter = 0;
+  // eslint-disable-next-line no-restricted-syntax
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+    counter += 1;
+    if (counter >= limit) break;
+  }
+
+  return chunks;
+};
+
+Worker.prototype.head.metadata = {
+  options: {
+    filename: { required: true },
+  },
+};
+
 module.exports = Worker;
