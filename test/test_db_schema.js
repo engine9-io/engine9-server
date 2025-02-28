@@ -3,8 +3,8 @@ const debug = require('debug')('test_db_schema.js');
 const SchemaWorker = require('../workers/SchemaWorker');
 const WorkerRunner = require('../scheduler/WorkerRunner');
 
-process.env.testingPluginId = '10000000-0000-0000-0000-000000000000';// testing ID
-process.env.testingInputId = '11111111-0000-0000-0000-000000000000';// testing ID
+process.env.testingPluginId = '733e7b21-aa12-4ca3-8c06-0816736fde0f';// testing ID
+process.env.testingInputId = '015a277c-f623-11ef-9cd2-0242ac120002';// testing ID
 
 const accountId = 'test';
 const runner = new WorkerRunner();
