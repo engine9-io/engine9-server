@@ -580,6 +580,7 @@ Worker.prototype.loadTimelineTables = async function (options) {
   const fileArray = [];
   for (const o of arr) {
     const { inputId, pluginId, idFilename } = o;
+    if (!idFilename) throw new Error('No idFilename specified');
     const output = {
       inputId,
       pluginId,
