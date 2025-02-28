@@ -109,17 +109,18 @@ Worker.prototype.importTransactions = async function (options) {
   }
   const ignore = ['id', 'person_id'];
   const includes = ['m.person_id_int as person_id'].concat(desc.columns.map((d) => {
-    if (ignore.indexOf(d.name) < 0) return `t.${d.name}`;
+    if (ignore.indexOf(d.name) < 0) return `t.${this.escapeColumn(d.name)}`;
     return null;
   }).filter(Boolean));
-
-  return this.internalLoadPeopleFromDatabase({
-    sql: `select ${includes.map((d) => this.escapeColumn(d)).join(',')},
+  const sql = `select ${includes.join(',')},
       '${plugin.id}' as plugin_id from ${table} t
       left join ${globalPrefix}transaction_metadata m
       on (t.remote_transaction_id=m.remote_transaction_id and
         m.transaction_bot_id='${plugin.remote_plugin_id}')
-       ${conditions.length > 0 ? `where ${conditions.join(' AND ')}` : ''}`,
+       ${conditions.length > 0 ? `where ${conditions.join(' AND ')}` : ''}`;
+
+  return this.internalLoadPeopleFromDatabase({
+    sql,
     pluginId: plugin.id,
     remoteInputId: `${(options.remotePluginId || plugin.id)}.${table}`,
   });
