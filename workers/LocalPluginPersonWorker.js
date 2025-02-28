@@ -107,8 +107,8 @@ Worker.prototype.importTransactions = async function (options) {
   const conditions = [];
   if (start || end) {
     if (!dateColumn) throw new Error(`start/end specified, but no date column for table ${table}`);
-    if (start) conditions.push(`${dateColumn}>=${this.escapeDate(relativeDate(start))}`);
-    if (end) conditions.push(`${dateColumn}<${this.escapeDate(relativeDate(end))}`);
+    if (start) conditions.push(`t.${dateColumn}>=${this.escapeDate(relativeDate(start))}`);
+    if (end) conditions.push(`t.${dateColumn}<${this.escapeDate(relativeDate(end))}`);
   }
   const ignore = ['id', 'person_id'];
   const includes = ['m.person_id_int as person_id'].concat(desc.columns.map((d) => {
