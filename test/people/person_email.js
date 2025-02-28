@@ -36,7 +36,7 @@ describe('Insert File of people with options', async () => {
     await knex.destroy();
   });
 
-  it('Should be able to upsert and deduplicate people and email status, and produce an audit output', async () => {
+  it('Should be able to upsert and deduplicate people and email status', async () => {
     debug('Argv=', process.argv);
     const stream = [
       { email: 'x@y.com', subscription_status: 'Subscribed', type: 'Work' },

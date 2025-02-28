@@ -1,7 +1,7 @@
 const { Transform } = require('node:stream');
 
 const { pipeline } = require('node:stream/promises');
-const { uuidRegex } = require('@engine9/packet-tools');
+const { uuidIsValid } = require('@engine9/packet-tools');
 const debug = require('debug')('analyze');
 
 module.exports = async function analyzeStream(options) {
@@ -74,7 +74,7 @@ module.exports = async function analyzeStream(options) {
             } else {
               r.type = 'datetime';
             }
-          } else if (type === 'string' && uuidRegex.test(value)) {
+          } else if (type === 'string' && uuidIsValid(value)) {
             r.type = 'uuid';
           } else if (isNumber) {
             r.isNumber = true;

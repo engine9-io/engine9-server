@@ -24,7 +24,7 @@ describe('Insert Stream of People, including name updates', async () => {
     await knex.destroy();
   });
 
-  it('Should be able to upsert and deduplicate people and email status, and produce an audit output', async () => {
+  it('Should be able to upsert and deduplicate people and email status', async () => {
     await sqlWorker.truncate({ table: 'person' });
     await sqlWorker.truncate({ table: 'person_phone' });
     await sqlWorker.truncate({ table: 'person_identifier' });

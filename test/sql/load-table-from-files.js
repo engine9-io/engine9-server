@@ -4,7 +4,7 @@ const {
   describe, it, after, before,
 } = require('node:test');
 const assert = require('node:assert');
-const debug = require('debug')('test/sql/load-table-from-files');
+// const debug = require('debug')('test/sql/load-table-from-files');
 const FileWorker = require('../../workers/FileWorker');
 const SQLWorker = require('../../workers/SQLWorker');
 

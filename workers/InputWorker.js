@@ -16,7 +16,7 @@ const parquet = require('@dsnp/parquetjs');
 const csv = require('csv');
 const { mkdirp } = require('mkdirp');
 const debug = require('debug')('InputWorker');
-const { uuidRegex, getTempFilename, TIMELINE_ENTRY_TYPES } = require('@engine9/packet-tools');
+const { uuidIsValid, getTempFilename, TIMELINE_ENTRY_TYPES } = require('@engine9/packet-tools');
 // const SQLWorker = require('./SQLWorker');
 const SQLiteWorker = require('./sql/SQLiteWorker');
 const PluginBaseWorker = require('./PluginBaseWorker');
@@ -370,7 +370,6 @@ Worker.prototype.idCSV = async function (options) {
             id, ts, entry_type_id, person_id, source_code_id,
           } = b;
           delete b.identifiers;
-          delete b.source_input_id;// we already know these
           delete b.input_id;
           // eslint-disable-next-line prefer-destructuring
           if (b.email) b.email_domain = b.email.split('@').slice(-1)[0].toLowerCase();
@@ -782,7 +781,7 @@ Worker.prototype.loadTimeline = async function (options) {
     new Transform({
       objectMode: true,
       async transform(item, enc, cb) {
-        if (!uuidRegex.test(item.id)) {
+        if (!uuidIsValid(item.id)) {
           throw new Error('loadTimeline requires items to have a uuid style id');
         }
         const missing = columns.filter((k) => item[k] === undefined);
@@ -805,7 +804,6 @@ Worker.prototype.loadTimeline.metadata = {
 
 Worker.prototype.loadTimelineDetails = async function (options) {
   const { table } = options;
-  const fileWorker = new FileWorker(this);
 
   try {
     const { columns } = await this.describe({ table });
@@ -814,13 +812,14 @@ Worker.prototype.loadTimelineDetails = async function (options) {
       debug(`Existing columns:${JSON.stringify(columns, null, 4)}`);
       throw new Error(`timeline detail table ${table} needs an id column of type uuid`);
     }
+    const fileWorker = new FileWorker(this);
     const { stream } = await fileWorker.fileToObjectStream({ ...options, columns });
     return this.insertFromStream({
       table: options.table, stream, upsert: true,
     });
   } catch (e) {
     if (e.code === 'DOES_NOT_EXIST') {
-      throw e;
+      return this.createAndLoadTable({ ...options, primary: 'id' });
     }
     throw e;
   }

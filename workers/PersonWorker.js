@@ -156,10 +156,10 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
       if (existsAlreadyInTableIdLookup[id.value]) return; // already exists in the table
       personIdentifersToInsert[id.value] = {
         person_id: item.person_id,
-        // source_input_id is the connection this record first came from.  It
+        // input_id is the connection this record first came from.  It
         // should be provided by the source stream, and will error if it's null.
         // If there truly is no input, provide a 0 uuid
-        source_input_id: item.source_input_id,
+        source_input_id: item.input_id,
         id_type: id.type,
         id_value: id.value,
       };
@@ -225,7 +225,10 @@ Worker.prototype.appendPersonId = async function ({ batch, sourceInputId }) {
   return batch;
 };
 
-Worker.prototype.getDefaultPipelineConfig = async function () {
+Worker.prototype.getPipelineConfig = async function ({
+  extraPreIdentityTransforms,
+  extraPostIdentityTransforms,
+}) {
   let customFields = [];
 
   const sqlWorker = await this.getSQLWorker();
@@ -250,15 +253,18 @@ Worker.prototype.getDefaultPipelineConfig = async function () {
       {
         path: 'engine9-interfaces/person_phone/transforms/inbound/extract_identifiers.js',
         options: { dedupe_with_phone: true },
-      },
-      { path: 'person.appendPersonId' },
-      // add the name
-      { path: 'engine9-interfaces/person/transforms/inbound/upsert_tables.js', options: {} },
-      { path: 'engine9-interfaces/person_email/transforms/inbound/upsert_tables.js', options: {} },
-      { path: 'engine9-interfaces/person_phone/transforms/inbound/upsert_tables.js', options: {} },
-    ].concat(customFields.filter(Boolean))
-    // { path: 'engine9-interfaces/person_address/transforms/inbound/upsert_tables.js' },
+      }]
+      .concat(extraPreIdentityTransforms || [])
+      .concat([
+        { path: 'person.appendPersonId' },
+        { path: 'engine9-interfaces/person/transforms/inbound/upsert_tables.js', options: {} },
+        { path: 'engine9-interfaces/person_email/transforms/inbound/upsert_tables.js', options: {} },
+        { path: 'engine9-interfaces/person_phone/transforms/inbound/upsert_tables.js', options: {} },
+      ])
+      .concat(customFields.filter(Boolean))
+      // { path: 'engine9-interfaces/person_address/transforms/inbound/upsert_tables.js' },
       // { path: 'engine9-interfaces/segment/transforms/inbound/upsert_tables.js' },
+      .concat(extraPostIdentityTransforms || [])
       .concat({ path: 'sql.upsertTables' }),
   };
 };
@@ -267,6 +273,7 @@ Worker.prototype.loadPeople = async function (options) {
   const worker = this;
   const {
     stream, filename, packet, batchSize = 500,
+    extraPreIdentityTransforms, extraPostIdentityTransforms,
   } = options;
 
   const fileWorker = new FileWorker(this);
@@ -301,11 +308,14 @@ Worker.prototype.loadPeople = async function (options) {
   });
   let pipelineConfig = null;
   if (!worker.compiledPipeline) {
-    pipelineConfig = await this.getDefaultPipelineConfig();
+    pipelineConfig = await this.getPipelineConfig({
+      extraPreIdentityTransforms,
+      extraPostIdentityTransforms,
+    });
     worker.compiledPipeline = await this.compilePipeline(pipelineConfig);
   }
   let records = 0;
-  const start = new Date();
+  const start = new Date().getTime();
   const summary = { executionTime: {} };
 
   await pipeline(
@@ -314,8 +324,7 @@ Worker.prototype.loadPeople = async function (options) {
     new Transform({
       objectMode: true,
       async transform(batch, encoding, cb) {
-        debug(`Processing batch of length ${batch.length} Total records:${records} Sample:`, batch[0]);
-        batch.forEach((b) => { b.source_input_id = b.source_input_id || inputId; });
+        batch.forEach((b) => { b.input_id = b.input_id || inputId; });
         const batchSummary = await worker.executeCompiledPipeline(
           { pipeline: worker.compiledPipeline, batch, pluginId },
         );
@@ -323,7 +332,12 @@ Worker.prototype.loadPeople = async function (options) {
           summary.executionTime[path] = (summary.executionTime[path] || 0) + val;
         });
         records += batch.length;
-        worker.logSome('PersonWorker upsert processed ', records, start, JSON.stringify({ filename, packet, ...summary }));
+        const end = new Date().getTime();
+        const ps = ((1000 * records) / (end - start)).toFixed(1);
+        if ((records % 25000) === 0) {
+          worker.progress(`Completed ${records} records, ${ps} per second`);
+        }
+        debug(`Processed batch of length ${batch.length} Total records:${records} ${ps} per second, Sample:`, batch[0]);
         cb();
       },
     }),

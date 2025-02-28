@@ -30,7 +30,7 @@ describe('Insert File of people with options', async () => {
     await knex.destroy();
   });
 
-  it('Should be able to upsert and deduplicate people and phone status, and produce an audit output', async () => {
+  it('Should be able to upsert and deduplicate people and phone status', async () => {
     const stream = [
       {
         remote_phone_id: '123425385-16822018411',

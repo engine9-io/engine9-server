@@ -9,7 +9,7 @@ const JSON5 = require('json5');// Useful for parsing extended JSON
 // knex starts up it's own debugger,
 const Knex = require('knex');
 
-const { uuidRegex } = require('@engine9/packet-tools');
+const { uuidIsValid } = require('@engine9/packet-tools');
 const ReportWorker = require('../../workers/ReportWorker');
 const SegmentWorker = require('../../workers/SegmentWorker');
 const { ObjectError } = require('../../utilities');
@@ -158,7 +158,7 @@ async function getData(options, databaseWorker) {
   if (eqlObject.columns.length === 0)eqlObject.columns = ['*'];
   if (options.id) {
     let id = parseInt(options.id, 10);
-    if (uuidRegex.test(options.id)) id = `'${options.id}'`;
+    if (uuidIsValid(options.id)) id = `'${options.id}'`;
     else if (Number.isNaN(id)) throw new Error('Invalid id');
     eqlObject.conditions = (eqlObject.conditions || []).concat({ eql: `id=${id}` });
     eqlObject.limit = 0;
@@ -232,7 +232,7 @@ async function getData(options, databaseWorker) {
     inc.foreign_id_field = inc.foreign_id_field || `${table}_id`;
     inc.conditions.push({
       eql: `${inc.foreign_id_field} in (${allIds.map((id) => {
-        if (uuidRegex.test(id)) return `'${options.id}'`;
+        if (uuidIsValid(id)) return `'${options.id}'`;
         if (Number.isNaN(id)) throw new Error('Invalid id');
         return `${id}`;
       }).join(',')})`,

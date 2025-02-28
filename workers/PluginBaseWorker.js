@@ -5,9 +5,13 @@ const fsp = fs.promises;
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const debug = require('debug')('PluginBaseWorker');
 const {
-  getUUIDv7, getInputUUID, TIMELINE_ENTRY_TYPES, uuidRegex, getTimelineOutputStream,
+  getUUIDv7,
+  getInputUUID,
+  TIMELINE_ENTRY_TYPES,
+  uuidIsValid,
+  getTimelineOutputStream,
+  getTimelineEntryUUID,
 } = require('@engine9/packet-tools');
-const { v5: uuidv5 } = require('uuid');
 
 const { LRUCache } = require('lru-cache');
 const { Mutex } = require('async-mutex');
@@ -483,46 +487,9 @@ Worker.prototype.appendEntryId = async function ({
   inputId,
   batch,
 }) {
-  const req = ['ts', 'entry_type_id', 'person_id'];
   batch.forEach((b) => {
     if (b.id) return;
-    /*
-      Outside systems CAN specify a unique UUID as remote_entry_uuid,
-      which will be used for updates, etc.
-      If not, it will be generated using whatever info we have
-    */
-    if (b.remote_entry_uuid) {
-      if (!uuidRegex.test(b.remote_entry_uuid)) throw new Error('Invalid remote_entry_uuid, it must be a UUID');
-      b.id = b.remote_entry_uuid;
-      return;
-    }
-    /*
-      Outside systems CAN specify a unique remote_entry_id
-      If not, it will be generated using whatever info we have
-    */
-
-    const inId = b.input_id || inputId;
-    if (!inId) throw new Error('Error appending entry id, no input_id in the file, and no default inputId');
-
-    if (b.remote_entry_id) {
-    // get a temp ID
-      const uuid = uuidv5(b.remote_entry_id, inId);
-      // Change out the ts to match the v7 sorting.
-      // But because outside specified remote_entry_id
-      // may not match this standard, uuid sorting isn't guaranteed
-      b.id = getUUIDv7(b.ts, uuid);
-      return;
-    }
-
-    const missing = req.filter((d) => b[d] === undefined);// 0 could be an entry type value
-    if (missing.length > 0) throw new Error(`Missing required fields to append an entry_id:${missing.join(',')}`);
-    const idString = `${b.ts}-${b.person_id}-${b.entry_type_id}-${b.source_code_id}`;
-    // get a temp ID
-    const uuid = uuidv5(idString, inId);
-    // Change out the ts to match the v7 sorting.
-    // But because outside specified remote_entry_uuid
-    // may not match this standard, uuid sorting isn't guaranteed
-    b.id = getUUIDv7(b.ts, uuid);
+    b.id = getTimelineEntryUUID(b, { defaults: { input_id: inputId } });
   });
 };
 
@@ -618,7 +585,7 @@ Worker.prototype.getPlugin = async function (opts) {
   const conditions = [];
   const values = [];
   if (pluginId) {
-    if (uuidRegex.test(pluginId)) {
+    if (uuidIsValid(pluginId)) {
       conditions.push('id=?');
       values.push(pluginId);
     } else {
