@@ -86,18 +86,20 @@ Worker.prototype.importAddresses = async function (options) {
 Worker.prototype.importAddresses.metadata = internalMeta;
 
 Worker.prototype.importTransactions = async function (options) {
-  const { table: inTable, start, end } = options;
+  const { start, end } = options;
 
   const dbPlugin = await this.getPlugin({ path: 'workerbots.DBBot' });
   const globalPrefix = dbPlugin?.table_prefix || '';
 
   const plugin = await this.getPlugin(options);
-  const table = `${plugin.table_prefix || ''}${inTable}`;
+  const table = `${plugin.table_prefix || ''}transaction`;
+  debug('Describing table ', table);
   let desc;
   try {
     desc = await this.describe({ table });
     if (!desc.columns) throw new Error('No columns');
   } catch (e) {
+    debug(`No such table:${table}`);
     return { no_data: true, does_not_exist: table };
   }
   const dateColumn = 'ts';
