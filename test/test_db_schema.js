@@ -3,8 +3,11 @@ const debug = require('debug')('test_db_schema.js');
 const SchemaWorker = require('../workers/SchemaWorker');
 const WorkerRunner = require('../scheduler/WorkerRunner');
 
-process.env.testingPluginId = '733e7b21-aa12-4ca3-8c06-0816736fde0f';// testing ID
-process.env.testingInputId = '015a277c-f623-11ef-9cd2-0242ac120002';// testing ID
+process.env.testingPluginId = '00000000-aa12-4ca3-8c06-0816736fde0f';// testing ID
+process.env.testingInputId = '00000000-f623-11ef-9cd2-0242ac120002';// testing ID
+process.env.testingPluginId2 = '00000000-ff01-42b3-ba2d-a2db610b6450';// testing ID
+process.env.testingInputId2 = '00000000-ff99-4697-a508-888de9fceafe';// testing ID
+process.env.testingInputId3 = '00000000-0898-4891-9d90-e9cb489e4143';// testing ID3
 
 const accountId = 'test';
 const runner = new WorkerRunner();
@@ -32,14 +35,14 @@ async function deploy(opts) {
 
   debug('Deployed all schemas');
 
-  schemaWorker.destroy();
+  if (!opts?.knex) schemaWorker.destroy();
 }
 async function truncate(opts) {
   const schemaWorker = new SchemaWorker(opts);
   debug('Truncating tables');
   const { tables } = await schemaWorker.tables({ type: 'table' });
   await Promise.all(tables.map((table) => schemaWorker.truncate({ table })));
-  schemaWorker.destroy();
+  if (!opts?.knex) schemaWorker.destroy();
 }
 
 async function insertDefaults(opts) {
@@ -53,7 +56,7 @@ async function insertDefaults(opts) {
     values: [process.env.testingInputId, process.env.testingPluginId, 'testing-input'],
   });
 
-  schemaWorker.destroy();
+  if (!opts?.knex) schemaWorker.destroy();
 }
 
 async function run() {
