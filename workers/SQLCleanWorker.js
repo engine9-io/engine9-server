@@ -9,7 +9,7 @@ require('dotenv').config({ path: '.env' });
 function Worker(worker) {
   SQLWorker.call(this, worker);
   this.accountId = worker.accountId;
-  if (!this.accountId) throw new Error('No accountId provided to SegmentWorker constructor');
+  if (!this.accountId) throw new Error('No accountId provided to SQLWorker constructor');
   if (worker.knex) {
     this.knex = worker.knex;
   } else {

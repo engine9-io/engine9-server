@@ -141,7 +141,11 @@ Worker.prototype.query = async function (options) {
 
     return this.parseQueryResults({ sql: opts.sql, results });
   } catch (e) {
-    info('Error running query:', this.accountId, this.info(), options, e);
+    info('Error running query for account:', this.accountId, this.info(), options, e);
+    if (e.message === 'aborted') {
+      throw new Error('Query was aborted, possibly because the connection was closed before the query completed');
+    }
+
     throw e;
   }
 };

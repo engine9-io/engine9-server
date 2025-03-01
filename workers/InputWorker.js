@@ -111,19 +111,37 @@ Worker.prototype.id = async function (options) {
   const worker = this;
 
   const {
-    inputId, defaultEntryType, filename,
+    defaultEntryType, filename,
   } = options;
-  let { pluginId } = options;
+  const parts = filename.split('/');
+  let { inputId, pluginId } = options;
   if (!inputId) {
-    throw new Error('id requires an inputId');
+    const uuid = parts[parts.length - 2];
+    if (uuidIsValid(uuid)) {
+      inputId = uuid;
+    } else {
+      throw new Error('id requires an inputId, and the directory from the filename is not correct');
+    }
   }
   if (!pluginId) {
-    const { data: inputData } = await this.query({ sql: 'select * from input where id=?', values: [inputId] });
+    const { data: inputData } = await this.query({ sql: 'select plugin_id from input where id=?', values: [inputId] });
     const input = inputData[0];
-    if (!input) {
-      throw new Error(`pluginId is required to identify new people, was not specified, and could not find input id ${inputId} in the database to track it down`);
+    if (input?.plugin_id) {
+      pluginId = input.plugin_id;
+    } else {
+      // check the filename
+      const testPluginId = parts[parts.length - 4];
+      if (uuidIsValid(testPluginId)) {
+        pluginId = testPluginId;
+      } else {
+        const remote_plugin_id = testPluginId.split(':').slice(-1)[0];
+        const { data: pluginData } = await this.query({ sql: 'select id from plugin where remote_plugin_id=?', values: [remote_plugin_id] });
+        pluginId = pluginData?.[0]?.id;
+        if (!pluginId) {
+          throw new Error(`pluginId is required to identify new people, was not specified, and could not find input id ${inputId}, nor remote_plugin_id ${remote_plugin_id} in the database to track it down`);
+        }
+      }
     }
-    pluginId = input.plugin_id;
   }
 
   const processId = `.${new Date().getTime()}.processing`;
