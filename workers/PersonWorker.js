@@ -302,6 +302,9 @@ Worker.prototype.loadPeople = async function (options) {
     pluginId = plugin?.[0]?.plugin_id;
     if (!pluginId) throw new Error(`Could not find pluginId for inputId=${inputId}`);
   }
+  // Make sure the input exists -- elsewhere we can make sure it has matching remote_input_id/name,
+  // but that's not critical for loading the data up
+  await this.insertFromStream({ stream: [{ id: inputId, plugin_id: pluginId }], table: 'input', upsert: true });
 
   const inStream = await fileWorker.fileToObjectStream({
     stream, filename, packet, type: 'person',

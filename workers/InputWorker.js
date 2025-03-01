@@ -107,6 +107,14 @@ Worker.prototype.getMetadata = async function ({ directory }) {
 Worker.prototype.getMetadata.metadata = {
 };
 
+Worker.prototype.listMissingIdFiles = async function (options) {
+  let { directory } = options;
+  if (!directory) directory = `${this.store_path}/${this.accountId}/stored_inputs`;
+};
+Worker.prototype.listMissingIdFiles.metadata = {
+
+};
+
 Worker.prototype.id = async function (options) {
   const worker = this;
 
