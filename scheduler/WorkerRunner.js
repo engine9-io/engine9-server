@@ -620,7 +620,7 @@ WorkerRunner.prototype.runAccount = function runAccount(accountId, callback) {
               console.log(util.inspect(output, { colors: true, depth: 6, maxArrayLength: 1000 }));
             } else {
               // eslint-disable-next-line no-console
-              console.log(JSON.stringify(output, null, 4));
+              console.log(JSON.stringify(output, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 4));
             }
             process.exit(0);
           } else {
@@ -638,7 +638,7 @@ WorkerRunner.prototype.runAccount = function runAccount(accountId, callback) {
         }
         // Try to parse the output, looking for circular structure
         try {
-          JSON.stringify(_output);
+          JSON.stringify(_output, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
         } catch (e) {
           debug(`Completed method ${method.name} but there was an unserializable part of the response:`, _output);
           hasError = true;
@@ -673,7 +673,7 @@ WorkerRunner.prototype.runAccount = function runAccount(accountId, callback) {
           console.log(util.inspect(response, { colors: true, depth: 6, maxArrayLength: 1000 }));
         } else {
           // eslint-disable-next-line no-console
-          console.log(JSON.stringify(response, null, 4));
+          console.log(JSON.stringify(response, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 4));
         }
         return callback(null, response);
       });
@@ -693,7 +693,7 @@ function end(e, d) {
 
   if (d) {
     // eslint-disable-next-line no-console
-    console.log(JSON.stringify(d, null, 4));
+    console.log(JSON.stringify(d, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 4));
   }
 
   process.exit();
