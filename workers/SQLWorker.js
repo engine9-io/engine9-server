@@ -491,6 +491,7 @@ Worker.prototype.createAndLoadTable = async function (options) {
     await this.createTableFromAnalysis({
       table,
       analysis,
+      indexes,
       initialColumns: options.initialColumns,
     });
     const { columns } = await this.describe({ table });
