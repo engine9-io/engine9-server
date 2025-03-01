@@ -450,7 +450,7 @@ Worker.prototype.deduceColumnDefinition = function (o) {
 };
 
 Worker.prototype.createTableFromAnalysis = async function ({
-  table, analysis, indexes, primary, initialColumns = [],
+  table, analysis, indexes, initialColumns = [],
 }) {
   if (!analysis) throw new Error('analysis is required');
   await this.connect();// set variables, etc
@@ -465,9 +465,16 @@ Worker.prototype.createTableFromAnalysis = async function ({
       };
     }),
   );
+  const pkey = (indexes || []).find((d) => d.primary);
+  if (pkey) {
+    [].concat(pkey.columns).forEach((colName) => {
+      const col = columns.find((d) => d.name === colName);
+      col.nullable = false;// primary keys can't be null
+    });
+  }
   debug(columns);
   return this.createTable({
-    table, columns, indexes, primary,
+    table, columns, indexes,
   });
 };
 

@@ -181,7 +181,8 @@ Manager.prototype.forkJob = function (_job, callback) {
       job: {
         accountId: job.accountId,
         jobId: job.jobId,
-        progress: 'Request acknowledged ... working.',
+        status: 'started',
+        progress: 'Engine9 request acknowledged ... working.',
       },
     };
 
@@ -374,7 +375,11 @@ Manager.prototype.forkJob = function (_job, callback) {
 
         manager.toSchedulerQueue.add({
           eventType: 'job_modify',
-          job: { ...modify, jobId: job.jobId, accountId: job.accountId },
+          job: {
+            ...modify,
+            jobId: job.jobId,
+            accountId: job.accountId,
+          },
         });
       } else {
         manager.toSchedulerQueue.add({
