@@ -159,10 +159,19 @@ Worker.prototype.list = async function ({ directory }) {
   while (dir.slice(-1) === '/') dir = dir.slice(0, -1);
   const { Bucket, Key: Prefix } = getParts(dir);
   const s3Client = new S3Client({});
-  const command = new ListObjectsV2Command({ Bucket, Prefix });
+  const command = new ListObjectsV2Command({
+    Bucket,
+    Prefix: `${Prefix}/`,
+    Delimiter: '/',
+  });
 
-  const { Contents } = await s3Client.send(command);
-  return Contents.map(({ Key }) => Key.slice(Prefix.length + 1));
+  const { Contents: files, CommonPrefixes } = await s3Client.send(command);
+  debug('Prefixes:', { CommonPrefixes });
+  return {
+    directories: (CommonPrefixes || []).map((d) => d.Prefix.slice(Prefix.length + 1, -1)),
+    Prefix,
+    files: (files || []).map(({ Key }) => Key.slice(Prefix.length + 1)),
+  };
 };
 Worker.prototype.list.metadata = {
   options: {
