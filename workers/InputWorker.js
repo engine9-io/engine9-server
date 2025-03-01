@@ -808,10 +808,11 @@ Worker.prototype.loadTimelineDetails = async function (options) {
 
   try {
     const { columns } = await this.describe({ table });
-    if (!columns.find((c) => (c.name === 'id'
-        && (c.type === 'id_uuid')))) {
+    const idColumn = columns.find((c) => (c.name === 'id'));
+    if (!idColumn
+        || (['id_uuid'].indexOf(idColumn.type) < 0)) {
       debug(`Existing columns:${JSON.stringify(columns, null, 4)}`);
-      throw new Error(`timeline detail table ${table} needs an id column of type uuid`);
+      throw new Error(`timeline detail table ${table} needs an id column of type uuid, found type ${idColumn?.type}`);
     }
     const fileWorker = new FileWorker(this);
     const { stream } = await fileWorker.fileToObjectStream({ ...options, columns });
