@@ -111,10 +111,29 @@ Worker.prototype.importTransactions = async function (options) {
     if (end) conditions.push(`t.${dateColumn}<${this.escapeDate(relativeDate(end))}`);
   }
   const ignore = ['id', 'person_id'];
+  /*
+    TRANSACTION,
+    TRANSACTION_INITIAL,
+    TRANSACTION_SUBSEQUENT,
+    TRANSACTION_REFUND,
+  */
+
   const includes = ['m.person_id_int as person_id'].concat(desc.columns.map((d) => {
     if (ignore.indexOf(d.name) < 0) return `t.${this.escapeColumn(d.name)}`;
     return null;
   }).filter(Boolean));
+
+  if (desc.columns.find((d) => d.name === 'entry_type')
+    || desc.columns.find((d) => d.name === 'entry_type_id')
+  ) {
+    // We're okay -- if there's invalid data in those field we should know it
+  } else if (desc.columns.find((d) => d.name === 'recurs')) {
+    includes.push(`case when length(t.recurs)>0 then 'TRANSACTION_RECURRING',
+     else 'TRANSACTION_ONE_TIME' end as entry_type`);
+  } else {
+    includes.push('\'TRANSACTION\' as entry_type');
+  }
+
   const sql = `select ${includes.join(',')},
       '${plugin.id}' as plugin_id from ${table} t
       left join ${globalPrefix}transaction_metadata m
