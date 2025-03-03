@@ -128,7 +128,8 @@ Worker.prototype.importTransactions = async function (options) {
   ) {
     // We're okay -- if there's invalid data in those field we should know it
   } else if (desc.columns.find((d) => d.name === 'recurs')) {
-    includes.push(`case when length(t.recurs)>0 then 'TRANSACTION_RECURRING',
+    includes.push(`case when length(t.recurs)>0 
+     then 'TRANSACTION_RECURRING'
      else 'TRANSACTION_ONE_TIME' end as entry_type`);
   } else {
     includes.push('\'TRANSACTION\' as entry_type');
