@@ -127,6 +127,9 @@ Worker.prototype.importTransactions = async function (options) {
     sql,
     pluginId: plugin.id,
     remoteInputId: `${(options.remotePluginId || plugin.id)}.${table}`,
+    extraPostIdentityTransforms: [
+      { path: 'engine9-interfaces/transaction/transforms/inbound/upsert_tables.js', options: {} },
+    ],
   });
 };
 Worker.prototype.importTransactions.metadata = internalMeta;

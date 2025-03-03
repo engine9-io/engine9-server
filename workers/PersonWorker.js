@@ -379,7 +379,11 @@ Worker.prototype.loadPeople.metadata = {
 };
 
 Worker.prototype.internalLoadPeopleFromDatabase = async function (options) {
-  const { sql, pluginId } = options;
+  const {
+    sql, pluginId,
+    extraPreIdentityTransforms,
+    extraPostIdentityTransforms,
+  } = options;
   if (!sql) throw new Error('sql is required');
   if (!pluginId) throw new Error('pluginId is required');
 
@@ -398,6 +402,8 @@ Worker.prototype.internalLoadPeopleFromDatabase = async function (options) {
     inputMetadata: JSON.stringify({
       sql: sql.slice(0, 1000),
     }),
+    extraPreIdentityTransforms,
+    extraPostIdentityTransforms,
   });
 };
 
