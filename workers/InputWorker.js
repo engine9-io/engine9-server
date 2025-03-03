@@ -666,8 +666,8 @@ Worker.prototype.statistics = async function (options) {
       let { directory } = d;
       while (directory.slice(-1) === '/')directory = directory.slice(0, -1);
       files = (await fileWorker.list({ directory }))
-        .filter((f) => f.endsWith('.id.parquet'))
-        .map((f) => ({ idFilename: `${directory}/${f}` }));
+        .filter((f) => f.name.endsWith('.id.parquet'))
+        .map((f) => ({ idFilename: `${directory}/${f.name}` }));
     } else {
       throw new Error(`Invalid directory for statistics:${JSON.stringify(d)}`);
     }

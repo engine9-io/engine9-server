@@ -167,11 +167,16 @@ Worker.prototype.list = async function ({ directory }) {
 
   const { Contents: files, CommonPrefixes } = await s3Client.send(command);
   debug('Prefixes:', { CommonPrefixes });
-  return {
-    directories: (CommonPrefixes || []).map((d) => d.Prefix.slice(Prefix.length + 1, -1)),
-    Prefix,
-    files: (files || []).map(({ Key }) => Key.slice(Prefix.length + 1)),
-  };
+  const output = [].concat((CommonPrefixes || []).map((f) => ({
+    name: f.Prefix.slice(Prefix.length + 1, -1),
+    type: 'directory',
+  })))
+    .concat((files || []).map(({ Key }) => ({
+      name: Key.slice(Prefix.length + 1),
+      type: 'file',
+    })));
+
+  return output;
 };
 Worker.prototype.list.metadata = {
   options: {

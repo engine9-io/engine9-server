@@ -490,7 +490,11 @@ Worker.prototype.list = async function ({ directory }) {
     const s3Worker = new S3Worker(this);
     return s3Worker.list({ directory });
   }
-  return fsp.readdir(directory);
+  const a = await fsp.readdir(directory, { withFileTypes: true });
+  return a.map((f) => ({
+    name: f.name,
+    type: f.isDirectory() ? 'directory' : 'file',
+  }));
 };
 Worker.prototype.list.metadata = {
   options: {
