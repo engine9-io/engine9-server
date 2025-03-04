@@ -860,4 +860,43 @@ Worker.prototype.loadTimelineDetails.metadata = {
   },
 };
 
+Worker.prototype.ensureTimelineDetailSummary = async function (options) {
+  const { table } = options;
+
+  const { columns } = await this.describe({ table });
+  const ignore = ['id', 'remote_input_id', 'remote_input_name'];
+
+  const entryType = `case ${Object.entries(TIMELINE_ENTRY_TYPES)
+    .filter(([, value]) => typeof value === 'number')
+    .map(([key, value]) => `when entry_type_id=${value} then ${this.escapeValue(key)}`).join(' \n')}
+    else 'N/A' end as entry_type`;
+  const sql = `select
+  timeline.id AS id,
+  timeline.ts AS ts,
+  timeline.entry_type_id,
+  ${entryType},
+  timeline.created_at AS created_at,
+  timeline.person_id AS person_id,
+  timeline.input_id AS input_id,
+  input.input_type AS input_type,
+  input.remote_input_id AS remote_input_id,
+  input.remote_input_name AS remote_input_name,
+  plugin.path AS plugin_path,
+  plugin.name AS plugin_name,
+  plugin.nickname AS plugin_nickname,
+  plugin.remote_plugin_id AS plugin_remote_id,
+  dict.source_code_id AS source_code_id,
+  dict.source_code AS source_code,
+  ${columns.filter((d) => ignore.indexOf(d.name) < 0).map((d) => this.escapeColumn(d.name)).join(',')}
+from ${table} d
+    JOIN timeline on (d.id = timeline.id)
+    JOIN input on (timeline.input_id = input.id)
+    JOIN plugin on (input.plugin_id = plugin.id)
+    left JOIN source_code_dictionary dict on (timeline.source_code_id = dict.source_code_id)`;
+  return this.ensureView({ table: `${table}_summary`, sql });
+};
+Worker.prototype.ensureTimelineDetailSummary.metadata = {
+  table: {},
+};
+
 module.exports = Worker;

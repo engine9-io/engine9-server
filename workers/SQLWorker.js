@@ -799,14 +799,34 @@ Worker.prototype.getCreateView.metadata = {
 };
 
 Worker.prototype.createView = async function (options) {
+  const table = options.table || options.name;
   let sql = options.sql || await this.buildSqlFromEQLObject(options);
   if (bool(options.replace, false)) {
-    sql = `CREATE VIEW ${options.name} AS ${sql}`;
+    sql = `CREATE VIEW ${table} AS ${sql}`;
   } else {
-    sql = `CREATE OR REPLACE VIEW ${options.name} AS ${sql}`;
+    sql = `CREATE OR REPLACE VIEW ${table} AS ${sql}`;
   }
 
-  this.query(sql);
+  return this.query(sql);
+};
+
+Worker.prototype.ensureView = async function ({ table, sql, replace }) {
+  // already exists
+  if (replace) return this.createView({ table, sql, replace: true });
+  try {
+    await this.describe({ table });
+  } catch (e) {
+    // doesn't exist
+    return this.createView({ table, sql });
+  }
+  return { exists: true };
+};
+Worker.prototype.ensureView.metadata = {
+  options: {
+    table: {},
+    sql: {},
+    replace: {},
+  },
 };
 
 Worker.prototype.createTable = async function ({
@@ -1398,8 +1418,10 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
 
     async function fromColumn(input, opts) {
       const {
-        table = baseTable, column, aggregate = 'NONE', function: func = 'NONE', name, eql,
+        table = baseTable, aggregate = 'NONE', function: func = 'NONE', name, eql,
       } = input;
+      let { column } = input;
+      if (typeof input === 'string') column = input;
       // eslint-disable-next-line no-shadow
       const { ignore_alias = false, orderBy = false } = opts || {};
       if (!table) throw new Error(`Invalid column, no table:${JSON.stringify(input)}`);
@@ -1421,6 +1443,7 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
         debugMore('Using a * column');
         result = `${dbWorker.escapeTable(table)}.*`;
       } else {
+        if (!column) throw new Error(`Invalid query, no column found in ${JSON.stringify(input)}`);
         const def = await getTableDef({ table });
         const columnDef = def.columns.find((x) => x.name === column);
         if (!columnDef) {
@@ -1428,7 +1451,7 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
           // and ignore them if they're not in the table
           // But NOT if you use eql, that will error
           if (opts && opts.ignore_missing) return null;
-          throw new Error(`no such column: ${column} for ${table} with input:${JSON.stringify(input)} and opts:${JSON.stringify(opts)}`);
+          throw new Error(`no such column: ${column} for table ${table} with input:${JSON.stringify(input)} and opts:${JSON.stringify(opts)}`);
         }
 
         const withFunction = await sqlFunctions[func](`${dbWorker.escapeTable(table)}.${dbWorker.escapeColumn(column)}`);
@@ -1479,7 +1502,7 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
 
       const values = await Promise.all(raw.map(fromConditionValue));
       if (typeof conditionFns[type] !== 'function') {
-        throw new Error(`Could not find function for type:${type}`);
+        throw new Error(`Could not find function for type:${type}, available functions:${Object.keys(conditionFns)}`);
       }
       return conditionFns[type](values);
     }
@@ -1517,13 +1540,15 @@ Worker.prototype.buildSqlFromEQLObject = async function (options) {
     if (joins.length) {
       joinClause = (await Promise.all(joins.map(async (j) => {
         if (typeof j === 'string') throw new Error(`Attempting to parse EQL -- Object required for table join that must include table and join_eql, invalid=${j}`);
-        const { table, join_eql } = j;
+        const { table, join_eql, type = 'inner' } = j;
         if (!table || !join_eql) throw new Error('Invalid join specification, must include table and join_eql');
+        const allowedTypes = ['left', 'right', 'inner', 'outer'];
+        if (type.indexOf(type) < 0) throw new Error(`Invalid join specification, type must be one of ${allowedTypes.join()}, it was ${type}`);
         const alias = j.alias || table;
 
         const match = dbWorker.transformEql({ eql: join_eql, table: baseTable });
 
-        return `left join ${dbWorker.escapeTable(table)} as ${dbWorker.escapeTable(alias)} on ${match.sql}`;
+        return `${type} join ${dbWorker.escapeTable(table)} as ${dbWorker.escapeTable(alias)} on ${match.sql}`;
       }))).join('\n').trim();
     }
     debugMore('Constructing parts');

@@ -1,6 +1,8 @@
+/* eslint-disable no-await-in-loop */
+
 const util = require('util');
 // const debug = require('debug')('SegmentWorker');
-const debugInfo = require('debug')('info:SegmentWorker');
+// const debugInfo = require('debug')('info:SegmentWorker');
 
 const JSON5 = require('json5');// Useful for parsing extended JSON
 
@@ -11,90 +13,9 @@ require('dotenv').config({ path: '.env' });
 function Worker(worker) {
   SQLWorker.call(this, worker);
   this.accountId = worker.accountId;
-  if (worker.knex) {
-    this.knex = worker.knex;
-  } else {
-    this.auth = {
-      ...worker.auth,
-    };
-  }
 }
 
 util.inherits(Worker, SQLWorker);
-
-/*
-build an array of rules
-{"combinator":"and",
-    "rules":[
-      {"field":"given_name","operator":"=","valueSource":"value","value":"Bob"},
-      {"field":"family_name","operator":"beginsWith","valueSource":"value","value":"J"},
-      { "combinator":"and","not":false
-        "rules":[
-          {"field":"age","operator":"=","valueSource":"value","value":42}],
-      }
-    ]
-  }
-*/
-/*
-export const defaultOperators = [
-  { name: `=`, value: `=`, label: `=` } as const,
-  { name: '!=', value: '!=', label: '!=' } as const,
-  { name: '<', value: '<', label: '<' } as const,
-  { name: '>', value: '>', label: '>' } as const,
-  { name: '<=', value: '<=', label: '<=' } as const,
-  { name: '>=', value: '>=', label: '>=' } as const,
-  { name: 'contains', value: 'contains', label: 'contains' } as const,
-  { name: 'beginsWith', value: 'beginsWith', label: 'begins with' } as const,
-  { name: 'endsWith', value: 'endsWith', label: 'ends with' } as const,
-  { name: 'doesNotContain', value: 'doesNotContain', label: 'does not contain' } as const,
-  { name: 'doesNotBeginWith', value: 'doesNotBeginWith', label: 'does not begin with' } as const,
-  { name: 'doesNotEndWith', value: 'doesNotEndWith', label: 'does not end with' } as const,
-  { name: 'null', value: 'null', label: 'is null' } as const,
-  { name: 'notNull', value: 'notNull', label: 'is not null' } as const,
-  { name: 'in', value: 'in', label: 'in' } as const,
-  { name: 'notIn', value: 'notIn', label: 'not in' } as const,
-  { name: 'between', value: 'between', label: 'between' } as const,
-  { name: 'notBetween', value: 'notBetween', label: 'not between' } as const,
-]
-*/
-Worker.prototype.getOperation = function getOperation(operator, source, valueParam) {
-  const value = [].concat(valueParam);
-  function n(v) {
-    return typeof v === 'number' ? v : this.escapeValue(v);
-  }
-  switch (operator) {
-    case '=': return `=${this.escapeValue(value[0])}`;
-    case '!=': return `<>${this.escapeValue(value[0])}`;
-    case '<': return `<${this.escapeValue(value[0])}`;
-    case '>': return `>${this.escapeValue(value[0])}`;
-    case '<=': return `<=${this.escapeValue(value[0])}`;
-    case '>=': return `>=${this.escapeValue(value[0])}`;
-    case 'contains': return ` LIKE ${this.escapeValue(`%${value[0]}%`)}`;
-    case 'beginsWith': return ` LIKE ${this.escapeValue(`${value[0]}%`)}`;
-    case 'endsWith': return ` LIKE ${this.escapeValue(`%${value[0]}`)}`;
-    case 'doesNotContain': return ` NOT LIKE ${this.escapeValue(`%${value[0]}%`)}`;
-    case 'doesNotBeginWith': return ` NOT LIKE ${this.escapeValue(`${value[0]}%`)}`;
-    case 'doesNotEndWith': return ` NOT LIKE ${this.escapeValue(`%${value[0]}`)}`;
-    case 'null': return ' IS NULL';
-    case 'notNull': return ' IS NOT NULL';
-    case 'in': return ` IN (${value.map(n).join(',')})`;
-    case 'notIn': return ` NOT IN (${value.map(n).join(',')})`;
-    case 'between': return ` BETWEEN ${n(value[0])} AND ${n(value[1])}`;
-    case 'notBetween': return ` NOT BETWEEN ${n(value[0])} AND ${n(value[1])}`;
-    default: throw new Error(`Unhandled operation type:${operator}`);
-  }
-};
-Worker.prototype.buildRule = function (rule) {
-  if (rule.rules) {
-    return `${rule.not ? ' NOT ' : ''}(${rule.rules
-      .map((r) => this.buildRule(r))
-      .join(rule.combinator === 'or' ? ' OR ' : ' AND ')})`;
-  } if (rule.field) {
-    return this.escapeColumn(rule.field)
-      + this.getOperation(rule.operator, rule.valueSource, rule.value);
-  }
-  return '1=1';// placeholder truthy check
-};
 
 /*
   Get all the configuration for the segment
@@ -109,27 +30,20 @@ Worker.prototype.getSegment = async function (options) {
   return data[0];
 };
 
-Worker.prototype.buildSQLFromQuery = async function ({ query: queryProp }) {
-  if (!queryProp) throw new Error('No query provided to buildSQLFromQuery');
-  let query = queryProp;
-  if (typeof query === 'string') {
-    try {
-      query = JSON5.parse(query);
-    } catch (e) {
-      debugInfo(queryProp, e);
-      throw new Error('Query cannot be parsed from segment');
-    }
+Worker.prototype.getSQL = async function ({ includes, count = false }) {
+  const clauses = [];
+  // eslint-disable-next-line no-restricted-syntax
+  for (const eql of includes) {
+    // Check for a column with person_id
+    const personId = eql.columns.find((d) => d === 'person_id' || d.name === 'person_id');
+    if (!personId) throw new Error(`Error with a subquery, there is no required person_id column defined for include ${JSON5.stringify(eql)}`);
+    const sql = await this.buildSqlFromEQLObject(eql);
+    clauses.push(`id in (${sql})`);
   }
-  let conditions = null;
-  try {
-    conditions = this.buildRule(query);
-  } catch (e) {
-    debugInfo(e, query);
-    throw new Error('Cannot build SQL from query');
-  }
-  if (!conditions || conditions === '()') conditions = '1=1';
 
-  return `from person where ${conditions}`;
+  const sql = `select ${count ? 'count(id) as people' : 'id as person_id'} from person 
+    ${clauses.length > 0 ? ` WHERE ${clauses.join('\n AND ')}` : ''}`;
+  return sql;
 };
 
 /*
@@ -227,8 +141,8 @@ Worker.prototype.count = async function (options) {
   }
 
   // just run a count
-  const whereClause = await this.buildSQLFromQuery(segment);
-  const { data } = await this.query({ sql: `select count(*) as people ${whereClause}` });
+  const sql = await this.getSQL({ ...segment, count: true });
+  const { data } = await this.query({ sql });
 
   return {
     id: segment.id,
