@@ -458,17 +458,21 @@ Worker.prototype.createTableFromAnalysis = async function ({
 }) {
   if (!analysis) throw new Error('analysis is required');
   await this.connect();// set variables, etc
-  const columns = initialColumns.concat(
-    analysis.fields.map((f) => {
-      let { name } = f;
-      name = cleanColumnName(name);
-      return {
+  const columns = initialColumns || [];
+  analysis.fields.forEach((f) => {
+    let { name } = f;
+    name = cleanColumnName(name);
+    // There may be duplicate column names after cleaning
+    // ignore the 2nd and further
+    if (!columns.find((c) => c.name === name)) {
+      columns.push({
         isKnexDefinition: true,
         name,
         ...this.deduceColumnDefinition(f, this.version),
-      };
-    }),
-  );
+      });
+    }
+  });
+
   const pkey = (indexes || []).find((d) => d.primary);
   if (pkey) {
     [].concat(pkey.columns).forEach((colName) => {
