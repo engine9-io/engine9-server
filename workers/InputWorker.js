@@ -492,13 +492,18 @@ Worker.prototype.idFiles = async function (options) {
       filename, inputId, pluginId,
     });
 
-    const x = {
-      id: inputId,
-      plugin_id: pluginId,
-      input_type: inputType,
-      remote_input_id: remoteInputId,
-      remote_input_name: remoteInputName,
-    };
+    await this.insertFromStream({
+      table: 'input',
+      stream: [{
+        id: inputId,
+        plugin_id: pluginId,
+        input_type: inputType,
+        remote_input_id: remoteInputId,
+        remote_input_name: remoteInputName,
+        data_path: directory,
+      }],
+      upsert: true,
+    });
     const sql = `update input set 
     min_timeline_ts=CASE WHEN min_timeline_ts is null then ${this.escapeDate(minTimestamp)}
     else LEAST(input.min_timeline_ts,${this.escapeDate(minTimestamp)}) end,
@@ -506,11 +511,7 @@ Worker.prototype.idFiles = async function (options) {
     else GREATEST(input.max_timeline_ts,${this.escapeDate(maxTimestamp)}) end
     WHERE id=${this.escapeValue(inputId)}`;
     // debug('Upserting input with', x, 'then updating with ', sql);
-    await this.insertFromStream({
-      table: 'input',
-      stream: [x],
-      upsert: true,
-    });
+
     await this.query(sql);
 
     directories[idFilename.split('/').slice(0, -1).join('/')] = true;
