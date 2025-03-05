@@ -902,7 +902,7 @@ from ${table} d
     JOIN input on (timeline.input_id = input.id)
     JOIN plugin on (input.plugin_id = plugin.id)
     left JOIN source_code_dictionary dict on (timeline.source_code_id = dict.source_code_id)`;
-  return this.ensureView({ table: `${table}_summary`, sql });
+  return this.ensureView({ table: `${table}_summary`, sql, replace: options.replace });
 };
 Worker.prototype.ensureTimelineDetailSummary.metadata = {
   table: {},

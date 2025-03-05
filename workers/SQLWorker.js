@@ -831,24 +831,34 @@ Worker.prototype.createView = async function (options) {
   const table = options.table || options.name;
   let sql = options.sql || await this.buildSqlFromEQLObject(options);
   if (bool(options.replace, false)) {
-    sql = `CREATE VIEW ${table} AS ${sql}`;
-  } else {
     sql = `CREATE OR REPLACE VIEW ${table} AS ${sql}`;
+  } else {
+    sql = `CREATE VIEW ${table} AS ${sql}`;
   }
-
-  return this.query(sql);
+  await this.query(sql);
+  return {
+    table,
+  };
 };
 
 Worker.prototype.ensureView = async function ({ table, sql, replace }) {
-  // already exists
-  if (replace) return this.createView({ table, sql, replace: true });
   try {
     await this.describe({ table });
   } catch (e) {
     // doesn't exist
-    return this.createView({ table, sql });
+    // already exists
+    if (replace) {
+      await this.createView({ table, sql, replace: true });
+      return { table, replaced: true };
+    }
+    throw e;
   }
-  return { exists: true };
+  // it exists
+  if (replace) {
+    await this.createView({ table, sql, replace: true });
+    return { table, replaced: true };
+  }
+  return { table, exists: true };
 };
 Worker.prototype.ensureView.metadata = {
   options: {
