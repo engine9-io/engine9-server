@@ -683,7 +683,9 @@ Worker.prototype.stringToType = function (_v, _t, length, nullable, nullAsString
   let dt = null;
   switch (t) {
     case 'date':
-      if (v === null && nullable) return null;
+      if (nullable) {
+        if (v === null || v === '') return null;
+      }
       dt = new Date(v);
       if (dt === 'Invalid Date') return null;
       return dt.toISOString().slice(0, 10);
