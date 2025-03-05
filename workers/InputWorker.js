@@ -829,6 +829,15 @@ Worker.prototype.loadTimeline.metadata = {
     filename: {},
   },
 };
+/*
+These are mapped into the timeline table, so shouldn't exist in the detail table
+*/
+const ignoredDetailColumns = [
+  'id', 'ts', 'input_id',
+  'entry_type_id', 'source_code_id',
+  'person_id',
+  'remote_input_id',
+  'remote_input_name'];
 
 Worker.prototype.loadTimelineDetails = async function (options) {
   const { table } = options;
@@ -848,7 +857,7 @@ Worker.prototype.loadTimelineDetails = async function (options) {
     });
   } catch (e) {
     if (e.code === 'DOES_NOT_EXIST') {
-      return this.createAndLoadTable({ ...options, primary: 'id' });
+      return this.createAndLoadTable({ ...options, ignoreColumns: ignoredDetailColumns, primary: 'id' });
     }
     throw e;
   }
@@ -865,7 +874,6 @@ Worker.prototype.ensureTimelineDetailSummary = async function (options) {
   const { table } = options;
 
   const { columns } = await this.describe({ table });
-  const ignore = ['id', 'ts', 'input_id', 'entry_type_id', 'source_code_id', 'person_id', 'remote_input_id', 'remote_input_name'];
 
   const entryType = `case ${Object.entries(TIMELINE_ENTRY_TYPES)
     .filter(([, value]) => typeof value === 'number')
@@ -888,7 +896,7 @@ Worker.prototype.ensureTimelineDetailSummary = async function (options) {
   plugin.remote_plugin_id AS plugin_remote_id,
   dict.source_code_id AS source_code_id,
   dict.source_code AS source_code,
-  ${columns.filter((d) => ignore.indexOf(d.name) < 0).map((d) => this.escapeColumn(d.name)).join(',')}
+  ${columns.filter((d) => ignoredDetailColumns.indexOf(d.name) < 0).map((d) => this.escapeColumn(d.name)).join(',')}
 from ${table} d
     JOIN timeline on (d.id = timeline.id)
     JOIN input on (timeline.input_id = input.id)

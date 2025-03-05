@@ -459,7 +459,7 @@ Worker.prototype.getTempTableName = function () {
 };
 
 Worker.prototype.createTableFromAnalysis = async function ({
-  table: tableOpt, analysis, indexes, initialColumns = [],
+  table: tableOpt, analysis, indexes, initialColumns = [], ignoreColumns = [],
 }) {
   if (!analysis) throw new Error('analysis is required');
   await this.connect();// set variables, etc
@@ -470,9 +470,11 @@ Worker.prototype.createTableFromAnalysis = async function ({
   analysis.fields.forEach((f) => {
     let { name } = f;
     name = cleanColumnName(name);
-    // There may be duplicate column names after cleaning
+    if (ignoreColumns.indexOf(name) >= 0) {
+      debug(`Ignoring column ${name}`);
+      // There may be duplicate column names after cleaning
     // ignore the 2nd and further
-    if (!columns.find((c) => c.name === name)) {
+    } else if (!columns.find((c) => c.name === name)) {
       if (f.type === 'string') {
         // Some database engines only allow certain numbers
         // of 'varchar' columns.  Set the max to 30 here,
@@ -527,6 +529,7 @@ Worker.prototype.createAndLoadTable = async function (options) {
       analysis,
       indexes,
       initialColumns: options.initialColumns,
+      ignoreColumns: options.ignoreColumns,
     });
     const { columns } = await this.describe({ table });
     const stream2 = await fworker.fileToObjectStream({
@@ -551,6 +554,7 @@ Worker.prototype.createAndLoadTable.metadata = {
     filename: {},
     stream: {},
     indexes: {},
+    ignoreColumns: { description: 'Columns to ignore' },
     primary: { description: 'In addition to indexes, specify a string primary key' },
   },
 };
