@@ -6,6 +6,7 @@ const debugMore = require('debug')('debug:SQLWorker');
 
 const Knex = require('knex');
 const { getUUIDv7 } = require('@engine9/packet-tools');
+const { v7: uuidv7 } = require('uuid');
 const { Readable } = require('stream');
 const through2 = require('through2');
 const JSON5 = require('json5');
@@ -453,22 +454,41 @@ Worker.prototype.deduceColumnDefinition = function (o) {
   return this.dialect.standardToKnex(o, this.version);
 };
 
+Worker.prototype.getTempTableName = function () {
+  return `temp_${new Date().toISOString().slice(0, 10)}_${uuidv7()}`.replace(/-/g, '_');
+};
+
 Worker.prototype.createTableFromAnalysis = async function ({
-  table, analysis, indexes, initialColumns = [],
+  table: tableOpt, analysis, indexes, initialColumns = [],
 }) {
   if (!analysis) throw new Error('analysis is required');
   await this.connect();// set variables, etc
+  const table = tableOpt || this.getTempTableName();
   const columns = initialColumns || [];
+
+  let stringCounter = 0;
   analysis.fields.forEach((f) => {
     let { name } = f;
     name = cleanColumnName(name);
     // There may be duplicate column names after cleaning
     // ignore the 2nd and further
     if (!columns.find((c) => c.name === name)) {
+      if (f.type === 'string') {
+        // Some database engines only allow certain numbers
+        // of 'varchar' columns.  Set the max to 30 here,
+        // which should accommodate
+        stringCounter += 1;
+        if (stringCounter > 30) {
+          f.type = 'text';
+        }
+      }
+
+      const definition = this.deduceColumnDefinition(f, this.version);
+
       columns.push({
         isKnexDefinition: true,
         name,
-        ...this.deduceColumnDefinition(f, this.version),
+        ...definition,
       });
     }
   });
@@ -480,7 +500,6 @@ Worker.prototype.createTableFromAnalysis = async function ({
       col.nullable = false;// primary keys can't be null
     });
   }
-  debug(columns);
   return this.createTable({
     table, columns, indexes,
   });
