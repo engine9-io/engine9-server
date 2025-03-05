@@ -594,43 +594,46 @@ Worker.prototype.createDetailTable.metadata = {
 };
 
 Worker.prototype.loadTimelineTables = async function (options) {
-  const loadTimeline = bool(options.loadTimeline, false);
+  let loadTimeline = bool(options.loadTimeline, false);
   const loadTimelineDetails = bool(options.loadTimelineDetails, false);
+  // if we're loading details, we have to load timeline
+  if (loadTimelineDetails) loadTimeline = true;
   const { timelineDetailTable } = options;
-  if (loadTimelineDetails && !loadTimeline) throw new Error('Cowardly refusing to load details table without loadTimeline as well');
   if (loadTimelineDetails && !timelineDetailTable) throw new Error('Cowardly refusing to load details table without timelineDetailTable as well');
-  if (!loadTimeline) return options;
+  if (!loadTimeline) {
+    return { did_not_load_timeline: true };
+  }
 
   let arr = options.fileArray;
   if (typeof arr === 'string') arr = JSON.parse(arr);
   if (!arr && options.filenames) {
     // assume the inputId is the same as the file directory,
     // it will error if it's not a UUID
-    arr = options.filenames.split(',').map((filename) => ({
-      filename,
-      inputId: filename.split('/').slice(-2)[0],
+    arr = options.filenames.split(',').map((idFilename) => ({
+      idFilename,
+      inputId: idFilename.split('/').slice(-2)[0],
     }));
   }
   if (!Array.isArray(arr))arr = [options];
   const fileArray = [];
   for (const o of arr) {
-    const { inputId, pluginId, idFilename } = o;
+    const { inputId, idFilename } = o;
     if (!idFilename) throw new Error('No idFilename specified');
     const output = {
       inputId,
-      pluginId,
       idFilename,
     };
     output.timelineResults = await this.loadTimeline({
       filename: idFilename,
       inputId,
     });
-    if (options.loadTimelineDetail) {
+    if (loadTimelineDetails) {
       output.detailResults = await this.loadTimelineDetails({
         filename: idFilename,
         table: timelineDetailTable,
       });
     }
+    output.records = output.timelineResults?.records || 0;
     fileArray.push(output);
   }
   const o = { fileArray };
@@ -841,7 +844,7 @@ Worker.prototype.loadTimeline.metadata = {
 These are mapped into the timeline table, so shouldn't exist in the detail table
 */
 const ignoredDetailColumns = [
-  'id', 'ts', 'input_id',
+  'ts', 'input_id',
   'entry_type_id', 'source_code_id',
   'person_id',
   'remote_input_id',

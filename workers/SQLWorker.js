@@ -499,6 +499,7 @@ Worker.prototype.createTableFromAnalysis = async function ({
   if (pkey) {
     [].concat(pkey.columns).forEach((colName) => {
       const col = columns.find((d) => d.name === colName);
+      if (!col) throw new Error(`Error creating table from analysis, no column in table ${table} matches the primary key column ${colName} with column ${columns.map((d) => d.name).join(',')}`);
       col.nullable = false;// primary keys can't be null
     });
   }
@@ -542,7 +543,7 @@ Worker.prototype.createAndLoadTable = async function (options) {
       table,
       stream: stream2.stream,
     });
-    return { ...streamResults, columns };
+    return streamResults;
   } catch (e) {
     debug(`Error creating and loading table with options:${JSON.stringify(options, null, 4)}`);
     throw e;
