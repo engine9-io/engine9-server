@@ -865,7 +865,7 @@ Worker.prototype.ensureTimelineDetailSummary = async function (options) {
   const { table } = options;
 
   const { columns } = await this.describe({ table });
-  const ignore = ['id', 'ts', 'input_id', 'entry_type_id', 'person_id', 'remote_input_id', 'remote_input_name'];
+  const ignore = ['id', 'ts', 'input_id', 'entry_type_id', 'source_code_id', 'person_id', 'remote_input_id', 'remote_input_name'];
 
   const entryType = `case ${Object.entries(TIMELINE_ENTRY_TYPES)
     .filter(([, value]) => typeof value === 'number')
