@@ -869,7 +869,7 @@ Worker.prototype.ensureTimelineDetailSummary = async function (options) {
 
   const entryType = `case ${Object.entries(TIMELINE_ENTRY_TYPES)
     .filter(([, value]) => typeof value === 'number')
-    .map(([key, value]) => `when entry_type_id=${value} then ${this.escapeValue(key)}`).join(' \n')}
+    .map(([key, value]) => `when timeline.entry_type_id=${value} then ${this.escapeValue(key)}`).join(' \n')}
     else 'N/A' end as entry_type`;
   const sql = `select
   timeline.id AS id,
