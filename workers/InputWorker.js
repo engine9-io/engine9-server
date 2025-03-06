@@ -614,6 +614,7 @@ Worker.prototype.loadTimelineTables = async function (options) {
   }
   if (!Array.isArray(arr))arr = [options];
   const fileArray = [];
+  let counter = 0;
   for (const o of arr) {
     const { idFilename } = o;
     if (!idFilename) throw new Error('No idFilename specified');
@@ -622,7 +623,8 @@ Worker.prototype.loadTimelineTables = async function (options) {
     // eslint-disable-next-line prefer-destructuring
     if (!inputId) inputId = idFilename.split('/').slice(-2)[0];
 
-    debug(`Processing file ${idFilename}`);
+    counter += 1;
+    debug(`Processing file ${counter} of ${arr.length}: ${idFilename}`);
     const output = {
       inputId,
       idFilename,
