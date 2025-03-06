@@ -610,14 +610,18 @@ Worker.prototype.loadTimelineTables = async function (options) {
     // it will error if it's not a UUID
     arr = options.filenames.split(',').map((idFilename) => ({
       idFilename,
-      inputId: idFilename.split('/').slice(-2)[0],
     }));
   }
   if (!Array.isArray(arr))arr = [options];
   const fileArray = [];
   for (const o of arr) {
-    const { inputId, idFilename } = o;
+    const { idFilename } = o;
     if (!idFilename) throw new Error('No idFilename specified');
+    let { inputId } = o;
+
+    // eslint-disable-next-line prefer-destructuring
+    if (!inputId) inputId = idFilename.split('/').slice(-2)[0];
+
     debug(`Processing file ${idFilename}`);
     const output = {
       inputId,
