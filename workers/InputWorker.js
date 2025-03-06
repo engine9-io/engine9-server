@@ -525,7 +525,6 @@ Worker.prototype.idFiles = async function (options) {
 
   return {
     fileArray: output,
-    directoryArray: Object.keys(directories).map((directory) => ({ directory })),
   };
 };
 Worker.prototype.idFiles.metadata = {
@@ -595,11 +594,11 @@ Worker.prototype.createDetailTable.metadata = {
 
 Worker.prototype.loadTimelineTables = async function (options) {
   let loadTimeline = bool(options.loadTimeline, false);
-  const loadTimelineDetails = bool(options.loadTimelineDetails, false);
+  const loadTimelineDetail = bool(options.loadTimelineDetail, false);
   // if we're loading details, we have to load timeline
-  if (loadTimelineDetails) loadTimeline = true;
+  if (loadTimelineDetail) loadTimeline = true;
   const { timelineDetailTable } = options;
-  if (loadTimelineDetails && !timelineDetailTable) throw new Error('Cowardly refusing to load details table without timelineDetailTable as well');
+  if (loadTimelineDetail && !timelineDetailTable) throw new Error('Cowardly refusing to load details table without timelineDetailTable as well');
   if (!loadTimeline) {
     return { did_not_load_timeline: true };
   }
@@ -628,7 +627,7 @@ Worker.prototype.loadTimelineTables = async function (options) {
       filename: idFilename,
       inputId,
     });
-    if (loadTimelineDetails) {
+    if (loadTimelineDetail) {
       output.detailResults = await this.loadTimelineDetails({
         filename: idFilename,
         table: timelineDetailTable,
@@ -639,8 +638,6 @@ Worker.prototype.loadTimelineTables = async function (options) {
   }
   const o = { fileArray };
 
-  // Pass through if there is a directory array
-  if (options.directoryArray) o.directoryArray = options.directoryArray;
   return o;
 };
 
@@ -661,9 +658,10 @@ Worker.prototype.loadTimelineTables.metadata = {
 */
 
 Worker.prototype.statistics = async function (options) {
+  if (true) return { todo: true };
   const writeStatisticsFile = bool(options.writeStatisticsFile, false);
   const fileWorker = new FileWorker(this);
-  let arr = options.directoryArray;
+  let arr = options.fileArray;
   if (typeof arr === 'string') {
     if (arr.indexOf('[') === 0) arr = JSON.parse(arr);
     else arr = arr.split(',').map((directory) => ({ directory }));
@@ -789,7 +787,7 @@ Worker.prototype.statistics.metadata = {
     /*
       Provide an array of directories, or a directory, or an actual filename
     */
-    directoryArray: {},
+    fileArray: {},
     directory: {},
     idFilename: {},
     writeStatisticsFile: {
