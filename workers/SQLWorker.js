@@ -829,7 +829,7 @@ Worker.prototype.getCreateView.metadata = {
 };
 
 Worker.prototype.createView = async function (options) {
-  const table = options.table || options.name;
+  const table = options.name || options.table;
   let sql = options.sql || await this.buildSqlFromEQLObject(options);
   if (bool(options.replace, false)) {
     sql = `CREATE OR REPLACE VIEW ${table} AS ${sql}`;
