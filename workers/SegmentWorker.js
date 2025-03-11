@@ -30,15 +30,23 @@ Worker.prototype.getSegment = async function (options) {
   return data[0];
 };
 
-Worker.prototype.getSQL = async function ({ includes, count = false }) {
+Worker.prototype.getSQL = async function ({ include, exclude, count = false }) {
   const clauses = [];
   // eslint-disable-next-line no-restricted-syntax
-  for (const eql of includes) {
+  for (const eql of include) {
     // Check for a column with person_id
     const personId = eql.columns.find((d) => d === 'person_id' || d.name === 'person_id');
     if (!personId) throw new Error(`Error with a subquery, there is no required person_id column defined for include ${JSON5.stringify(eql)}`);
     const sql = await this.buildSqlFromEQLObject(eql);
     clauses.push(`id in (${sql})`);
+  }
+  // eslint-disable-next-line no-restricted-syntax
+  for (const eql of exclude) {
+    // Check for a column with person_id
+    const personId = eql.columns.find((d) => d === 'person_id' || d.name === 'person_id');
+    if (!personId) throw new Error(`Error with a subquery, there is no required person_id column defined for include ${JSON5.stringify(eql)}`);
+    const sql = await this.buildSqlFromEQLObject(eql);
+    clauses.push(`id not in (${sql})`);
   }
 
   const sql = `select ${count ? 'count(id) as people' : 'id as person_id'} from person 

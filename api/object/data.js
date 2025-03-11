@@ -419,7 +419,7 @@ router.post(['/eql'], async (req, res) => {
   }
 });
 
-router.get('/query/fields', async (req, res) => {
+router.get('/segment/fields', async (req, res) => {
   res.json({
     fields: [
       {
@@ -446,6 +446,7 @@ router.get('/query/fields', async (req, res) => {
             options: [
               { name: 1, label: 'Segment 1' },
               { name: 2, label: 'Segment 2' },
+              { name: 2, label: 'Segment 3' },
             ],
           },
           {

@@ -20,6 +20,20 @@ describe('Test SQL builder', async () => {
     sqlWorker.destroy();
   });
 
+  it('should build a simple person query from an object with no eql', async () => {
+    const query = {
+      table: 'person',
+      columns: [
+        'id',
+      ],
+      limit: 1,
+    };
+
+    const sql = await sqlWorker.buildSqlFromEQLObject(query);
+    const { data } = await sqlWorker.query(sql);
+    debug('Results of ', sql, data);
+  });
+
   it('should build a query from an object with eql', async () => {
     const query = {
       table: 'person',
@@ -31,7 +45,13 @@ describe('Test SQL builder', async () => {
       conditions: [
         { eql: "YEAR(modified_at)>'2020-01-01'" },
         { eql: 'id in (1,2,3)' },
-        { eql: 'id in (3)' },
+        {
+          type: 'EQUALS',
+          values: [
+            { ref: { column: 'id' } },
+            { value: { value: '3' } },
+          ],
+        },
       ],
       groupBy: [{ eql: "YEAR(modified_at)>'2020-01-01'" }],
     };

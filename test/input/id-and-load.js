@@ -9,7 +9,9 @@ const debug = require('debug')('test-framework');
 const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const InputWorker = require('../../workers/InputWorker');
-const { deploy, truncate, insertDefaults } = require('../test_db_schema');
+const {
+  deploy, truncate, insertDefaults, pluginA,
+} = require('../test_db_schema');
 const { createSampleActionFile } = require('../sample_data/generate_sample_data');
 
 describe('id and load multiple files', async () => {
@@ -32,33 +34,8 @@ describe('id and load multiple files', async () => {
     await insertDefaults();
     await sqlWorker.drop({ table: timelineDetailTable });
     await sqlWorker.query('select 1');
-    const opts = {
-      id: process.env.testingPluginId,
-      type: 'local',
-      name: 'Sample Timeline Testing',
-      path: 'engine9-testing/sql-plugin-timeline',
-      tablePrefix,
-      schema: {
-        tables: [
-          {
-            name: timelineDetailTable,
-            columns: {
-              id: 'id_uuid',
-              remote_input_id: 'string',
-              remote_input_name: 'string',
-              email: 'string',
-              action_target: 'string',
-              action_content: 'string',
-              sample_uppercase_content: 'string',
-            },
-            indexes: [
-              { columns: 'id', primary: true },
-            ],
-          },
-        ],
-      },
-    };
-    await inputWorker.ensurePlugin(opts);
+
+    await inputWorker.ensurePlugin(pluginA);
   });
 
   after(async () => {

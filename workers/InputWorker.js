@@ -664,7 +664,6 @@ Worker.prototype.loadTimelineTables.metadata = {
 */
 
 Worker.prototype.statistics = async function (options) {
-  if (true) return { todo: true };
   const writeStatisticsFile = bool(options.writeStatisticsFile, false);
   const fileWorker = new FileWorker(this);
   let arr = options.fileArray;
