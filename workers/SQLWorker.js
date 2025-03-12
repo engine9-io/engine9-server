@@ -847,11 +847,9 @@ Worker.prototype.ensureView = async function ({ table, sql, replace }) {
     await this.describe({ table });
   } catch (e) {
     // doesn't exist
-    if (replace) {
-      await this.createView({ table, sql, replace: true });
-      return { table, replaced: true };
-    }
-    throw e;
+
+    await this.createView({ table, sql, replace: true });
+    return { table, replaced: true };
   }
   // it exists
   if (replace) {
