@@ -357,7 +357,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   const valuesToLookup = itemsWithNoIds
     .reduce((a, o) => {
       // debug(`Need to lookup:'${o[inputField]}'`);
-      a.add(o[inputField]);
+      a.add(o[inputField].toLowerCase());
       return a;
     }, new Set());
   const knex = await this.connect();
@@ -393,11 +393,15 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   if (idType === 'foreign_uuid') throw new Error(`Unsupported id type:${idType}`);
 
   const valuesToInsert = Object.values(itemsWithNoIds.reduce((a, b) => {
-    a[b[inputField]] = {
-      ...additionalWhere,
-      [idColumn]: idType === 'id_uuid' ? getUUIDv7() : null,
-      [inputField]: b[inputField],
-    };
+    const lookup = b[inputField].toLowerCase();
+    // this handles case sensitivity, but picks the first case varietal used
+    if (!a[lookup]) {
+      a[lookup] = {
+        ...additionalWhere,
+        [idColumn]: idType === 'id_uuid' ? getUUIDv7() : null,
+        [inputField]: b[inputField],
+      };
+    }
     // debug('Added to insert:', a[b[inputField]]);
     return a;
   }, {}));

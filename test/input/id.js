@@ -27,6 +27,12 @@ describe('Add ids', async () => {
   const personWorker = new PersonWorker({ accountId, knex });
 
   before(async () => {
+    try {
+      await sqlWorker.query('truncate table source_code_dictionary');
+    } catch (e) {
+      // do nothing, doesn't exist
+
+    }
     await rebuildAll();
   });
 
