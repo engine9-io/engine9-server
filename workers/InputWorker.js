@@ -119,7 +119,7 @@ Worker.prototype.id = async function (options) {
   const worker = this;
 
   const {
-    defaultEntryType, filename,
+    filename, defaultEntryType, defaultTimestamp,
   } = options;
   const parts = filename.split('/');
   let { inputId, pluginId } = options;
@@ -156,6 +156,7 @@ Worker.prototype.id = async function (options) {
 
   const fileWorker = new FileWorker(this);
   const personWorker = new PersonWorker(this);
+
   const { fields } = await fileWorker.analyze({ filename });
 
   const initialSchema = {
@@ -259,7 +260,7 @@ Worker.prototype.id = async function (options) {
         worker.markPerformance('start-upsert-person');
         await personWorker.loadPeople({ stream: batch, pluginId, inputId });
         worker.markPerformance('start-append-entry');
-        await worker.appendEntryId({ inputId, batch });
+        await worker.appendEntryId({ inputId, batch, defaultTimestamp });
         worker.markPerformance('end-batch');
         // parquetjs requires the appendRow to be completed before subsequent calls
         // eslint-disable-next-line no-restricted-syntax
@@ -332,6 +333,9 @@ Worker.prototype.id.metadata = {
     defaultEntryType: {
       description: 'Default entry type if not specified in the file',
     },
+    defaultTimestamp: {
+      description: 'Default timestamp if not specified in the file',
+    },
   },
 };
 
@@ -342,7 +346,7 @@ Worker.prototype.idCSV = async function (options) {
   const worker = this;
 
   const {
-    inputId, defaultEntryType, filename,
+    inputId, defaultEntryType, defaultTimestamp, filename,
   } = options;
   if (!inputId) throw new Error('id requires an inputId');
   const processId = `.${new Date().getTime()}.processing`;
@@ -389,7 +393,7 @@ Worker.prototype.idCSV = async function (options) {
         worker.markPerformance('start-upsert-person');
         await personWorker.appendPersonId({ batch, inputId });
         worker.markPerformance('start-append-entry');
-        await worker.appendEntryId({ inputId, batch });
+        await worker.appendEntryId({ inputId, batch, defaultTimestamp });
         worker.markPerformance('end-batch');
         batch.forEach((b) => {
           const {
@@ -425,6 +429,9 @@ Worker.prototype.idCSV.metadata = {
   options: {
     filename: {},
     defaultEntryType: {
+      description: 'Default entry type if not specified in the file',
+    },
+    defaultTimestamp: {
       description: 'Default entry type if not specified in the file',
     },
   },
@@ -467,14 +474,14 @@ Worker.prototype.idFiles = async function (options) {
     if (!o.pluginId) {
       const { data } = await this.query(`select plugin_id from input where id=${this.escapeValue(inputId)}`);
       o.pluginId = data?.[0]?.plugin_id;
-      if (!o.pluginId) throw new Error(`pluginId must be specified, and cannot be found in the database for inputId${inputId}`);
+      if (!o.pluginId) throw new Error(`pluginId must be specified, and cannot be found in the database for inputId: ${inputId}`);
     }
   }
 
   // eslint-disable-next-line no-restricted-syntax
   for (const o of arr) {
     const {
-      inputId, pluginId, filename,
+      inputId, pluginId, filename, defaultEntryType, defaultTimestamp,
     } = o;
     const directory = filename.split('/').slice(0, -1).join('/');
     let metadata = {};
@@ -489,7 +496,7 @@ Worker.prototype.idFiles = async function (options) {
     const {
       idFilename, minTimestamp, maxTimestamp,
     } = await this.id({
-      filename, inputId, pluginId,
+      filename, inputId, pluginId, defaultEntryType, defaultTimestamp,
     });
 
     await this.insertFromStream({
@@ -533,6 +540,8 @@ Worker.prototype.idFiles.metadata = {
     filename: {},
     inputId: {},
     pluginId: {},
+    defaultEntryType: {},
+    defaultTimestamp: {},
   },
 };
 
@@ -848,6 +857,7 @@ Worker.prototype.loadTimeline.metadata = {
 These are mapped into the timeline table, so shouldn't exist in the detail table
 */
 const ignoredDetailColumns = [
+  'id',
   'ts', 'input_id',
   'entry_type_id', 'source_code_id',
   'person_id',

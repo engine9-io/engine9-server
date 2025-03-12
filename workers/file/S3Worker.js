@@ -4,7 +4,10 @@ const fs = require('node:fs');
 const { mimeType: mime } = require('mime-type/with-db');
 const { getTempFilename } = require('@engine9/packet-tools');
 const {
-  S3Client, GetObjectCommand, GetObjectAttributesCommand, PutObjectCommand,
+  S3Client,
+  GetObjectCommand,
+  HeadObjectCommand,
+  GetObjectAttributesCommand, PutObjectCommand,
   ListObjectsV2Command,
 } = require('@aws-sdk/client-s3');
 
@@ -181,6 +184,41 @@ Worker.prototype.list = async function ({ directory }) {
 Worker.prototype.list.metadata = {
   options: {
     directory: { required: true },
+  },
+};
+
+Worker.prototype.stat = async function ({ filename }) {
+  if (!filename) throw new Error('filename is required');
+
+  const s3Client = new S3Client({});
+  const { Bucket, Key } = getParts(filename);
+  const command = new HeadObjectCommand({ Bucket, Key });
+  const response = await s3Client.send(command);
+
+  const {
+    // "AcceptRanges": "bytes",
+    ContentLength, // : "3191",
+    ContentType, // : "image/jpeg",
+    // ETag": "\"6805f2cfc46c0f04559748bb039d69ae\"",
+    LastModified, // : "2016-12-15T01:19:41.000Z",
+    // Metadata": {},
+    // VersionId": "null"
+
+  } = response;
+  const modifiedAt = new Date(LastModified);
+  const createdAt = modifiedAt;// Same for S3
+  const size = parseInt(ContentLength, 10);
+
+  return {
+    createdAt,
+    modifiedAt,
+    contentType: ContentType,
+    size,
+  };
+};
+Worker.prototype.stat.metadata = {
+  options: {
+    filename: {},
   },
 };
 

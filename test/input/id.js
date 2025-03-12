@@ -11,8 +11,7 @@ const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const InputWorker = require('../../workers/InputWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-const { insertDefaults } = require('../test_db_schema');
-const { createSampleActionFile } = require('../sample_data/generate_sample_data');
+const { createSampleActionFile, insertDefaults } = require('../test_db_schema');
 
 describe('Add ids', async () => {
   const accountId = 'test';

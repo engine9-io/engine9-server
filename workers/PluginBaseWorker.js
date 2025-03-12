@@ -465,6 +465,7 @@ Worker.prototype.appendEntryTypeId = function ({
     if (o.entry_type_id !== undefined) return;
     const etype = o.entry_type || defaultEntryType;
     if (!etype) {
+      debug('No entry type found in ', JSON.stringify(o));
       throw new Error('No entry_type specified, specify a defaultEntryType');
     }
     const id = TIMELINE_ENTRY_TYPES[etype];
@@ -484,11 +485,19 @@ Worker.prototype.appendEntryTypeId = function ({
   ts+
 */
 Worker.prototype.appendEntryId = async function ({
+  defaultTimestamp,
   inputId,
   batch,
 }) {
   batch.forEach((b) => {
     if (b.id) return;
+    // allows for a remote_transaction_id to also be considered the remote_entry_id
+    if (!b.remote_entry_id && b.remote_transaction_id) {
+      b.remote_entry_id = b.remote_transaction_id;
+    }
+    if (!b.ts && defaultTimestamp) {
+      b.ts = defaultTimestamp;
+    }
     b.id = getTimelineEntryUUID(b, { defaults: { input_id: inputId } });
   });
 };

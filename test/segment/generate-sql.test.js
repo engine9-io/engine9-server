@@ -47,7 +47,7 @@ describe('Segment works as relates to plugins', async () => {
           columns: ['person_id'],
           groupBy: ['person_id'],
           having: [
-            { eql: 'sum(amount)<100' },
+            { eql: 'sum(amount)>10' },
           ],
         },
       ],

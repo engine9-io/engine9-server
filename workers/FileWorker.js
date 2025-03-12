@@ -390,7 +390,12 @@ Worker.prototype.stream = async function (
     } else {
       // Check if the file exists, and fast fail if not
       // Otherwise the stream hangs out as a handle
-      await fsp.stat(filename);
+      try {
+        await fsp.stat(filename);
+      } catch (e) {
+        debug('Current directory:', process.cwd(), '__dirname:', __dirname);
+        throw e;
+      }
       stream = fs.createReadStream(filename);
       encoding = (await this.detectEncoding(options)).encoding;
     }
@@ -499,6 +504,32 @@ Worker.prototype.list = async function ({ directory }) {
 Worker.prototype.list.metadata = {
   options: {
     directory: { required: true },
+  },
+};
+Worker.prototype.stat = async function ({ filename }) {
+  if (!filename) throw new Error('filename is required');
+  if (filename.indexOf('s3://') === 0) {
+    const s3Worker = new S3Worker(this);
+    return s3Worker.stat({ filename });
+  }
+  const {
+    ctime,
+    birthtime,
+    size,
+  } = await fsp.stat(filename);
+  const modifiedAt = new Date(ctime);
+  let createdAt = birthtime;
+  if (createdAt === 0 || !createdAt) createdAt = ctime;
+  createdAt = new Date(createdAt);
+  return {
+    createdAt,
+    modifiedAt,
+    size,
+  };
+};
+Worker.prototype.stat.metadata = {
+  options: {
+    filename: {},
   },
 };
 
