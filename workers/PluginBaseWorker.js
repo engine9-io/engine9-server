@@ -349,7 +349,7 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   this.itemCaches = this.itemCaches || {};
   this.itemCaches[type] = this.itemCaches[type] || new LRUCache({ max: 10000 });
   itemsWithNoIds.forEach((o) => {
-    o[outputField] = this.itemCaches[type].get(o[inputField]);
+    o[outputField] = this.itemCaches[type].get(o[inputField].toLowerCase());
   });
   itemsWithNoIds = itemsWithNoIds.filter((o) => !o[outputField]);
   if (itemsWithNoIds.length === 0) return batch;
@@ -371,12 +371,12 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
   // Populate the cache
   existingIds.forEach((r) => {
     // debug(`Adding to cache:${type} '${r.lookup}' '${r.id}'`);
-    this.itemCaches[type].set(r.lookup.trim(), r.id);
+    this.itemCaches[type].set(r.lookup.trim().toLowerCase(), r.id);
   });
 
   // Filter out ones in the database already
   itemsWithNoIds = itemsWithNoIds.filter((o) => {
-    const id = this.itemCaches[type].get(o[inputField]);
+    const id = this.itemCaches[type].get(o[inputField].toLowerCase());
     o[outputField] = id;
     if (!o[outputField]) return true;
     return false;
@@ -409,10 +409,10 @@ Worker.prototype.appendDatabaseIdWithCaching = async function ({
     .andWhere(additionalWhere);
 
   // Populate the cache
-  newIds.forEach((r) => this.itemCaches[type].set(r.lookup, r.id));
+  newIds.forEach((r) => this.itemCaches[type].set(r.lookup.toLowerCase(), r.id));
 
   itemsWithNoIds = itemsWithNoIds.filter((o) => {
-    const id = this.itemCaches[type].get(o[inputField]);
+    const id = this.itemCaches[type].get(o[inputField].toLowerCase());
     if (this.debugCounter < 5) {
       this.debugCounter += 1;
       // debug('Assigning Id', id, 'for', inputField, o[inputField]);

@@ -11,7 +11,7 @@ const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const InputWorker = require('../../workers/InputWorker');
 const PersonWorker = require('../../workers/PersonWorker');
-const { createSampleActionFile, insertDefaults } = require('../test_db_schema');
+const { createSampleActionFile, rebuildAll } = require('../test_db_schema');
 
 describe('Add ids', async () => {
   const accountId = 'test';
@@ -27,7 +27,7 @@ describe('Add ids', async () => {
   const personWorker = new PersonWorker({ accountId, knex });
 
   before(async () => {
-    await insertDefaults();
+    await rebuildAll();
   });
 
   after(async () => {
@@ -45,6 +45,17 @@ describe('Add ids', async () => {
         email: 'Margie_Von57@gmail.com',
         remote_input_name: 'Q1 Advocacy Action',
         source_code: 'ACQ_EM_2023_X_123',
+        action_target: 'Jasmin.Kovacek-Corkery@hotmail.com',
+        action_content: 'Cui optio tamen.',
+      },
+      {
+        remote_entry_uuid: '5bbbc3a9-ee40-41b8-b243-1176007346fc',
+        ts: '2024-04-28T18:12:36.191Z',
+        entry_type: 'FORM_SUBMIT',
+        remote_input_id: 'form_0',
+        email: 'Margie_Von57@gmail.com',
+        remote_input_name: 'Q1 Advocacy Action',
+        source_code: 'acq_em_2023_x_123', // test lower caser
         action_target: 'Jasmin.Kovacek-Corkery@hotmail.com',
         action_content: 'Cui optio tamen.',
       },
