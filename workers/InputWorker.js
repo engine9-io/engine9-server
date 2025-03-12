@@ -303,11 +303,11 @@ Worker.prototype.id = async function (options) {
     const s3 = new S3Worker(this);
 
     const directory = filename.split('/').slice(0, -1).join('/');
-    await s3.put({ filename: outputFile, directory });
-    const file = outputFile.split('/').pop();
+    const file = `${filename.split('/').pop()}.id.parquet`;
+    await s3.put({ filename: outputFile, file, directory });
     return {
-      originalFields: fields,
-      parquestSchema: parquetSchemaDefinition,
+      // originalFields: fields,
+      // parquestSchema: parquetSchemaDefinition,
       idFilename: `${directory}/${file}`,
       sourceIdFilename: outputFile,
       records,
