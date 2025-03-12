@@ -53,7 +53,7 @@ function pick(a) {
   return a[Math.floor(Math.random() * a.length)];
 }
 
-async function createSampleActionFile(opts) {
+async function createSampleActionFile(opts = {}) {
   const actionArray = [];
   const { users = 10, ts } = opts || {};
   const userArray = opts.userArray || faker.helpers.multiple(createRandomPerson, { count: users });
@@ -259,39 +259,52 @@ const pluginB = {
 
 const rebuildAll = async function () {
   const schemaWorker = new SchemaWorker(env);
-  const knex = await schemaWorker.connect();
-  const inputWorker = new InputWorker({ accountId, knex });
-  const timelineDetailTable = 'testing_aaa_timeline_sample_details';
+  try {
+    const knex = await schemaWorker.connect();
+    try {
+      // This could be tighter to check if things are deployed
+      const { data: [{ plugins }] } = await schemaWorker.query('select count(*) as plugins from plugin');
+      if (plugins !== 2) {
+        throw new Error('Not built');
+      }
+      return { built: true };
+    } catch (e) {
+      // not built already
+    }
+    const inputWorker = new InputWorker({ accountId, knex });
+    const timelineDetailTable = 'testing_aaa_timeline_sample_details';
 
-  await deploy(env);
-  await truncate(env);
-  await insertDefaults();
-  await schemaWorker.drop({ table: timelineDetailTable });
-  await schemaWorker.query('select 1');
-  await inputWorker.ensurePlugin(pluginA);
-  await inputWorker.ensurePlugin(pluginB);
-  // make sure we use a fresh input
-  const fileArray = [
-    { filename: `${__dirname}/sample_data/person.csv`, defaultEntryType: 'FILE_IMPORT', inputId: process.env.testingInputId },
-    { filename: `${__dirname}/sample_data/action.csv`, inputId: process.env.testingInputIdB },
-    { filename: `${__dirname}/sample_data/transaction.csv`, inputId: process.env.testingTransactionInputId },
-  ];
+    await deploy(env);
+    await truncate(env);
+    await insertDefaults();
+    await schemaWorker.drop({ table: timelineDetailTable });
+    await schemaWorker.query('select 1');
+    await inputWorker.ensurePlugin(pluginA);
+    await inputWorker.ensurePlugin(pluginB);
+    // make sure we use a fresh input
+    const fileArray = [
+      { filename: `${__dirname}/sample_data/person.csv`, defaultEntryType: 'FILE_IMPORT', inputId: process.env.testingInputId },
+      { filename: `${__dirname}/sample_data/action.csv`, inputId: process.env.testingInputIdB },
+      { filename: `${__dirname}/sample_data/transaction.csv`, inputId: process.env.testingTransactionInputId },
+    ];
 
-  const files = await inputWorker.idFiles({ fileArray });
+    const files = await inputWorker.idFiles({ fileArray });
 
-  await inputWorker.loadTimelineTables({
-    ...files,
-    loadTimeline: true,
-    loadTimelineDetail: true,
-    timelineDetailTable,
-  });
+    await inputWorker.loadTimelineTables({
+      ...files,
+      loadTimeline: true,
+      loadTimelineDetail: true,
+      timelineDetailTable,
+    });
 
-  const { data: [{ timeline }] } = await schemaWorker.query('select count(*) as timeline from timeline');
-  if (timeline === 0) {
-    throw new Error('No records loaded to timeline, issue with loading the test data');
+    const { data: [{ timeline }] } = await schemaWorker.query('select count(*) as timeline from timeline');
+    if (timeline === 0) {
+      throw new Error('No records loaded to timeline, issue with loading the test data');
+    }
+  } finally {
+    schemaWorker.destroy();
   }
-
-  schemaWorker.destroy();
+  return { complete: true };
 };
 
 module.exports = {
