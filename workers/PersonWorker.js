@@ -285,7 +285,7 @@ Worker.prototype.loadPeople = async function (options) {
       fileMetadata = await fileWorker.json({ filename: metaPath });
       debug('Retrieved metadata from :', metaPath, fileMetadata);
     } catch (e) {
-      debug(`Could not get medata from ${metaPath}`);
+      debug(`Could not get metadata from ${metaPath}`);
       debug(e);
     }
   }
