@@ -88,9 +88,6 @@ Worker.prototype.importAddresses.metadata = internalMeta;
 Worker.prototype.importTransactions = async function (options) {
   const { start, end } = options;
 
-  const dbPlugin = await this.getPlugin({ path: 'workerbots.DBBot' });
-  const globalPrefix = dbPlugin?.table_prefix || '';
-
   const plugin = await this.getPlugin(options);
   const table = `${plugin.table_prefix || ''}transaction`;
   debug('Describing table ', table);
@@ -110,7 +107,7 @@ Worker.prototype.importTransactions = async function (options) {
     if (start) conditions.push(`t.${dateColumn}>=${this.escapeDate(relativeDate(start))}`);
     if (end) conditions.push(`t.${dateColumn}<${this.escapeDate(relativeDate(end))}`);
   }
-  const ignore = ['id', 'person_id'];
+  const ignore = ['id', 'person_id', 'remote_transaction_id'];
   /*
     TRANSACTION,
     TRANSACTION_INITIAL,
@@ -118,7 +115,7 @@ Worker.prototype.importTransactions = async function (options) {
     TRANSACTION_REFUND,
   */
 
-  const includes = ['m.person_id_int as person_id'].concat(desc.columns.map((d) => {
+  const includes = ['remote_transaction_id as remote_entry_id'].concat(desc.columns.map((d) => {
     if (ignore.indexOf(d.name) < 0) return `t.${this.escapeColumn(d.name)}`;
     return null;
   }).filter(Boolean));
@@ -126,7 +123,7 @@ Worker.prototype.importTransactions = async function (options) {
   if (desc.columns.find((d) => d.name === 'entry_type')
     || desc.columns.find((d) => d.name === 'entry_type_id')
   ) {
-    // We're okay -- if there's invalid data in those field we should know it
+    // We're okay -- if there's invalid data in those field we should know it and fix it
   } else if (desc.columns.find((d) => d.name === 'recurs')) {
     includes.push(`case when length(t.recurs)>0 
      then 'TRANSACTION_RECURRING'
@@ -137,9 +134,6 @@ Worker.prototype.importTransactions = async function (options) {
 
   const sql = `select ${includes.join(',')},
       '${plugin.id}' as plugin_id from ${table} t
-      left join ${globalPrefix}transaction_metadata m
-      on (t.remote_transaction_id=m.remote_transaction_id and
-        m.transaction_bot_id='${plugin.remote_plugin_id}')
        ${conditions.length > 0 ? `where ${conditions.join(' AND ')}` : ''}`;
   debug('importTransactions SQL:', sql);
 
