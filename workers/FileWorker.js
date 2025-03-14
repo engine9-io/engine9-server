@@ -228,7 +228,14 @@ Worker.prototype.fileToObjectStream = async function (options) {
       objectMode: true,
       transform(d, enc, cb) {
         if (!d) return cb();
-        const obj = JSON5.parse(d);
+        let obj;
+        try {
+          obj = JSON5.parse(d);
+        } catch (e) {
+          debug('Invalid line:');
+          debug(d);
+          throw e;
+        }
         /* JSONL could potentially start with an array of names,
         in which case we need to map the subsequent values
       */

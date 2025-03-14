@@ -240,7 +240,7 @@ const pluginA = {
   },
 };
 const pluginB = {
-  id: process.env.testingPluginId,
+  id: process.env.testingPluginIdB,
   type: 'local',
   name: 'Sample Testing Plugin B',
   path: 'engine9-testing/sql-plugin-timeline',
@@ -281,8 +281,9 @@ const rebuildAll = async function () {
       {
         filename: `${__dirname}/sample_data/person.csv`, defaultTimestamp: new Date(), defaultEntryType: 'FILE_IMPORT', inputId: process.env.testingInputId,
       },
-      { filename: `${__dirname}/sample_data/action.csv`, inputId: process.env.testingInputIdB },
-      { filename: `${__dirname}/sample_data/transaction.csv`, inputId: process.env.testingTransactionInputId },
+      // { filename: `${__dirname}/sample_data/action.csv`, inputId: process.env.testingInputIdB },
+      // { filename: `${__dirname}/sample_data/transaction.csv`,
+      // inputId: process.env.testingTransactionInputId },
     ];
 
     const files = await inputWorker.idFiles({

@@ -470,7 +470,7 @@ Worker.prototype.export = async function ({ bindings, include, exclude }) {
         });
         // eslint-disable-next-line no-await-in-loop
         batch.forEach((person) => {
-          this.push(JSON.stringify(person));
+          this.push(`${JSON.stringify(person)}\n`);
         });
 
         records += batch.length;
@@ -486,7 +486,7 @@ Worker.prototype.export = async function ({ bindings, include, exclude }) {
     fs.createWriteStream(filename),
   );
   sqlWorker.destroy();
-  return { filename, records };
+  return { filename, records, sql };
 };
 
 module.exports = Worker;

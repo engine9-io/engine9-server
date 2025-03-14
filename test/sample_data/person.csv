@@ -1,4 +1,4 @@
-person_id,given_name,family_name,email,phone,mobile_phone,birthdate,street_1,street_2,city,region,postal_code,country,avatar
+remote_person_id,given_name,family_name,email,phone,mobile_phone,birthdate,street_1,street_2,city,region,postal_code,country,avatar
 100000001,Lennie,Runolfsson,Leopold_Kunde@hotmail.com,997.552.9858,313.802.0946,-722809146517,600 S West Street Suite 601,,Boscotown,AR,72919,SZ,https://cloudflare-ipfs.com/ipfs/Qmd3W5DuhgHirLHGVixi6V76LhCkZUz6pnFt5AJBiyvHye/avatar/702.jpg
 100000001,Maria,Schowalter,Colby.Botsford@gmail.com,(260) 926-8374,(514) 885-4201 x017,866602060767,84915 Main Street E Apt. 667,,Lake Tylerstead,MN,55080,NE,https://avatars.githubusercontent.com/u/53957623
 100000005,Alysa,Rau,Morris_Kub41@gmail.com,1-886-811-6465 x8031,1-446-678-4551,-423065062545,7998 Monroe Street Suite 351,,Padbergboro,HI,96824,PE,https://cloudflare-ipfs.com/ipfs/Qmd3W5DuhgHirLHGVixi6V76LhCkZUz6pnFt5AJBiyvHye/avatar/350.jpg

@@ -45,15 +45,14 @@ describe('Pushing data out, and ingesting results', async () => {
         {
           table: 'person_identifier',
           columns: ['person_id'],
-          conditions: [
-            { eql: `source_input_id='${process.env.testingInputId}'` },
+          joins: [
+            {
+              table: 'input',
+              join_eql: `source_input_id=input.id AND input.plugin_id='${process.env.testingPluginId}'`,
+            },
           ],
-        },
-        {
-          table: 'person_email',
-          columns: ['person_id'],
           conditions: [
-            { eql: `source_input_id='${process.env.testingInputId}'` },
+            { eql: 'id_type=\'remote_person_id\'' },
           ],
         },
       ],
@@ -61,8 +60,8 @@ describe('Pushing data out, and ingesting results', async () => {
       ],
     };
 
-    const { filename, records } = await segmentWorker.export(exportConfig);
-    debug(`Exported ${filename}`);
+    const { filename, records, sql } = await segmentWorker.export(exportConfig);
+    debug(`Exported ${filename} with sql:`, sql);
     assert(records > 0, 'No records exported');
   });
 
