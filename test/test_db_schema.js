@@ -108,7 +108,7 @@ async function createSampleFiles() {
       const formId = Math.floor(Math.random() * transactionFormNames.length);
       transactionArray.push({
         remote_transaction_id: `trans_id.${counter}`,
-        entry_date: faker.date.past().toISOString(),
+        ts: faker.date.past().toISOString(),
         entry_type: 'TRANSACTION',
         remote_input_id: `form_${formId}`,
         remote_input_name: transactionFormNames[formId],
@@ -140,14 +140,6 @@ async function createSampleFiles() {
     actionFilename,
   };
   return output;
-}
-
-if (require.main === module) {
-  debug(`Creating ${count} fake transactions`);
-  (async () => {
-    // eslint-disable-next-line no-console
-    console.log(await createSampleFiles());
-  })();
 }
 
 async function drop(opts) {
@@ -267,6 +259,9 @@ const rebuildAll = async function () {
       if (plugins !== 2) {
         throw new Error('Not built');
       }
+      const { data: [{ timeline }] } = await schemaWorker.query('select count(*) as timeline from timeline');
+      if (timeline <= 0) throw new Error('Not built, no timeline entries');
+
       return { built: true };
     } catch (e) {
       // not built already
@@ -283,12 +278,17 @@ const rebuildAll = async function () {
     await inputWorker.ensurePlugin(pluginB);
     // make sure we use a fresh input
     const fileArray = [
-      { filename: `${__dirname}/sample_data/person.csv`, defaultEntryType: 'FILE_IMPORT', inputId: process.env.testingInputId },
+      {
+        filename: `${__dirname}/sample_data/person.csv`, defaultTimestamp: new Date(), defaultEntryType: 'FILE_IMPORT', inputId: process.env.testingInputId,
+      },
       { filename: `${__dirname}/sample_data/action.csv`, inputId: process.env.testingInputIdB },
       { filename: `${__dirname}/sample_data/transaction.csv`, inputId: process.env.testingTransactionInputId },
     ];
 
-    const files = await inputWorker.idFiles({ fileArray });
+    const files = await inputWorker.idFiles({
+      fileArray,
+      targetDirectory: `${__dirname}/sample_data/tmp`,
+    });
 
     await inputWorker.loadTimelineTables({
       ...files,
@@ -306,6 +306,10 @@ const rebuildAll = async function () {
   }
   return { complete: true };
 };
+
+if (require.main === module) {
+  rebuildAll();
+}
 
 module.exports = {
   run,

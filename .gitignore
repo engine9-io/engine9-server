@@ -5,6 +5,7 @@
 .google-service-account.json
 account-config.json
 .DS_Store
+test/sample_data/tmp/*
 # Logs
 logs
 *.log

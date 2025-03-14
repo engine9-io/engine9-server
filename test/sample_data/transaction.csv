@@ -1,4 +1,4 @@
-remote_transaction_id,entry_date,entry_type,remote_input_id,remote_input_name,email,amount,recurs,source_code
+remote_transaction_id,ts,entry_type,remote_input_id,remote_input_name,email,amount,recurs,source_code
 trans_id.1,2024-12-11T13:53:11.966Z,TRANSACTION,form_2,EOQ Transaction3,Nils_Howe66@hotmail.com,183.45,daily,EM_2023_X_123_B
 trans_id.2,2025-02-04T19:25:22.127Z,TRANSACTION,form_0,Donation1,Nils_Howe66@hotmail.com,19.41,annually,EM_2023_X_123_B
 trans_id.3,2024-12-29T18:24:29.637Z,TRANSACTION,form_1,Transaction2,Nils_Howe66@hotmail.com,18.66,,EM_2023_X_123_A

@@ -119,7 +119,7 @@ Worker.prototype.id = async function (options) {
   const worker = this;
 
   const {
-    filename, defaultEntryType, defaultTimestamp,
+    filename, defaultEntryType, defaultTimestamp, targetDirectory,
   } = options;
   const parts = filename.split('/');
   let { inputId, pluginId } = options;
@@ -198,7 +198,9 @@ Worker.prototype.id = async function (options) {
   const parquetSchema = new parquet.ParquetSchema(parquetSchemaDefinition);
 
   let outputFile;
-  if (filename.indexOf('/') === 0) {
+  if (targetDirectory) {
+    outputFile = targetDirectory.split('/').concat(`${parts.slice(-1)[0]}.id.parquet`).join('/');
+  } else if (filename.indexOf('/') === 0) {
     outputFile = `${filename}.id.parquet`;
   } else {
     outputFile = await getTempFilename({ postfix: '.id.parquet' });
@@ -213,9 +215,11 @@ Worker.prototype.id = async function (options) {
     ],
   });
   // for debugging
-  // writer.setRowGroupSize(1);
+  if (process.env.PARQUET_ROW_GROUP_SIZE) {
+    writer.setRowGroupSize(parseInt(process.env.PARQUET_ROW_GROUP_SIZE, 10));
+  }
 
-  const batcher = this.getBatchTransform({ batchSize: 500 }).transform;
+  const batcher = this.getBatchTransform({ batchSize: options.batchSize || 500 }).transform;
   let records = 0;
   let batches = 0;
   let minTimestamp = null;
@@ -252,7 +256,7 @@ Worker.prototype.id = async function (options) {
 
         batches += 1;
         records += batch.length;
-        if (batches % 10 === 0) debug(`Processed ${batches} batches, ${records} records`);
+        if (batches % 10 === 0) debug(`Processed ${batches} batches, ${records} records, sample:`, batch[0]);
         worker.markPerformance('start-entry-type-id');
         await worker.appendEntryTypeId({ batch, defaultEntryType });
         worker.markPerformance('start-source-code-id');
@@ -293,7 +297,9 @@ Worker.prototype.id = async function (options) {
       },
     }),
   );
+
   await writer.close();
+
   debug(`Finished writing ${outputFile}`);
 
   await fsp.rename(`${outputFile}${processId}`, `${outputFile}`);
@@ -336,6 +342,7 @@ Worker.prototype.id.metadata = {
     defaultTimestamp: {
       description: 'Default timestamp if not specified in the file',
     },
+    targetDirectory: { description: 'Put id files here, not in the same directory (default)' },
   },
 };
 
@@ -480,6 +487,7 @@ Worker.prototype.idFiles = async function (options) {
 
   // eslint-disable-next-line no-restricted-syntax
   for (const o of arr) {
+    const targetDirectory = o.targetDirectory || options.targetDirectory;
     const {
       inputId, pluginId, filename, defaultEntryType, defaultTimestamp,
     } = o;
@@ -496,7 +504,7 @@ Worker.prototype.idFiles = async function (options) {
     const {
       idFilename, minTimestamp, maxTimestamp,
     } = await this.id({
-      filename, inputId, pluginId, defaultEntryType, defaultTimestamp,
+      filename, inputId, pluginId, defaultEntryType, defaultTimestamp, targetDirectory,
     });
 
     await this.insertFromStream({
@@ -542,6 +550,7 @@ Worker.prototype.idFiles.metadata = {
     pluginId: {},
     defaultEntryType: {},
     defaultTimestamp: {},
+    targetDirectory: { description: 'Put id files here, not in the same directory (default)' },
   },
 };
 

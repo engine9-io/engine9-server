@@ -529,8 +529,13 @@ Worker.prototype.appendEntryId = async function ({
     if (!b.remote_entry_id && b.remote_transaction_id) {
       b.remote_entry_id = b.remote_transaction_id;
     }
-    if (!b.ts && defaultTimestamp) {
-      b.ts = defaultTimestamp;
+    if (!b.ts) {
+      if (defaultTimestamp) {
+        b.ts = defaultTimestamp;
+      } else {
+        debug(b);
+        throw new Error(`Cannot append timeline entry id, no 'ts' value, and no defaultTimestamp specified, object keys=${Object.keys(b)}`);
+      }
     }
     b.id = getTimelineEntryUUID(b, { defaults: { input_id: inputId } });
   });

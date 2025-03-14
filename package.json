@@ -11,8 +11,8 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.723.0",
     "@aws-sdk/client-sqs": "^3.730.0",
-    "@dsnp/parquetjs": "^1.8.5",
-    "@engine9/packet-tools": "^1.1.16",
+    "@dsnp/parquetjs": "^1.8.6",
+    "@engine9/packet-tools": "^1.1.17",
     "async": "^3.2.5",
     "async-mutex": "^0.5.0",
     "better-sqlite3": "^11.7.0",

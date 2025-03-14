@@ -8,7 +8,7 @@ const {
   describe,
 } = require('node:test');
 
-describe('Should write a sample file', async () => {
+describe('Should write a sample file then read it', async () => {
 // declare a schema for the `fruits` table
   const schema = new parquet.ParquetSchema({
     uuid: { type: 'BYTE_ARRAY' },
@@ -29,7 +29,7 @@ describe('Should write a sample file', async () => {
     name: 'apples',
     quantity: 10,
     price: 2.5,
-    date: new Date(),
+    ts: new Date(),
     in_stock: true,
   });
   await writer.appendRow({
@@ -37,9 +37,21 @@ describe('Should write a sample file', async () => {
     name: 'oranges',
     quantity: 10,
     price: 2.5,
-    date: new Date(),
+    ts: new Date(),
     in_stock: true,
   });
   await writer.close();
   debug(`Wrote ${filename}`);
+  const reader = await parquet.ParquetReader.openFile(filename);
+
+  // create a new cursor
+  const cursor = reader.getCursor();
+
+  // read all records from the file and print them
+  let record = null;
+  do {
+    // eslint-disable-next-line no-await-in-loop
+    record = await cursor.next();
+    debug('Read:', record);
+  } while (record);
 });
