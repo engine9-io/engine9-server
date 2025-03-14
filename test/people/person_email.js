@@ -53,7 +53,8 @@ describe('Insert File of people with options', async () => {
     await personWorker.loadPeople({ stream, inputId: process.env.testingInputId });
     const { data } = await sqlWorker.query('select * from person_email');
     const dupeEmail = data.filter((d) => d.email === 'dupe_email@y.com');
-    assert.equal(data.filter((d) => d.email === 'x@y.com').length, 1, 'Did not deduplicate on just email address');
+    const exes = data.filter((d) => d.email === 'x@y.com');
+    assert.equal(exes.length, 1, `There should only have been one x@y.com, there are ${exes.length}`);
     assert.equal(dupeEmail.length, 2, `There were ${dupeEmail.length} dupe_email@y.com addresses, should be 2 -- did not deduplicate correctly when there was a person_id`);
     assert.equal(data.filter((d) => d.email === 'dupe_email@y.com' && d.subscription_status === 'Unsubscribed').length, 2, 'Did not unsubscribe two email addresses');
     assert(data[0].email_hash_v1.length > 0, 'Did not hash the email');

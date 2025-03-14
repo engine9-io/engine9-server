@@ -13,7 +13,7 @@ const WorkerRunner = require('../../scheduler/WorkerRunner');
 const SQLWorker = require('../../workers/SQLWorker');
 const InputWorker = require('../../workers/InputWorker');
 const { deploy, truncate, insertDefaults } = require('../test_db_schema');
-const { createSampleActionFile } = require('../sample_data/generate_sample_data');
+const { createSampleActionFile } = require('../test_db_schema');
 
 describe('id and load multiple files', async () => {
   const accountId = 'test';

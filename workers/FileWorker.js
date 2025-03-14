@@ -11,7 +11,6 @@ const PacketTools = require('@engine9/packet-tools');
 const debug = require('debug')('FileWorker');
 // const through2 = require('through2');
 const csv = require('csv');
-const es = require('event-stream');
 const JSON5 = require('json5');// Useful for parsing extended JSON
 const languageEncoding = require('detect-file-encoding-and-language');
 const S3Worker = require('./file/S3Worker');
@@ -30,6 +29,30 @@ util.inherits(Worker, BaseWorker);
 Worker.metadata = {
   alias: 'file',
 };
+
+class LineReaderTransform extends Transform {
+  constructor(options = {}) {
+    super({ ...options, readableObjectMode: true });
+    this.buffer = '';
+  }
+
+  // eslint-disable-next-line no-underscore-dangle
+  _transform(chunk, encoding, callback) {
+    this.buffer += chunk.toString();
+    const lines = this.buffer.split(/\r?\n/);
+    this.buffer = lines.pop();
+    lines.forEach((line) => this.push(line));
+    callback();
+  }
+
+  // eslint-disable-next-line no-underscore-dangle
+  _flush(callback) {
+    if (this.buffer) {
+      this.push(this.buffer);
+    }
+    callback();
+  }
+}
 
 Worker.prototype.csvToObjectTransforms = function (options) {
   const transforms = [];
@@ -199,6 +222,8 @@ Worker.prototype.fileToObjectStream = async function (options) {
     */
     let headers = null;
 
+    const lineReader = new LineReaderTransform();
+
     const jsonlTransform = new Transform({
       objectMode: true,
       transform(d, enc, cb) {
@@ -225,7 +250,7 @@ Worker.prototype.fileToObjectStream = async function (options) {
       },
     });
 
-    transforms.push(es.split());
+    transforms.push(lineReader);
     transforms.push(jsonlTransform);
   } else {
     throw new Error(`Unsupported file type: ${postfix}`);

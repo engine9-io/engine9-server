@@ -169,7 +169,10 @@ Worker.prototype.getFilename.metadata = {
 
 // Clean up database pools
 Worker.prototype.destroy = function () {
-  if (typeof this.knex?.destroy === 'function') this.knex.destroy();
+  if (typeof this.knex?.destroy === 'function') {
+    debug(`***** Destroying Knex instance for account ${this.accountId}`);
+    this.knex.destroy();
+  }
 };
 
 Worker.prototype.markPerformance = function (name) {
