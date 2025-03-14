@@ -2,8 +2,11 @@ const { performance, PerformanceObserver } = require('node:perf_hooks');
 const util = require('node:util');
 const { pipeline } = require('node:stream/promises');
 const { createHash } = require('node:crypto');
+const fs = require('node:fs');
 const { Transform } = require('node:stream');
 const debug = require('debug')('PersonWorker');
+const JSON5 = require('json5');
+const { getTempFilename } = require('@engine9/packet-tools');
 
 const { v7: uuidv7 } = require('uuid');
 
@@ -177,12 +180,11 @@ Worker.prototype.assignIdsBlocking = async function ({ batch }) {
   return batch;
 };
 Worker.prototype.getSQLWorker = async function () {
-  let { sqlWorker } = this;
-  if (!sqlWorker) {
-    sqlWorker = new SQLWorker(this);
-    await sqlWorker.connect();
+  if (!this.sqlWorker) {
+    this.sqlWorker = new SQLWorker(this);
+    await this.sqlWorker.connect();
   }
-  return sqlWorker;
+  return this.sqlWorker;
 };
 
 Worker.prototype.appendPersonId = async function ({ batch, sourceInputId }) {
@@ -340,7 +342,7 @@ Worker.prototype.loadPeople = async function (options) {
         if ((records % 25000) === 0) {
           worker.progress(`Completed ${records} records, ${ps} per second`);
         }
-        debug(`Processed batch of length ${batch.length} Total records:${records} ${ps} per second, Sample:`, batch[0]);
+        debug(`loadPeople processed batch of length ${batch.length} Total records:${records} ${ps} per second, Sample:`, batch[0]);
         cb();
       },
     }),
@@ -405,6 +407,86 @@ Worker.prototype.internalLoadPeopleFromDatabase = async function (options) {
     extraPreIdentityTransforms,
     extraPostIdentityTransforms,
   });
+};
+
+Worker.prototype.getPersonExportSQL = async function ({ include, exclude, count = false }) {
+  const sqlWorker = await this.getSQLWorker();
+  const clauses = [];
+  // eslint-disable-next-line no-restricted-syntax
+  for (const eql of include) {
+    // Check for a column with person_id
+    const personId = eql.columns.find((d) => d === 'person_id' || d.name === 'person_id');
+    if (!personId) throw new Error(`Error with a subquery, there is no required person_id column defined for include ${JSON5.stringify(eql)}`);
+    // eslint-disable-next-line no-await-in-loop
+    const sql = await sqlWorker.buildSqlFromEQLObject(eql);
+    clauses.push(`id in (${sql})`);
+  }
+  // eslint-disable-next-line no-restricted-syntax
+  for (const eql of exclude) {
+    // Check for a column with person_id
+    const personId = eql.columns.find((d) => d === 'person_id' || d.name === 'person_id');
+    if (!personId) throw new Error(`Error with a subquery, there is no required person_id column defined for include ${JSON5.stringify(eql)}`);
+    // eslint-disable-next-line no-await-in-loop
+    const sql = await sqlWorker.buildSqlFromEQLObject(eql);
+    clauses.push(`id not in (${sql})`);
+  }
+
+  const sql = `select ${count ? 'count(id) as people' : 'id as person_id'} from person 
+    ${clauses.length > 0 ? ` WHERE ${clauses.join('\n AND ')}` : ''}`;
+  return sql;
+};
+
+Worker.prototype.export = async function ({ bindings, include, exclude }) {
+  const worker = this;
+  const sqlWorker = await this.getSQLWorker();
+  const sql = await this.getPersonExportSQL({ include, exclude });
+  const pipelineCache = {};
+
+  let records = 0;
+  const start = new Date().getTime();
+  const batchSize = 300;
+  const filename = await getTempFilename({ accountId: this.accountId, postfix: '.jsonl' });
+  const sqlStream = await sqlWorker.stream({ sql });
+  await pipeline(
+    sqlStream,
+    this.getBatchTransform({ batchSize }).transform,
+    new Transform({
+      objectMode: true,
+      async transform(batch, encoding, cb) {
+        // eslint-disable-next-line no-await-in-loop
+        const { boundItems } = await worker.resolveBindings({
+          bindings,
+          pipeline: pipelineCache,
+          path: 'Data Export',
+          batch,
+        });
+
+        const personIdMap = batch.reduce((a, b) => { a[b.person_id] = b; return a; }, {});
+        Object.entries(boundItems).forEach(([key, items]) => {
+          items.forEach((item) => {
+            const p = personIdMap[item.person_id];
+            if (p) p[key] = (p[key] || []).concat(item);
+          });
+        });
+        // eslint-disable-next-line no-await-in-loop
+        batch.forEach((person) => {
+          this.push(JSON.stringify(person));
+        });
+
+        records += batch.length;
+        const end = new Date().getTime();
+        const ps = ((1000 * records) / (end - start)).toFixed(1);
+        if ((records % 25000) === 0) {
+          worker.progress(`Completed ${records} records, ${ps} per second`);
+        }
+        debug(`Export processed batch of length ${batch.length} Total records:${records} ${ps} per second, Sample:`, batch[0]);
+        cb();
+      },
+    }),
+    fs.createWriteStream(filename),
+  );
+  sqlWorker.destroy();
+  return { filename, records };
 };
 
 module.exports = Worker;

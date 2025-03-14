@@ -4,18 +4,16 @@ const util = require('util');
 // const debug = require('debug')('SegmentWorker');
 // const debugInfo = require('debug')('info:SegmentWorker');
 
-const JSON5 = require('json5');// Useful for parsing extended JSON
-
-const SQLWorker = require('./SQLWorker');
+const PersonWorker = require('./PersonWorker');
 
 require('dotenv').config({ path: '.env' });
 
 function Worker(worker) {
-  SQLWorker.call(this, worker);
+  PersonWorker.call(this, worker);
   this.accountId = worker.accountId;
 }
 
-util.inherits(Worker, SQLWorker);
+util.inherits(Worker, PersonWorker);
 
 /*
   Get all the configuration for the segment
@@ -28,30 +26,6 @@ Worker.prototype.getSegment = async function (options) {
   const { data } = await this.query({ sql: 'select * from segment where id=?', values: [options.id] });
   if (data.length === 0) throw new Error(`Could not find segment ${options.id}`);
   return data[0];
-};
-
-Worker.prototype.getSQL = async function ({ include, exclude, count = false }) {
-  const clauses = [];
-  // eslint-disable-next-line no-restricted-syntax
-  for (const eql of include) {
-    // Check for a column with person_id
-    const personId = eql.columns.find((d) => d === 'person_id' || d.name === 'person_id');
-    if (!personId) throw new Error(`Error with a subquery, there is no required person_id column defined for include ${JSON5.stringify(eql)}`);
-    const sql = await this.buildSqlFromEQLObject(eql);
-    clauses.push(`id in (${sql})`);
-  }
-  // eslint-disable-next-line no-restricted-syntax
-  for (const eql of exclude) {
-    // Check for a column with person_id
-    const personId = eql.columns.find((d) => d === 'person_id' || d.name === 'person_id');
-    if (!personId) throw new Error(`Error with a subquery, there is no required person_id column defined for include ${JSON5.stringify(eql)}`);
-    const sql = await this.buildSqlFromEQLObject(eql);
-    clauses.push(`id not in (${sql})`);
-  }
-
-  const sql = `select ${count ? 'count(id) as people' : 'id as person_id'} from person 
-    ${clauses.length > 0 ? ` WHERE ${clauses.join('\n AND ')}` : ''}`;
-  return sql;
 };
 
 /*
@@ -149,7 +123,7 @@ Worker.prototype.count = async function (options) {
   }
 
   // just run a count
-  const sql = await this.getSQL({ ...segment, count: true });
+  const sql = await this.getPersonExportSQL({ ...segment, count: true });
   const { data } = await this.query({ sql });
 
   return {
@@ -168,14 +142,6 @@ Worker.prototype.count.metadata = {
     query: {},
   },
 };
-
-/*
-Worker.prototype.getSampleFields = async function () {
-
-  this.describe(`person_email`
-
-};
-*/
 
 Worker.prototype.sample = async function (queryProp) {
   const whereClause = await this.buildSQLFromQuery(queryProp);

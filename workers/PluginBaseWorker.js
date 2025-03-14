@@ -29,10 +29,15 @@ util.inherits(Worker, SchemaWorker);
   Core method that takes an extension configuration,
   creates all the environment variables, including SQL, etc
 */
+/*
+Not sure this is actually used anywhere -- commenting out to figure out
 
-const validPaths = /^[a-zA-Z-_]+$/; // Don't allow dots or anything crazy in path names - simple simple
+// Don't allow dots or anything crazy in path names - simple simple
+const validPaths = /^[a-zA-Z-_]+$/;
 Worker.prototype.compilePlugin = async function ({ extensionPath }) {
-  if (!extensionPath?.match(validPaths)) throw new Error(`Invalid extension path: ${extensionPath}`);
+  if (!extensionPath?.match(validPaths)){
+  throw new Error(`Invalid extension path: ${extensionPath}`);
+  }
   // eslint-disable-next-line import/no-dynamic-require,global-require
   const config = require(`./${extensionPath}/engine9_extension.js`);
 
@@ -70,6 +75,7 @@ Worker.prototype.compilePlugin = async function ({ extensionPath }) {
     return { streams };
   });
 };
+*/
 
 /*
   The input id is either stored in the database, or generated and
@@ -181,6 +187,63 @@ Worker.prototype.compilePipeline = async function (_pipeline) {
   return { transforms };
 };
 
+Worker.prototype.resolveBindings = async function ({
+  bindings, pipeline, path, batch, tablesToUpsert,
+}) {
+  pipeline.bindings = pipeline.bindings || {};
+  const boundItems = {};
+
+  const sqlComment = path.replace(/^[a-zA-Z/_-]*/, '_');
+  /*
+      Bindings are the heart of getting data into and out of a transform.  Bindings allow for
+      including and comparing existing data, allowing setups for upserting data,
+      as well as outputs of timeline entries, etc.
+      */
+  const bindingNames = Object.keys(bindings);
+  // eslint-disable-next-line no-await-in-loop
+  await Promise.all(bindingNames.map(async (name) => {
+    const binding = bindings[name];
+    if (!binding.type) {
+      debug(`Error with binding:${JSON.stringify(binding)}`);
+      throw new Error(`type is required for binding ${name}, not found in ${JSON.stringify(Object.keys(binding))}`);
+    }
+    if (pipeline.bindings[name]) {
+      boundItems[name] = pipeline.bindings[name];
+    } else if (binding.type === 'packet.output.timeline') {
+      const {
+        stream: timelineStream, promises,
+        files,
+      } = await getTimelineOutputStream({});
+      debug(`Creating a new output timeline for binding ${name}`);
+      pipeline.bindings[name] = timelineStream;
+      pipeline.newStreams = pipeline.newStreams.concat(timelineStream);
+      pipeline.promises = pipeline.promises.concat(promises || []);
+      pipeline.files = pipeline.files.concat(files);
+      boundItems[name] = timelineStream;
+    } else if (binding.type === 'sql.query') {
+      if (!binding.lookup) throw new Error(`lookup as an array is required for binding ${name}`);
+      if (binding.lookup.length !== 1) throw new Error(`Currently only one lookup column is allowed for sql.query bindings, found ${binding.lookup.length} for ${name}`);
+      const values = new Set();
+      batch.forEach((b) => {
+        const v = b[binding.lookup[0]];
+        if (v) values.add(v);
+      });
+      if (values.size === 0) {
+        boundItems[name] = [];
+        return;
+      }
+      const sql = `/* ${sqlComment} */ select * from ${this.escapeTable(binding.table)}`
+          + ` where ${this.escapeColumn(binding.lookup[0])} in (${[...values].map(() => '?').join(',')})`;
+      const { data } = await this.query({ sql, values: [...values] });
+      boundItems[name] = data;
+    } else if (binding.type === 'sql.tables.upsert') {
+      if (!tablesToUpsert) throw new Error("This series of transforms don't allow for sql.tables.upsert");
+      boundItems[name] = tablesToUpsert;
+    }
+  }));
+  return { boundItems };
+};
+
 Worker.prototype.executeCompiledPipeline = async function ({
   pipeline, batch, sourceInputId, pluginId,
 }) {
@@ -194,8 +257,8 @@ Worker.prototype.executeCompiledPipeline = async function ({
   // output files
   pipeline.files = pipeline.files || [];
 
-  const tablesToUpsert = {};
   const summary = { records: batch.length, executionTime: {} };
+  const tablesToUpsert = {};
 
   // eslint-disable-next-line no-restricted-syntax
   for (const {
@@ -207,53 +270,20 @@ Worker.prototype.executeCompiledPipeline = async function ({
           transform, bindings, options, path,
         })}`);
       }
-      const cleanPath = path.replace(/^[a-zA-Z/_-]*/, '_');
-      const transformArguments = {
-        batch, options, sourceInputId, pluginId,
-      };
-      const bindingNames = Object.keys(bindings);
-      /*
-      Bindings are the heart of getting data into and out of a transform.  Bindings allow for
-      including and comparing existing data, allowing setups for upserting data,
-      as well as outputs of timeline entries, etc.
-      */
+
       // eslint-disable-next-line no-await-in-loop
-      await Promise.all(bindingNames.map(async (name) => {
-        const binding = bindings[name];
-        if (!binding.type) throw new Error(`type is required for binding ${name}`);
-        if (pipeline.bindings[name]) {
-          transformArguments[name] = pipeline.bindings[name];
-        } else if (binding.type === 'packet.output.timeline') {
-          const {
-            stream: timelineStream, promises,
-            files,
-          } = await getTimelineOutputStream({});
-          debug(`Creating a new output timeline for binding ${name}`);
-          pipeline.bindings[name] = timelineStream;
-          pipeline.newStreams = pipeline.newStreams.concat(timelineStream);
-          pipeline.promises = pipeline.promises.concat(promises || []);
-          pipeline.files = pipeline.files.concat(files);
-          transformArguments[name] = timelineStream;
-        } else if (binding.type === 'sql.query') {
-          if (!binding.lookup) throw new Error(`lookup as an array is required for binding ${name}`);
-          if (binding.lookup.length !== 1) throw new Error(`Currently only one lookup column is allowed for sql.query bindings, found ${binding.lookup.length} for ${name}`);
-          const values = new Set();
-          batch.forEach((b) => {
-            const v = b[binding.lookup[0]];
-            if (v) values.add(v);
-          });
-          if (values.size === 0) {
-            transformArguments[name] = [];
-            return;
-          }
-          const sql = `/* ${cleanPath} */ select * from ${this.escapeTable(binding.table)}`
-          + ` where ${this.escapeColumn(binding.lookup[0])} in (${[...values].map(() => '?').join(',')})`;
-          const { data } = await this.query({ sql, values: [...values] });
-          transformArguments[name] = data;
-        } else if (binding.type === 'sql.tables.upsert') {
-          transformArguments[name] = tablesToUpsert;
-        }
-      }));
+      const { boundItems } = await this.resolveBindings({
+        bindings, pipeline, tablesToUpsert, path, batch,
+      });
+
+      const transformArguments = {
+        ...boundItems,
+        batch,
+        options,
+        sourceInputId,
+        pluginId,
+      };
+
       const start = new Date().getTime();
       // eslint-disable-next-line no-await-in-loop
       await transform(transformArguments);
