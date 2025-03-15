@@ -172,17 +172,6 @@ function getIntArray(s, nonZeroLength) {
   return a;
 }
 
-function getStringArray(s, nonZeroLength) {
-  let a = s || [];
-  if (typeof a === 'number') a = String(a);
-  if (typeof a === 'string') a = [a];
-
-  if (typeof s === 'string') a = s.split(',');
-  a = a.map((x) => x.toString().trim()).filter(Boolean);
-  if (nonZeroLength && a.length === 0) a = [0];
-  return a;
-}
-
 /*
         generate a unique hexadecimal key
 */
@@ -307,6 +296,17 @@ function analyzeTypeToParquet(t) {
     default:
       return { type: 'UTF8', map: (v) => v };
   }
+}
+
+function getStringArray(s, nonZeroLength) {
+  let a = s || [];
+  if (typeof a === 'number') a = String(a);
+  if (typeof a === 'string') a = [a];
+
+  if (typeof s === 'string') a = s.split(',');
+  a = a.map((x) => x.toString().trim()).filter(Boolean);
+  if (nonZeroLength && a.length === 0) a = [0];
+  return a;
 }
 
 module.exports = {

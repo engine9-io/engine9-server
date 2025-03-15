@@ -1,11 +1,14 @@
+/* eslint-disable no-await-in-loop */
 const fs = require('node:fs');
 
 const fsp = fs.promises;
 const zlib = require('node:zlib');
 const util = require('node:util');
-const { Readable, Transform, PassThrough } = require('node:stream');
-
+const {
+  Readable, Transform, PassThrough, Writable,
+} = require('node:stream');
 const { pipeline } = require('node:stream/promises');
+const { createHash } = require('node:crypto');
 const { stringify } = require('csv');
 const PacketTools = require('@engine9/packet-tools');
 const debug = require('debug')('FileWorker');
@@ -17,7 +20,7 @@ const S3Worker = require('./file/S3Worker');
 const ParquetWorker = require('./ParquetWorker');
 const analyzeStream = require('../utilities/analyze');
 
-const { bool } = require('../utilities');
+const { bool, getStringArray } = require('../utilities');
 const BaseWorker = require('./BaseWorker');
 
 function Worker(worker) {
@@ -585,6 +588,61 @@ Worker.prototype.head.metadata = {
   options: {
     filename: { required: true },
   },
+};
+
+Worker.prototype.getUniqueStream = async function (options) {
+  const existingFiles = getStringArray(options.existingFiles);
+  const identityFunction = options.identityFunction || ((o) => JSON.stringify(o));
+  const identitySet = new Set();
+  // eslint-disable-next-line no-restricted-syntax, guard-for-in
+  for (const filename of existingFiles) {
+    const { stream: existsStream } = await this.fileToObjectStream({ filename });
+    await pipeline(
+      existsStream,
+      new Transform({
+        objectMode: true,
+        transform(d, enc, cb) {
+          const v = createHash('md5').update((identityFunction(d) || '').toString()).digest('hex');
+          identitySet.add(v);
+          cb(null, d);
+        },
+      }),
+      new Writable({
+        objectMode: true,
+        write(d, enc, cb) {
+          cb();
+        },
+      }),
+    );
+    debug(`Finished loading ${filename}`);
+  }
+  const { stream: inStream } = await this.fileToObjectStream(options);
+  const uniqueStream = inStream.pipe(
+    new Transform({
+      objectMode: true,
+      transform(d, enc, cb) {
+        const v = createHash('md5').update((identityFunction(d) || '').toString()).digest('hex');
+        if (identitySet.has(v)) {
+          // do nothing
+          cb();
+        } else {
+          identitySet.add(v);
+          cb(null, d);
+        }
+      },
+    }),
+  );
+  return { stream: uniqueStream };
+};
+
+Worker.prototype.getUniqueStream.metadata = {
+  options: {
+    existingFiles: {},
+    filename: {},
+    stream: {},
+    identityFunction: {},
+  },
+
 };
 
 module.exports = Worker;
