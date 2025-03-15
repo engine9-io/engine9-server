@@ -21,24 +21,22 @@ describe('Pushing data out, and ingesting results', async () => {
   it('Should be able to turn a configuration into a query', async () => {
     const exportConfig = {
       bindings: {
-        phones: {
+        /* phones: {
           type: 'sql.query',
           table: 'person_phone',
           lookup: ['person_id'],
-          /* conditions: [
+           conditions: [
             { eql: `source_input_id='${process.env.testingInputId}'` },
           ],
-          */
         },
+        */
         remote_ids: {
           type: 'sql.query',
           table: 'person_identifier',
           lookup: ['person_id'],
-          /*
           conditions: [
             { eql: 'id_type=\'remote_person_id\'' },
           ],
-          */
         },
       },
       include: [

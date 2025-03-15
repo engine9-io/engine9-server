@@ -193,7 +193,6 @@ Worker.prototype.resolveBindings = async function ({
   pipeline.bindings = pipeline.bindings || {};
   const boundItems = {};
 
-  const sqlComment = path.replace(/^[a-zA-Z/_-]*/, '_');
   /*
       Bindings are the heart of getting data into and out of a transform.  Bindings allow for
       including and comparing existing data, allowing setups for upserting data,
@@ -232,8 +231,22 @@ Worker.prototype.resolveBindings = async function ({
         boundItems[name] = [];
         return;
       }
-      const sql = `/* ${sqlComment} */ select * from ${this.escapeTable(binding.table)}`
-          + ` where ${this.escapeColumn(binding.lookup[0])} in (${[...values].map(() => '?').join(',')})`;
+      const query = {
+        table: binding.table,
+        columns: binding.columns || ['*'],
+        joins: binding.joins,
+        conditions: [
+          { eql: `${this.escapeColumn(binding.lookup[0])} in (${[...values].map(() => '\'??\'').join(',')})` },
+        ].concat(binding.conditions || []),
+      };
+      let sql = await this.buildSqlFromEQLObject(query);
+
+      /// const sql = `/* ${sqlComment} */ select * from ${this.escapeTable(binding.table)}
+      //    where ${this.escapeColumn(binding.lookup[0])}
+      //   in (${[...values].map(() => '?').join(',')})`;
+      const sqlComment = path.replace(/^[a-zA-Z/_-]*/, '_');
+      sql = `/* ${sqlComment} */ ${sql.replace(/'\?\?'/g, '?')}`;
+
       const { data } = await this.query({ sql, values: [...values] });
       boundItems[name] = data;
     } else if (binding.type === 'sql.tables.upsert') {
